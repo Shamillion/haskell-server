@@ -6,10 +6,10 @@ module News where
 
 import Data.Aeson
 import Data.List as LT                 (find) 
-import Database.PostgreSQL.Simple
+import Data.String                   (fromString)
+import Database.PostgreSQL.Simple as S
 import Data.Monoid                     ((<>))
 import qualified Data.Text as T hiding (last)
-import Data.Text.Encoding              (encodeUtf8)
 import qualified Data.ByteString.Lazy.Char8 as LC
 import GHC.Generics
 import System.IO.Unsafe                (unsafePerformIO)
@@ -77,15 +77,18 @@ getParentCategories cat = unsafePerformIO $ do
           _       -> pc 
   pure $ filter (/="Null") $ buildingList [cat]
 
-setMethodNews :: [(T.Text, Maybe T.Text)] -> Query     
-setMethodNews ls = " WHERE " <> "title LIKE '%'"
-  --case mthd of
-  --"created_at" -> "creation_date = '" <> fromMaybe param <> "'" 
-  --_            -> "title LIKE '%'"
-  --where
-    --fromMaybe (Just e) = e
-    --fromMaybe Nothing  = "Null"
-
+setMethodNews :: [(T.Text, Maybe T.Text)] -> Query    
+setMethodNews [(mthd, param)] = " WHERE " <>  
+  case mthd of
+  "created_at"     -> creationDate "="
+  "created_at__lt" -> creationDate "<"
+  "created_at__gt" -> creationDate ">"
+  "author" -> "name_user = '" <> fromMaybe param <> "'" 
+  _ -> "title LIKE '%'"
+  where
+    fromMaybe (Just e) =  fromString $ T.unpack e
+    fromMaybe Nothing  = "Null"
+    creationDate x = "News.creation_date " <> x <> " '" <> fromMaybe param <> "'"
 
 
 

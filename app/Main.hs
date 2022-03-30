@@ -29,7 +29,7 @@ setQueryAndRespond req = case entity of
   _       -> (getAuthor, encode . (map parseAuthor))
   where
     [entity] = pathInfo req 
-    method   = queryString req
+    method   = queryToQueryText $ queryString req
 
 
        
