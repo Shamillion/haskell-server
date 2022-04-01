@@ -36,8 +36,8 @@ setQueryAndRespond req = case entity of
 app :: Application
 app req respond = do
     let (qry,resp) = setQueryAndRespond req
-    conn <- connectPostgreSQL "host='localhost' port=5432 dbname='serverdb' \
-                                            \ user='haskell' password='haskell'"
+    conn <- connectPostgreSQL "host='localhost' port=5432 \ 
+               \ dbname='haskellserverlite' user='haskell' password='haskell'"
     val <- query_ conn qry :: IO [[T.Text]]     
     print $ pathInfo req 
     print $ queryToQueryText $ queryString req 
