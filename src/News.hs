@@ -13,7 +13,7 @@ import qualified Data.Text as T hiding (last)
 import qualified Data.ByteString.Lazy.Char8 as LC
 import GHC.Generics
 import System.IO.Unsafe                (unsafePerformIO)
-import Author
+import User
 import Db
 
 
@@ -21,53 +21,47 @@ import Db
 getNews :: Query -> Query
 getNews str = 
   "SELECT DISTINCT substring(title from 1 for 12), (news.creation_date :: TEXT), \
-   \ (author_ :: TEXT), name_category, (ARRAY_AGG(DISTINCT name_tag) :: TEXT), \
-   \ substring(content from 1 for 12), main_photo, (photo :: TEXT) \
-   \ FROM news_publish \    
-   \ INNER JOIN news ON news_publish.news_id = news.news_id \   
-   \ INNER JOIN tag ON news_publish.tag_id = tag.tag_id \
+   \ (author :: TEXT), name_category, substring(content from 1 for 12), \ 
+   \ (photo :: TEXT), (is_published :: TEXT) \
+   \ FROM news \ 
    \ INNER JOIN category ON news.category_id = category.category_id \
-   \ INNER JOIN ( SELECT  author.author_id, name_user, surname_user, avatar, \
-   \ users.creation_date, is_admin, description_author \
-   \ FROM news \
-   \ INNER JOIN  author ON news.author_id = author.author_id \  
-   \ INNER JOIN  users ON users.user_id  = author.user_id \
-   \ ) author_ ON news.author_id = author_.author_id "                        
+   \ INNER JOIN ( SELECT  user_id, name_user, users.creation_date, is_admin, \
+   \ is_author \
+   \ FROM users ) author ON news.user_id = author.user_id "                        
    <> str <>  -- WHERE title LIKE '%' 
-   " GROUP BY title, news.creation_date, author_, name_category, \
-   \ main_photo, photo, content;"
+   " GROUP BY title, news.creation_date, author, name_category, \
+   \ photo, content, is_published;"
 
 data News = News
   { title         :: T.Text
   , creation_date :: T.Text
-  , author        :: Author
-  , category      :: [T.Text] 
-  , tags          :: [T.Text] 
-  , content       :: T.Text
-  , main_photo    :: T.Text
+  , author        :: User
+  , category      :: [T.Text]   
+  , content       :: T.Text  
   , photo         :: [T.Text]  
+  , is_published  :: Bool
   }
    deriving (Show, Generic, ToJSON)
 
 errorNews :: News
-errorNews =  News "error" "error" errorAuthor ["error"] 
-                         ["error"] "error" "error" ["error"]   
+errorNews =  News "error" "error" errorUser ["error"] "error" ["error"] False  
 
 parseNews :: [T.Text] -> News
 parseNews ls
-  | length ls /= 8 = errorNews
-  | otherwise = News n1 n2 author cats tags n6 n7 pht 
+  | length ls /= 7 = errorNews
+  | otherwise = News n1 n2 author cats n5 pht isPbl 
   where 
-    [n1,n2,n3,n4,n5,n6,n7,n8] = ls
+    [n1,n2,n3,n4,n5,n6,n7] = ls
     splitText = T.splitOn "," . T.tail . T.init 
-    author = parseAuthor $ splitText n3
+    author = parseUser $ splitText n3
     cats = getParentCategories n4
-    pht = splitText n8
-    tags = splitText n5
+    pht = splitText n6
+    isPbl = n7 == "t"
+    
 
 getParentCategories :: T.Text -> [T.Text] 
 getParentCategories cat = unsafePerformIO $ do
-  conn <- connectPostgreSQL "host='localhost' port=5432 dbname='serverdb' \
+  conn <- connectPostgreSQL "host='localhost' port=5432 dbname='haskellserverlite' \
                              \ user='haskell' password='haskell'"
   ls <- query_ conn $ getCategory :: IO [[T.Text]]
   let buildingList pc = do
@@ -80,9 +74,9 @@ getParentCategories cat = unsafePerformIO $ do
 setMethodNews :: [(T.Text, Maybe T.Text)] -> Query    
 setMethodNews [(mthd, param)] = " WHERE " <>  
   case mthd of
-  "created_at"     -> creationDate "="
-  "created_at__lt" -> creationDate "<"
-  "created_at__gt" -> creationDate ">"
+  "created_at"    -> creationDate "="
+  "created_until" -> creationDate "<"
+  "created_since" -> creationDate ">="
   "author" -> "name_user = '" <> fromMaybe param <> "'" 
   _ -> "title LIKE '%'"
   where
