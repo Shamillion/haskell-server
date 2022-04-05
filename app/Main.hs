@@ -16,17 +16,17 @@ import           Network.HTTP.Types              (status200, queryToQueryText)
 import           Network.Wai                as W
 import           Network.Wai.Handler.Warp        (run)
 import           Database.PostgreSQL.Simple as DB    
-import           Author
+import           User
 import           Db
 import           News
-
+--import           Data.ByteString.Base64
    
 
 
 setQueryAndRespond :: W.Request -> (DB.Query, ([[T.Text]] -> LC.ByteString))
 setQueryAndRespond req = case entity of
-  "posts" -> (getNews (setMethodNews method), encode . (map parseNews))
-  _       -> (getAuthor, encode . (map parseAuthor))
+  "news" -> (getNews (setMethodNews method), encode . (map parseNews))
+  _      -> (getUser, encode . (map parseUser))
   where
     [entity] = pathInfo req 
     method   = queryToQueryText $ queryString req

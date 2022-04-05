@@ -25,10 +25,10 @@ source-repository head
 
 library
   exposed-modules:
-      Author
       Db
       Lib
       News
+      User
   other-modules:
       Paths_haskell_server
   hs-source-dirs:

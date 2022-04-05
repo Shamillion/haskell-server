@@ -27,8 +27,8 @@ getNews str =
    \ INNER JOIN category ON news.category_id = category.category_id \
    \ INNER JOIN ( SELECT  user_id, name_user, users.creation_date, is_admin, \
    \ is_author \
-   \ FROM users ) author ON news.user_id = author.user_id "                        
-   <> str <>  -- WHERE title LIKE '%' 
+   \ FROM users ) author ON news.user_id = author.user_id \                        
+   \ WHERE " <> str <>  -- WHERE title LIKE '%' 
    " GROUP BY title, news.creation_date, author, name_category, \
    \ photo, content, is_published;"
 
@@ -71,15 +71,20 @@ getParentCategories cat = unsafePerformIO $ do
           _       -> pc 
   pure $ filter (/="Null") $ buildingList [cat]
 
-setMethodNews :: [(T.Text, Maybe T.Text)] -> Query    
-setMethodNews [(mthd, param)] = " WHERE " <>  
-  case mthd of
-  "created_at"    -> creationDate "="
-  "created_until" -> creationDate "<"
-  "created_since" -> creationDate ">="
-  "author" -> "name_user = '" <> fromMaybe param <> "'" 
-  _ -> "title LIKE '%'"
+
+setMethodNews :: [(T.Text, Maybe T.Text)] -> Query   
+setMethodNews [] = "title LIKE '%'" 
+setMethodNews ((mthd, param):xs) 
+      | xs == [] = choiceMethod 
+      | otherwise = choiceMethod  <> " AND " <> setMethodNews xs
   where
+    choiceMethod =
+      case mthd of
+        "created_at"    -> creationDate "="
+        "created_until" -> creationDate "<"
+        "created_since" -> creationDate ">="
+        "author" -> "name_user = '" <> fromMaybe param <> "'" 
+        _ -> "title LIKE '%'"            
     fromMaybe (Just e) =  fromString $ T.unpack e
     fromMaybe Nothing  = "Null"
     creationDate x = "News.creation_date " <> x <> " '" <> fromMaybe param <> "'"
