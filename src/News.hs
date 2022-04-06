@@ -84,6 +84,7 @@ setMethodNews ((mthd, param):xs)
         "created_until" -> creationDate "<"
         "created_since" -> creationDate ">="
         "author" -> "name_user = '" <> fromMaybe param <> "'" 
+        "category" -> "News.category_id = " <> fromMaybe param
         _ -> "title LIKE '%'"            
     fromMaybe (Just e) =  fromString $ T.unpack e
     fromMaybe Nothing  = "Null"
