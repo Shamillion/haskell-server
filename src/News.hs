@@ -5,7 +5,7 @@ module News where
 
 
 import Data.Aeson
-import Data.List as LT                 (find) 
+import Data.List as LT                 (find, filter) 
 import Data.String                   (fromString)
 import Database.PostgreSQL.Simple as S
 import Data.Monoid                     ((<>))
@@ -18,7 +18,7 @@ import Db
 
 
 
-getNews :: Query -> Query
+getNews :: (Query, Query) -> Query
 getNews str = 
   "SELECT DISTINCT substring(title from 1 for 12), (news.creation_date :: TEXT), \
    \ (author :: TEXT), name_category, substring(content from 1 for 12), \ 
@@ -28,9 +28,9 @@ getNews str =
    \ INNER JOIN ( SELECT  user_id, name_user, users.creation_date, is_admin, \
    \ is_author \
    \ FROM users ) author ON news.user_id = author.user_id \                        
-   \ WHERE " <> str <>  -- WHERE title LIKE '%' 
+   \ WHERE " <> fst str <>  -- WHERE title LIKE '%' 
    " GROUP BY title, news.creation_date, author, name_category, \
-   \ photo, content, is_published;"
+   \ photo, content, is_published "  <> snd str
 
 data News = News
   { title         :: T.Text
@@ -72,19 +72,42 @@ getParentCategories cat = unsafePerformIO $ do
   pure $ filter (/="Null") $ buildingList [cat]
 
 
-setMethodNews :: [(T.Text, Maybe T.Text)] -> Query   
-setMethodNews [] = "title LIKE '%'" 
-setMethodNews ((mthd, param):xs) 
-      | xs == [] = choiceMethod 
-      | otherwise = choiceMethod  <> " AND " <> setMethodNews xs
+setMethodNews :: [(T.Text, Maybe T.Text)] -> (Query, Query)
+setMethodNews ls = (filterNews, sortNews)
   where
-    choiceMethod =
+    filterNews = setFiltersNews $ LT.filter ((/="sort_by") . fst) ls
+    sortNews = 
+      case findSort of
+        [("sort_by", Just x)] -> sortBy x
+        _ -> ";"
+    findSort = LT.filter ((=="sort_by") . fst) ls
+
+sortBy :: T.Text -> Query 
+sortBy mthd = fromString $ "ORDER BY " <>
+  case mthd of
+   _ -> "News.creation_date;"
+      
+
+
+
+
+setFiltersNews :: [(T.Text, Maybe T.Text)] -> Query   
+setFiltersNews [] = "title LIKE '%'" 
+setFiltersNews ((mthd, param):xs) 
+      | xs == [] = choiceFilter 
+      | otherwise = choiceFilter  <> " AND " <> setFiltersNews xs
+  where
+    choiceFilter =
       case mthd of
         "created_at"    -> creationDate "="
         "created_until" -> creationDate "<"
         "created_since" -> creationDate ">="
-        "author" -> "name_user = '" <> fromMaybe param <> "'" 
+        "author"   -> "name_user = '" <> fromMaybe param <> "'" 
         "category" -> "News.category_id = " <> fromMaybe param
+        "title"    -> "title ILIKE '%" <> fromMaybe param <> "%'" 
+        "content"  -> "content ILIKE '%" <> fromMaybe param <> "%'" 
+        "search"   -> "(content || name_user || name_category) ILIKE '%" <> 
+                                                         fromMaybe param <> "%'" 
         _ -> "title LIKE '%'"            
     fromMaybe (Just e) =  fromString $ T.unpack e
     fromMaybe Nothing  = "Null"
