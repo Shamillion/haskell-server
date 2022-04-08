@@ -84,10 +84,11 @@ setMethodNews ls = (filterNews, sortNews)
 
 sortBy :: T.Text -> Query 
 sortBy mthd = fromString $ "ORDER BY " <>
-  case mthd of
-   _ -> "News.creation_date;"
-      
-
+  case mthd of   
+   "author"   -> "author[2];"   -- don't work
+   "category" -> "name_category;"
+   "photo"    -> "CARDINALITY(photo);" -- don't work
+   _          -> "creation_date;"
 
 
 
