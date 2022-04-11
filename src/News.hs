@@ -20,7 +20,7 @@ import Db
 
 getNews :: (Query, Query) -> Query
 getNews str = 
-  "SELECT DISTINCT substring(title from 1 for 12), (news.creation_date :: TEXT), \
+  "SELECT substring(title from 1 for 12), (news.creation_date :: TEXT), \
    \ (author :: TEXT), name_category, substring(content from 1 for 12), \ 
    \ (photo :: TEXT), (is_published :: TEXT) \
    \ FROM news \ 
@@ -29,8 +29,8 @@ getNews str =
    \ is_author \
    \ FROM users ) author ON news.user_id = author.user_id \                        
    \ WHERE " <> fst str <>  -- WHERE title LIKE '%' 
-   " GROUP BY title, news.creation_date, author, name_category, \
-   \ photo, content, is_published "  <> snd str
+   " GROUP BY title, news.creation_date, author, author.name_user, \
+   \ name_category, photo, content, is_published "  <> snd str
 
 data News = News
   { title         :: T.Text
@@ -55,7 +55,7 @@ parseNews ls
     splitText = T.splitOn "," . T.tail . T.init 
     author = parseUser $ splitText n3
     cats = getParentCategories n4
-    pht = splitText n6
+    pht = map ("/photo?get_photo=" <>) $ splitText n6
     isPbl = n7 == "t"
     
 
@@ -85,7 +85,7 @@ setMethodNews ls = (filterNews, sortNews)
 sortBy :: T.Text -> Query 
 sortBy mthd = fromString $ "ORDER BY " <>
   case mthd of   
-   "author"   -> "author[2];"   -- don't work
+   "author"   -> "author.name_user;"   -- don't work
    "category" -> "name_category;"
    "photo"    -> "CARDINALITY(photo);" -- don't work
    _          -> "creation_date;"
