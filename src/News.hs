@@ -72,44 +72,49 @@ getParentCategories cat = unsafePerformIO $ do
   pure $ filter (/="Null") $ buildingList [cat]
 
 
-setMethodNews :: [(T.Text, Maybe T.Text)] -> (Query, Query)
-setMethodNews ls = (filterNews, sortNews)
+setMethodNews :: [(T.Text, Maybe T.Text)] -> Maybe (Query, Query)
+setMethodNews ls = do
+  a <- filterNews
+  b <- sortNews
+  pure (a,b)
   where
     filterNews = setFiltersNews $ LT.filter ((/="sort_by") . fst) ls
     sortNews = 
       case findSort of
         [("sort_by", Just x)] -> sortBy x
-        _ -> ";"
+        _ -> pure ";"
     findSort = LT.filter ((=="sort_by") . fst) ls
 
-sortBy :: T.Text -> Query 
-sortBy mthd = fromString $ "ORDER BY " <>
+sortBy :: T.Text -> Maybe Query 
+sortBy mthd = fromString <$> Just "ORDER BY " <>
   case mthd of   
-   "author"   -> "author.name_user;"   -- don't work
-   "category" -> "name_category;"
-   "photo"    -> "CARDINALITY(photo);" -- don't work
-   _          -> "creation_date;"
+   "date"     -> Just $ "creation_date;"
+   "author"   -> Just $ "author.name_user;"   
+   "category" -> Just $ "name_category;"
+   "photo"    -> Just $ "CARDINALITY(photo);" 
+   _          -> Nothing
 
 
 
-setFiltersNews :: [(T.Text, Maybe T.Text)] -> Query   
-setFiltersNews [] = "title LIKE '%'" 
+setFiltersNews :: [(T.Text, Maybe T.Text)] -> Maybe Query   
+setFiltersNews [] = pure "title LIKE '%'" 
 setFiltersNews ((mthd, param):xs) 
       | xs == [] = choiceFilter 
-      | otherwise = choiceFilter  <> " AND " <> setFiltersNews xs
+      | otherwise = choiceFilter >>= nextStep   
   where
+    nextStep n = (pure $ n <> " AND ") <> setFiltersNews xs
     choiceFilter =
       case mthd of
-        "created_at"    -> creationDate "="
-        "created_until" -> creationDate "<"
-        "created_since" -> creationDate ">="
-        "author"   -> "name_user = '" <> fromMaybe param <> "'" 
-        "category" -> "News.category_id = " <> fromMaybe param
-        "title"    -> "title ILIKE '%" <> fromMaybe param <> "%'" 
-        "content"  -> "content ILIKE '%" <> fromMaybe param <> "%'" 
-        "search"   -> "(content || name_user || name_category) ILIKE '%" <> 
-                                                         fromMaybe param <> "%'" 
-        _ -> "title LIKE '%'"            
+        "created_at"    -> Just $ creationDate "="
+        "created_until" -> Just $ creationDate "<"
+        "created_since" -> Just $ creationDate ">="
+        "author"   -> Just $ "name_user = '" <> fromMaybe param <> "'" 
+        "category" -> Just $ "News.category_id = " <> fromMaybe param
+        "title"    -> Just $ "title ILIKE '%" <> fromMaybe param <> "%'" 
+        "content"  -> Just $ "content ILIKE '%" <> fromMaybe param <> "%'" 
+        "search"   -> Just $ "(content || name_user || name_category) ILIKE '%"  
+                                                      <> fromMaybe param <> "%'" 
+        _ -> Nothing            
     fromMaybe (Just e) =  fromString $ T.unpack e
     fromMaybe Nothing  = "Null"
     creationDate x = "News.creation_date " <> x <> " '" <> fromMaybe param <> "'"

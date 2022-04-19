@@ -12,7 +12,7 @@ import           Data.Monoid                     ((<>))
 import           qualified Data.Text as T hiding (last)
 import           GHC.Generics
 import           Network.HTTP.Simple        
-import           Network.HTTP.Types              (status200, queryToQueryText)
+import           Network.HTTP.Types    (status200, status404, queryToQueryText)
 import           Network.Wai                as W
 import           Network.Wai.Handler.Warp        (run)
 import           Database.PostgreSQL.Simple as DB    
@@ -39,12 +39,12 @@ app req respond = do
     conn <- connectPostgreSQL "host='localhost' port=5432 \ 
                \ dbname='haskellserverlite' user='haskell' password='haskell'"
     val <- query_ conn qry :: IO [[T.Text]]     
+    print $ requestMethod req
     print $ pathInfo req 
-    print $ queryToQueryText $ queryString req 
     print $ queryString req    
     print val  
    -- print $ map parseNews val
-    respond $ responseLBS status200 [] $ resp val 
+    respond $ responseLBS status200 [("Content-Type", "text/plain")] $ resp val 
 
 main = do
   --  visitorCount <- newMVar 0
