@@ -15,11 +15,14 @@ import GHC.Generics
 import System.IO.Unsafe                (unsafePerformIO)
 import User
 import Db
+-- import Debug.Trace
 
 
 
-getNews :: (Query, Query) -> Query
-getNews str = 
+getNews :: Maybe (Query, Query) -> Query
+getNews str = if str == Nothing 
+  then "404"
+  else
   "SELECT substring(title from 1 for 12), (news.creation_date :: TEXT), \
    \ (author :: TEXT), name_category, substring(content from 1 for 12), \ 
    \ (photo :: TEXT), (is_published :: TEXT) \
@@ -28,9 +31,11 @@ getNews str =
    \ INNER JOIN ( SELECT  user_id, name_user, users.creation_date, is_admin, \
    \ is_author \
    \ FROM users ) author ON news.user_id = author.user_id \                        
-   \ WHERE " <> fst str <>  -- WHERE title LIKE '%' 
+   \ WHERE " <> fltr <>  -- WHERE title LIKE '%' 
    " GROUP BY title, news.creation_date, author, author.name_user, \
-   \ name_category, photo, content, is_published "  <> snd str
+   \ name_category, photo, content, is_published "  <> srt
+   where 
+     Just (fltr,srt) = str
 
 data News = News
   { title         :: T.Text
@@ -86,7 +91,7 @@ setMethodNews ls = do
     findSort = LT.filter ((=="sort_by") . fst) ls
 
 sortBy :: T.Text -> Maybe Query 
-sortBy mthd = fromString <$> Just "ORDER BY " <>
+sortBy mthd = fromString <$> ("ORDER BY " <>) <$>
   case mthd of   
    "date"     -> Just $ "creation_date;"
    "author"   -> Just $ "author.name_user;"   
@@ -102,7 +107,7 @@ setFiltersNews ((mthd, param):xs)
       | xs == [] = choiceFilter 
       | otherwise = choiceFilter >>= nextStep   
   where
-    nextStep n = (pure $ n <> " AND ") <> setFiltersNews xs
+    nextStep n = ((n <> " AND ") <>) <$> setFiltersNews xs
     choiceFilter =
       case mthd of
         "created_at"    -> Just $ creationDate "="
