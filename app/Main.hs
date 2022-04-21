@@ -9,7 +9,7 @@ import qualified Data.ByteString.Lazy.Char8 as LC
 import           Control.Concurrent.MVar
 --import           Control.Monad                   (join)
 import           Data.Monoid                     ((<>))
-import           qualified Data.Text as T hiding (last)
+import           qualified Data.Text as T 
 import           GHC.Generics
 import           Network.HTTP.Simple        
 import           Network.HTTP.Types        (status200, status403, status404, 
@@ -18,7 +18,7 @@ import           Network.Wai                as W
 import           Network.Wai.Handler.Warp        (run)
 import           Database.PostgreSQL.Simple as DB    
 import           User
-import           Db
+import           Category
 import           News
 --import           Data.ByteString.Base64
    
@@ -28,6 +28,7 @@ setQueryAndRespond :: W.Request -> (DB.Query, ([[T.Text]] -> LC.ByteString))
 setQueryAndRespond req = case (reqMtd, entity) of
   ("GET", "news")  -> (getNews (setMethodNews method), encode . (map parseNews))
   ("GET", "users") -> (getUser, encode . (map parseUser))
+  ("GET", "category") -> (getCategory, encode . (map parseCategory))
   _                -> ("404", (\x -> "404"))
   where
     reqMtd = requestMethod req

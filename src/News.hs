@@ -5,16 +5,16 @@ module News where
 
 
 import Data.Aeson
-import Data.List as LT                 (find, filter) 
+import Data.List as LT               (find, filter) 
 import Data.String                   (fromString)
 import Database.PostgreSQL.Simple as S
 import Data.Monoid                     ((<>))
-import qualified Data.Text as T hiding (last)
+import qualified Data.Text as T 
 import qualified Data.ByteString.Lazy.Char8 as LC
 import GHC.Generics
-import System.IO.Unsafe                (unsafePerformIO)
+--import System.IO.Unsafe                (unsafePerformIO)
 import User
-import Db
+import Category
 -- import Debug.Trace
 
 
@@ -63,19 +63,6 @@ parseNews ls
     pht = map ("/photo?get_photo=" <>) $ splitText n6
     isPbl = n7 == "t"
     
-
-getParentCategories :: T.Text -> [T.Text] 
-getParentCategories cat = unsafePerformIO $ do
-  conn <- connectPostgreSQL "host='localhost' port=5432 dbname='haskellserverlite' \
-                             \ user='haskell' password='haskell'"
-  ls <- query_ conn $ getCategory :: IO [[T.Text]]
-  let buildingList pc = do
-        let val = LT.find (\(x:y:xy) -> y == head pc) ls 
-        case val of
-          Just el -> buildingList (head el : pc)
-          _       -> pc 
-  pure $ filter (/="Null") $ buildingList [cat]
-
 
 setMethodNews :: [(T.Text, Maybe T.Text)] -> Maybe (Query, Query)
 setMethodNews ls = do

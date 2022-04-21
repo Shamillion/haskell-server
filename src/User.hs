@@ -4,7 +4,7 @@ module User where
 
 import Data.Aeson
 import Database.PostgreSQL.Simple
-import qualified Data.Text as T hiding (last)
+import qualified Data.Text as T 
 
 
 
