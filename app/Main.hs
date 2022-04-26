@@ -20,7 +20,8 @@ import           Database.PostgreSQL.Simple as DB
 import           User
 import           Category
 import           News
---import           Data.ByteString.Base64
+import           Auth
+
    
 
 
@@ -29,7 +30,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
   ("GET", "news")  -> (getNews (setMethodNews method), encode . (map parseNews))
   ("GET", "users") -> (getUser, encode . (map parseUser))
   ("GET", "category") -> (getCategory, encode . (map parseCategory))
-  _                -> ("404", (\x -> "404"))
+  _                -> ("404", \x -> "404")
   where
     reqMtd = requestMethod req
     [entity] = pathInfo req 
@@ -40,7 +41,9 @@ setQueryAndRespond req = case (reqMtd, entity) of
 app :: Application
 app req respond = do
   let (qry,resp) = setQueryAndRespond req
-  print $ requestMethod req
+  print $ requestMethod req  
+  print $ requestHeaders req 
+  print $ checkAuth $ requestHeaders req  
   print $ pathInfo req 
   print $ queryString req 
   print qry

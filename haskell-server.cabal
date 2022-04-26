@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      Auth
       Category
       Db
       Lib
@@ -37,6 +38,7 @@ library
   build-depends:
       aeson
     , base >=4.7 && <5
+    , base64-bytestring
     , bytestring
     , http-conduit
     , http-types
@@ -56,6 +58,7 @@ executable haskell-server-exe
   build-depends:
       aeson
     , base >=4.7 && <5
+    , base64-bytestring
     , bytestring
     , haskell-server
     , http-conduit
@@ -77,6 +80,7 @@ test-suite haskell-server-test
   build-depends:
       aeson
     , base >=4.7 && <5
+    , base64-bytestring
     , bytestring
     , haskell-server
     , http-conduit
