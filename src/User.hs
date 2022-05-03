@@ -3,6 +3,7 @@
 module User where
 
 import Data.Aeson
+import Data.Monoid                     ((<>))
 import Database.PostgreSQL.Simple
 import qualified Data.Text as T 
 
@@ -11,10 +12,10 @@ import qualified Data.Text as T
 
 
 
-getUser :: Query
-getUser = "SELECT  (user_id :: TEXT), name_user, (creation_date :: TEXT), \
+getUser :: Query -> Query
+getUser str = "SELECT  (user_id :: TEXT), name_user, (creation_date :: TEXT), \
    \ (is_admin :: TEXT), (is_author :: TEXT) \
-   \ FROM users;"
+   \ FROM users " <> str <> ";" 
 
 data User = User
   { user_id        :: Int
@@ -45,8 +46,8 @@ parseUser ls
   where     
     [u1,u2,u3,u4,u5] = ls
     id = read $ T.unpack u1 :: Int
-    isAdm = u4 == "t"
-    isAth = u5 == "t"
+    isAdm = u4 == "t" || u4 == "true"
+    isAth = u5 == "t" || u5 == "true"
 
 
 
