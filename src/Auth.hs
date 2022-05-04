@@ -3,30 +3,33 @@
 module Auth where
 
 import           Network.Wai
-import qualified Data.ByteString.Lazy as L
+--import qualified Data.ByteString.Lazy as L
 import Network.HTTP.Types.Header
-import qualified Data.ByteString.Base64.Lazy as BB
+import qualified Data.ByteString.Base64 as BB
+import Data.ByteString.Char8          (split)
+--import Data.ByteString.UTF8 (toString)
+--import Data.String          (fromString)
 import Database.PostgreSQL.Simple
+import Database.PostgreSQL.Simple.Types 
 import qualified Data.Text as T
-import Data.String                   (fromString)
 import System.IO.Unsafe          (unsafePerformIO)
 import User
 
 
 
 
+
 checkAuth :: RequestHeaders -> Either String [User]
 checkAuth ls = 
-  if fls == [] then Left "No auth"
+  if fls == [] then Left "No Authorization"
     else 
       case decodeLogAndPass of
-        Left x -> Left $ show x
-        Right [x,y] -> pure $ unsafePerformIO $ do
+        Left x -> Left x
+        Right [x,y] -> isEmptyList $ unsafePerformIO $ do
           conn <- connectPostgreSQL "host='localhost' port=5432 \ 
-                 \ dbname='haskellserverlite' user='haskell' password='haskell'"
-          let [un, ps] = map (\v -> "'" ++ filter (/='"') (show v) ++ "'") [x,y] 
-          let qry = getUser $ fromString $ "WHERE login = " <> 
-                                                     un <> " AND pass = " <> ps    
+                 \ dbname='haskellserverlite' user='haskell' password='haskell'"       
+          let qry = getUser $ Query $ 
+                         "WHERE login = '" <> x <> "' AND pass = '" <> y <> "'"  
           print qry                                               
           userList <- query_ conn $ qry :: IO [[T.Text]] 
           print userList
@@ -34,7 +37,6 @@ checkAuth ls =
   where
     fls = filter  ((=="Authorization") . fst) ls
     [(hdr, str)] = fls
-    decodeLogAndPass = (L.split 58) <$>           
-                       (BB.decode . last . L.split 32 . L.fromStrict $ str)
-          
- 
+    decodeLogAndPass = (split ':') <$> (BB.decode . last . split ' ' $ str)
+    isEmptyList [] = Left "No such user in DB"      
+    isEmptyList ul = Right ul

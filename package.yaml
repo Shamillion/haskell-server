@@ -27,6 +27,7 @@ dependencies:
 - http-conduit
 - http-types
 - text
+- utf8-string
 - wai
 - warp
 - postgresql-simple
