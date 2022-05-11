@@ -8,10 +8,11 @@ import Network.HTTP.Types.Header
 import qualified Data.ByteString.Base64 as BB
 import Data.ByteString.Char8          (split)
 --import Data.ByteString.UTF8 (toString)
---import Data.String          (fromString)
+import Data.String          (fromString)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.Types 
-import qualified Data.Text as T
+import qualified Network.Wai            as W
+import qualified Data.Text              as T
 import System.IO.Unsafe          (unsafePerformIO)
 import User
 
@@ -40,3 +41,21 @@ checkAuth ls =
     decodeLogAndPass = (split ':') <$> (BB.decode . last . split ' ' $ str)
     isEmptyList [] = Left "No such user in DB"      
     isEmptyList ul = Right ul
+
+authForGetNews :: W.Request -> Query
+authForGetNews req = 
+  case checkAuth (requestHeaders req) of     
+    Right [u] -> fromString $ show $ user_id u    
+    _         -> Query $ "Null" 
+  
+isAdmin :: W.Request -> Bool
+isAdmin req = 
+  case checkAuth (requestHeaders req) of     
+    Right [u] -> is_admin u    
+    _         -> False   
+  
+  
+  
+  
+  
+  

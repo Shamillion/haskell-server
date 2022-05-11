@@ -6,11 +6,16 @@ module Category where
 
 import Data.Aeson
 import Database.PostgreSQL.Simple
+import Database.PostgreSQL.Simple.Types 
 import Data.Monoid               ((<>))
 import Data.List as LT           (find, filter) 
 import qualified Data.Text as T
+import qualified Data.ByteString.Char8  as BC     
 import GHC.Generics 
 import System.IO.Unsafe          (unsafePerformIO)
+--import Auth
+--import User
+
 
 
 getCategory :: Query
@@ -42,3 +47,29 @@ getParentCategories cat = unsafePerformIO $ do
           Just el -> buildingList (head el : pc)
           _       -> pc 
   pure $ filter (/="Null") $ buildingList [cat]
+
+
+createCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+createCategory False _ = "404"
+createCategory _ [] = "404"
+createCategory _ ls = Query $
+  "INSERT INTO category (name_category, parent_category) \
+  \ VALUES ('" <> name_category <> "', '" <> parent_category <> "');"
+  where
+    fls = map (BC.split '>' . fst) ls     
+    [parent_category,name_category] = head fls
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+

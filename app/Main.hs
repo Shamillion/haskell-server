@@ -27,15 +27,17 @@ import           Auth
 
 setQueryAndRespond :: W.Request -> (DB.Query, ([[T.Text]] -> LC.ByteString))
 setQueryAndRespond req = case (reqMtd, entity) of
-  ("GET", "news")  -> (getNews (setMethodNews method), encode . (map parseNews))
+  ("GET", "news")  -> (getNews auth method, encode . (map parseNews))
   ("GET", "users") -> (getUser "", encode . (map parseUser))
   ("GET", "category") -> (getCategory, encode . (map parseCategory))
+  ("POST", "category") -> (createCategory adm (queryString req), \x -> "OK")
   _                -> ("404", \x -> "404")
   where
     reqMtd = requestMethod req
     [entity] = pathInfo req 
-    method   = queryToQueryText $ queryString req
-
+    auth = authForGetNews req
+    method = setMethodNews . queryToQueryText . queryString $ req
+    adm = isAdmin req
 
        
 app :: Application

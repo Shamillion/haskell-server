@@ -19,8 +19,8 @@ import Category
 
 
 
-getNews :: Maybe (Query, Query) -> Query
-getNews str = if str == Nothing 
+getNews :: Query -> Maybe (Query, Query) -> Query
+getNews auth str = if str == Nothing 
   then "404"
   else
   "SELECT substring(title from 1 for 12), (news.creation_date :: TEXT), \
@@ -31,7 +31,8 @@ getNews str = if str == Nothing
    \ INNER JOIN ( SELECT  user_id, name_user, users.creation_date, is_admin, \
    \ is_author \
    \ FROM users ) author ON news.user_id = author.user_id \                        
-   \ WHERE " <> fltr <>  -- WHERE title LIKE '%' 
+   \ WHERE (is_published = TRUE OR is_published = FALSE AND \
+   \ author.user_id = " <> auth <> ") AND " <> fltr <>  -- WHERE title LIKE '%' 
    " GROUP BY title, news.creation_date, author, author.name_user, \
    \ name_category, photo, content, is_published "  <> srt
    where 
@@ -61,7 +62,7 @@ parseNews ls
     author = parseUser $ splitText n3
     cats = getParentCategories n4
     pht = map ("/photo?get_photo=" <>) $ splitText n6
-    isPbl = n7 == "t"
+    isPbl = n7 == "true" || n7 == "t" 
     
 
 setMethodNews :: [(T.Text, Maybe T.Text)] -> Maybe (Query, Query)
