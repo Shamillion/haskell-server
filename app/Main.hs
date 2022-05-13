@@ -30,7 +30,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
   ("GET", "news")  -> (getNews auth method, encode . (map parseNews))
   ("GET", "users") -> (getUser "", encode . (map parseUser))
   ("GET", "category") -> (getCategory, encode . (map parseCategory))
-  ("POST", "category") -> (createCategory adm (queryString req), \x -> "OK")
+  ("POST", "category") -> (createCategory adm (queryString req), \[[x]] -> encode x)
   _                -> ("404", \x -> "404")
   where
     reqMtd = requestMethod req
@@ -55,12 +55,19 @@ app req respond = do
     _     -> do        
       conn <- connectPostgreSQL "host='localhost' port=5432 \ 
                \ dbname='haskellserverlite' user='haskell' password='haskell'"
-      val <- query_ conn qry :: IO [[T.Text]] 
-      print val  
-     -- print $ map parseNews val
-      responds status200 $ resp val 
+      val <- case requestMethod req of
+        "GET" -> query_ conn qry :: IO [[T.Text]]         
+        _     -> (\x -> [[T.pack $ show x]]) <$> execute_ conn qry 
+      print val                  
+      responds status200 $ resp val     
   where
-    responds sts = respond . responseLBS sts [("Content-Type", "text/plain")]                                                                   
+    responds sts = respond . responseLBS sts [("Content-Type", "text/plain")]  
+   
+    
+    
+    
+    
+                                                                     
 
 main = do
   --  visitorCount <- newMVar 0

@@ -52,12 +52,16 @@ getParentCategories cat = unsafePerformIO $ do
 createCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 createCategory False _ = "404"
 createCategory _ [] = "404"
-createCategory _ ls = Query $
-  "INSERT INTO category (name_category, parent_category) \
-  \ VALUES ('" <> name_category <> "', '" <> parent_category <> "');"
+createCategory True ls 
+  | categorys == [] = "404" 
+  | otherwise = Query $
+      "INSERT INTO category (name_category, parent_category) \
+      \ VALUES ('" <> name_category <> "', '" <> parent_category <> "');"
   where
-    fls = map (BC.split '>' . fst) ls     
-    [parent_category,name_category] = head fls
+    (x:xs) = map (BC.split '>' . fst) ls 
+    categorys = filter (/= "") x       
+    [parent_category,name_category] = 
+       if length categorys == 1 then "Null" : categorys else categorys
         
 
 
