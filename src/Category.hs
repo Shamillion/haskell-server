@@ -48,7 +48,7 @@ getParentCategories cat = unsafePerformIO $ do
           _       -> pc 
   pure $ filter (/="Null") $ buildingList [cat]
 
-
+--'.../category?aaa>bbb'   aaa - parent category's name,  bbb - category's name 
 createCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 createCategory False _ = "404"
 createCategory _ [] = "404"
@@ -64,9 +64,35 @@ createCategory True ls
        if length categorys == 1 then "Null" : categorys else categorys
         
 
-
-
-
+-- '.../category?change_name=aaa>bbb'    aaa - old category's name,  bbb - new category's name
+-- '.../category?change_parent=aaa>bbb'  aaa - category's name,  bbb - new parent category's name
+editCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+editCategory False _ = "404"
+editCategory _ [] = "404"
+editCategory True ls 
+  | fls == [] = "404" 
+  | otherwise = Query $ 
+    case method of
+      "change_name" ->     
+        "UPDATE category \
+        \ SET   parent_category = '" <> new_name <> "' \
+        \ WHERE parent_category = '" <> name <> "'; \
+        \ UPDATE category \
+        \ SET   name_category = '" <> new_name <> "' \
+        \ WHERE name_category = '" <> name <> "';"    
+      "change_parent" -> 
+        "UPDATE category \
+        \ SET parent_category = '" <> new_name <> "' \
+        \ WHERE name_category = '" <> name <> "';" 
+      _ -> "404"         
+  where
+    fls = filter ((/="???") . snd) $ map (fmap fromMaybe) ls 
+    (x:xs) = map (fmap (BC.split '>')) fls 
+    categorys = (filter (/= "")) <$> x       
+    (method,[name,new_name]) =  if length (snd categorys) < 2 
+                                       then ("404", ["",""]) else categorys
+    fromMaybe (Just e) = e
+    fromMaybe Nothing  = "???"
 
 
 

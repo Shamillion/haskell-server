@@ -31,6 +31,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
   ("GET", "users") -> (getUser "", encode . (map parseUser))
   ("GET", "category") -> (getCategory, encode . (map parseCategory))
   ("POST", "category") -> (createCategory adm (queryString req), \[[x]] -> encode x)
+  ("PUT", "category") -> (editCategory adm (queryString req), \[[x]] -> encode x)
   _                -> ("404", \x -> "404")
   where
     reqMtd = requestMethod req
