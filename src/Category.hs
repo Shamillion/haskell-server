@@ -71,30 +71,30 @@ editCategory False _ = "404"
 editCategory _ [] = "404"
 editCategory True ls 
   | fls == [] = "404" 
-  | otherwise = Query $ 
-    case method of
-      "change_name" ->     
-        "UPDATE category \
-        \ SET   parent_category = '" <> new_name <> "' \
-        \ WHERE parent_category = '" <> name <> "'; \
-        \ UPDATE category \
-        \ SET   name_category = '" <> new_name <> "' \
-        \ WHERE name_category = '" <> name <> "';"    
-      "change_parent" -> 
-        "UPDATE category \
-        \ SET parent_category = '" <> new_name <> "' \
-        \ WHERE name_category = '" <> name <> "';" 
-      _ -> "404"         
+  | otherwise = Query $ checkQuery $ map buildQuery fls''               
   where
     fls = filter ((/="???") . snd) $ map (fmap fromMaybe) ls 
-    (x:xs) = map (fmap (BC.split '>')) fls 
-    categorys = (filter (/= "")) <$> x       
-    (method,[name,new_name]) =  if length (snd categorys) < 2 
-                                       then ("404", ["",""]) else categorys
+    fls' = map (fmap (BC.split '>')) fls 
+    categorys = map ((filter (/= "")) <$>) fls'       
+    fls''@((method,[name,new_name]):xs) = map (\x -> if length (snd x) < 2 
+                                       then ("404", ["",""]) else x) categorys
     fromMaybe (Just e) = e
     fromMaybe Nothing  = "???"
-
-
+    checkQuery lq = if elem "404" lq then "404" else mconcat lq
+    buildQuery (method,[name,new_name]) = 
+      case method of
+        "change_name" ->     
+          "UPDATE category \
+          \ SET   parent_category = '" <> new_name <> "' \
+          \ WHERE parent_category = '" <> name <> "'; \
+          \ UPDATE category \
+          \ SET   name_category = '" <> new_name <> "' \
+          \ WHERE name_category = '" <> name <> "'; "    
+        "change_parent" -> 
+          "UPDATE category \
+          \ SET parent_category = '" <> new_name <> "' \
+          \ WHERE name_category = '" <> name <> "'; " 
+        _ -> "404"
 
 
 
