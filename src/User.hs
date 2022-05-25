@@ -6,8 +6,8 @@ import Data.Aeson
 import Data.Monoid                     ((<>))
 import Database.PostgreSQL.Simple
 import qualified Data.Text as T 
-
-
+import Database.PostgreSQL.Simple.Types 
+import qualified Data.ByteString.Char8 as BC 
 
 
 
@@ -50,6 +50,24 @@ parseUser ls
     isAth = u5 == "t" || u5 == "true"
 
 
+-- /user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true   (strict order) 
+createUser :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+createUser False _ = "404"
+createUser _ ls 
+  | ls == [] || (map fst ls) /= checkList = "404"
+  | searchNothing = "404"
+  | otherwise = Query $
+      "INSERT INTO users (name_user, login, pass, \
+      \       creation_date, is_admin, is_author) \
+      \ VALUES ('" <> name_user <> "', '" <> login <> "', '" <> pass <> 
+                "', NOW(), '" <> is_admin <> "', '" <> is_author <> "');"
+  where
+    checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
+    sndList = map (fromMaybe . snd) ls
+    searchNothing = elem "Nothing" sndList
+    [name_user, login, pass, is_admin, is_author] = map (fromMaybe . snd) ls
+    fromMaybe (Just e) = e
+    fromMaybe Nothing  = "Nothing"
 
 
 

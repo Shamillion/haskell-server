@@ -28,7 +28,8 @@ import           Auth
 setQueryAndRespond :: W.Request -> (DB.Query, ([[T.Text]] -> LC.ByteString))
 setQueryAndRespond req = case (reqMtd, entity) of
   ("GET", "news")  -> (getNews auth method, encode . (map parseNews))
-  ("GET", "users") -> (getUser "", encode . (map parseUser))
+  ("GET", "user") -> (getUser "", encode . (map parseUser))
+  ("POST", "user") -> (createUser adm (queryString req), \[[x]] -> encode x)
   ("GET", "category") -> (getCategory, encode . (map parseCategory))
   ("POST", "category") -> (createCategory adm (queryString req), \[[x]] -> encode x)
   ("PUT", "category") -> (editCategory adm (queryString req), \[[x]] -> encode x)
