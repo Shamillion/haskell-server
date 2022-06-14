@@ -21,6 +21,7 @@ import           User
 import           Category
 import           News
 import           Auth
+import           Photo
 
    
 
@@ -29,17 +30,20 @@ setQueryAndRespond :: W.Request -> (DB.Query, ([[T.Text]] -> LC.ByteString))
 setQueryAndRespond req = case (reqMtd, entity) of
   ("GET", "news")  -> (getNews auth method, encode . (map parseNews))
   ("GET", "user") -> (getUser "", encode . (map parseUser))
-  ("POST", "user") -> (createUser adm (queryString req), \[[x]] -> encode x)
+  ("POST", "user") -> (createUser adm arr, \[[x]] -> encode x)
   ("GET", "category") -> (getCategory, encode . (map parseCategory))
-  ("POST", "category") -> (createCategory adm (queryString req), \[[x]] -> encode x)
-  ("PUT", "category") -> (editCategory adm (queryString req), \[[x]] -> encode x)
+  ("POST", "category") -> (createCategory adm arr, \[[x]] -> encode x)
+  ("PUT", "category") -> (editCategory adm arr, \[[x]] -> encode x)
+  ("GET", "photo")  -> (getPhoto arr, \[[x]] -> encode x)
   _                -> ("404", \x -> "404")
   where
     reqMtd = requestMethod req
     [entity] = pathInfo req 
     auth = authForGetNews req
-    method = setMethodNews . queryToQueryText . queryString $ req
+    arr = queryString  req
+    method = setMethodNews . queryToQueryText $ arr
     adm = isAdmin req
+     
 
        
 app :: Application

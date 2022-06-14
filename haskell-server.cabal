@@ -30,6 +30,7 @@ library
       Db
       Lib
       News
+      Photo
       User
   other-modules:
       Paths_haskell_server
