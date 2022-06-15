@@ -8,8 +8,9 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as LC
 import           Control.Concurrent.MVar
 --import           Control.Monad                   (join)
-import           Data.Monoid                     ((<>))
+import           Data.Monoid               ((<>))
 import           qualified Data.Text as T 
+import           Data.Text.Encoding        (encodeUtf8)
 import           GHC.Generics
 import           Network.HTTP.Simple        
 import           Network.HTTP.Types        (status200, status403, status404, 
@@ -56,19 +57,23 @@ app req respond = do
   print $ queryString req 
   print qry
   case qry of
-    "403" -> responds status403 "403 Forbidden"
-    "404" -> responds status403 "404 Not Found"
+  --  "403" -> responds status403 "text/plain" "403 Forbidden"
+    "404" -> responds status403 "text/plain" "404 Not Found"
     _     -> do        
       conn <- connectPostgreSQL "host='localhost' port=5432 \ 
                \ dbname='haskellserverlite' user='haskell' password='haskell'"
       val <- case requestMethod req of
         "GET" -> query_ conn qry :: IO [[T.Text]]         
         _     -> (\x -> [[T.pack $ show x]]) <$> execute_ conn qry 
-      print val                  
-      responds status200 $ resp val     
+      print val 
+      let hdr = if pathInfo req == ["photo"] 
+                  then  getHdr val'
+                  else  "text/plain" 
+          [[val']] = val                          
+      responds status200 hdr $ resp val     
   where
-    responds sts = respond . responseLBS sts [("Content-Type", "text/plain")]  
-   
+    responds sts hdr = respond . responseLBS sts [("Content-Type", hdr)]  
+    getHdr = encodeUtf8 . T.drop 1 . T.takeWhile (/=';') . T.dropWhile (/=':')  
     
     
     
