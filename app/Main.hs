@@ -11,6 +11,7 @@ import           Control.Concurrent.MVar
 import           Data.Monoid               ((<>))
 import           qualified Data.Text as T 
 import           Data.Text.Encoding        (encodeUtf8)
+--import qualified Data.Text.Lazy.Encoding as LE   (encodeUtf8)
 import           GHC.Generics
 import           Network.HTTP.Simple        
 import           Network.HTTP.Types        (status200, status403, status404, 
@@ -24,7 +25,11 @@ import           News
 import           Auth
 import           Photo
 
-   
+
+
+
+
+
 
 
 setQueryAndRespond :: W.Request -> (DB.Query, ([[T.Text]] -> LC.ByteString))
@@ -35,7 +40,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
   ("GET", "category") -> (getCategory, encode . (map parseCategory))
   ("POST", "category") -> (createCategory adm arr, \[[x]] -> encode x)
   ("PUT", "category") -> (editCategory adm arr, \[[x]] -> encode x)
-  ("GET", "photo")  -> (getPhoto arr, \[[x]] -> encode x)
+  ("GET", "photo")  -> (getPhoto arr, decodeImage)
   _                -> ("404", \x -> "404")
   where
     reqMtd = requestMethod req
@@ -57,9 +62,8 @@ app req respond = do
   print $ queryString req 
   print qry
   case qry of
-  --  "403" -> responds status403 "text/plain" "403 Forbidden"
     "404" -> responds status403 "text/plain" "404 Not Found"
-    _     -> do        
+    _     -> do                    
       conn <- connectPostgreSQL "host='localhost' port=5432 \ 
                \ dbname='haskellserverlite' user='haskell' password='haskell'"
       val <- case requestMethod req of
@@ -69,14 +73,14 @@ app req respond = do
       let hdr = if pathInfo req == ["photo"] 
                   then  getHdr val'
                   else  "text/plain" 
-          [[val']] = val                          
+          [[val']] = val                                
       responds status200 hdr $ resp val     
   where
     responds sts hdr = respond . responseLBS sts [("Content-Type", hdr)]  
     getHdr = encodeUtf8 . T.drop 1 . T.takeWhile (/=';') . T.dropWhile (/=':')  
     
-    
-    
+
+
     
                                                                      
 

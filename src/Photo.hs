@@ -7,6 +7,10 @@ import           Data.Char                  (isDigit)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.Types 
 import qualified Data.ByteString.Char8 as BC 
+import qualified Data.ByteString.Lazy.Char8 as LC
+import qualified Data.Text as T 
+import           Data.Text.Encoding        (encodeUtf8)
+import           Data.ByteString.Base64.Lazy    (decodeLenient)
 import           Data.Monoid                     ((<>))
 
 
@@ -24,3 +28,19 @@ getPhoto (x:xs) = Query $
     if BC.all isDigit n
       then "SELECT image FROM photo WHERE photo_id = " <> n <> ";"
       else "404"
+
+decodeImage :: [[T.Text]] -> LC.ByteString
+decodeImage [] = "404"
+decodeImage [[img]] = decodeLenient . LC.fromStrict . encodeUtf8 $ img'
+  where
+    img' = T.drop 1 . T.dropWhile (/=',') $ img
+
+
+
+
+
+
+
+
+
+
