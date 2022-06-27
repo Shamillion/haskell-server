@@ -8,6 +8,7 @@ import Data.Aeson
 import Data.List as LT               (find, filter) 
 import Data.String                   (fromString)
 import Database.PostgreSQL.Simple as S
+import Database.PostgreSQL.Simple.Types
 import Data.Monoid                     ((<>))
 import qualified Data.Text as T 
 import qualified Data.ByteString.Lazy.Char8 as LC
@@ -116,7 +117,34 @@ setFiltersNews ((mthd, param):xs)
 
 
 
-
+--'.../news?title=Text&category_id=3&content=Text&
+--       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
+--          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
+createNews :: Bool -> Query -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+createNews False _ _ = "404"
+createNews _ _ [] = "404"
+createNews True auth ls 
+  | nothingInLs = "404" 
+  | otherwise = Query $
+      "INSERT INTO news (title, creation_date, user_id, category_id, photo, \ 
+      \ content, is_published) \
+      \ VALUES ('" <> title <> "', NOW(), " <> auth <> ", " <> categoryId <>
+        ", " <> "'{" <> photo <> "}', '" <> content <> "', " 
+        <> isPublished <> ");"
+  where
+    nothingInLs = any (\(x,y) -> y == Nothing) ls 
+    ls' = fromMaybe <$> ls
+    fromMaybe (Just e) = e
+    fromMaybe Nothing  = "Null"
+    categoryId =     
+    content = 
+    isPublished =
+    photo =
+    
+    
+    (x:xs) = map (BC.split '>' . fst) ls           
+    [parent_category,name_category] = 
+       if length categorys == 1 then "Null" : categorys else categorys
 
 
 

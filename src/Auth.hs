@@ -54,7 +54,11 @@ isAdmin req =
     Right [u] -> is_admin u    
     _         -> False   
   
-  
+isAuthor :: W.Request -> Bool
+isAuthor req = 
+  case checkAuth (requestHeaders req) of     
+    Right [u] -> is_author u    
+    _         -> False  
   
   
   
