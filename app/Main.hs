@@ -34,22 +34,23 @@ import           Photo
 
 setQueryAndRespond :: W.Request -> (DB.Query, ([[T.Text]] -> LC.ByteString))
 setQueryAndRespond req = case (reqMtd, entity) of
-  ("GET", "news")  -> (getNews auth method, encode . (map parseNews))
-  ("GET", "user") -> (getUser "", encode . (map parseUser))
+  ("GET",  "news") -> (getNews authId method, encode . (map parseNews))
+  ("POST", "news") -> (createNews athr authId arr, \[[x]] -> encode x)
+  ("GET",  "user") -> (getUser "", encode . (map parseUser))
   ("POST", "user") -> (createUser adm arr, \[[x]] -> encode x)
-  ("GET", "category") -> (getCategory, encode . (map parseCategory))
+  ("GET",  "category") -> (getCategory, encode . (map parseCategory))
   ("POST", "category") -> (createCategory adm arr, \[[x]] -> encode x)
-  ("PUT", "category") -> (editCategory adm arr, \[[x]] -> encode x)
-  ("GET", "photo")  -> (getPhoto arr, decodeImage)
+  ("PUT",  "category") -> (editCategory adm arr, \[[x]] -> encode x)
+  ("GET",  "photo")  -> (getPhoto arr, decodeImage)
   _                -> ("404", \x -> "404")
   where
     reqMtd = requestMethod req
     [entity] = pathInfo req 
-    auth = authForGetNews req
+    authId = authForGetNews req
     arr = queryString  req
     method = setMethodNews . queryToQueryText $ arr
     adm = isAdmin req
-     
+    athr = isAuthor req 
 
        
 app :: Application

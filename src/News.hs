@@ -12,6 +12,7 @@ import Database.PostgreSQL.Simple.Types
 import Data.Monoid                     ((<>))
 import qualified Data.Text as T 
 import qualified Data.ByteString.Lazy.Char8 as LC
+import qualified Data.ByteString.Char8      as BC
 import GHC.Generics
 --import System.IO.Unsafe                (unsafePerformIO)
 import User
@@ -128,23 +129,27 @@ createNews True auth ls
   | otherwise = Query $
       "INSERT INTO news (title, creation_date, user_id, category_id, photo, \ 
       \ content, is_published) \
-      \ VALUES ('" <> title <> "', NOW(), " <> auth <> ", " <> categoryId <>
+      \ VALUES ('" <> title <> "', NOW(), " <> fromQuery auth <> ", " <> categoryId <>
         ", " <> "'{" <> photo <> "}', '" <> content <> "', " 
         <> isPublished <> ");"
   where
     nothingInLs = any (\(x,y) -> y == Nothing) ls 
-    ls' = fromMaybe <$> ls
+    ls' = map (fromMaybe <$>) ls
     fromMaybe (Just e) = e
     fromMaybe Nothing  = "Null"
-    categoryId =     
-    content = 
-    isPublished =
-    photo =
+    title = getValue "title"
+    categoryId = getValue "category_id"     
+    content = getValue "content"
+    isPublished = getValue "is_published"
+    photo = "1, 2"  -- ------------------------------------------  It needs to be done. 
+    getValue str = sndMaybe . LT.find (\(x,y) -> x == str) $ ls'
+    sndMaybe Nothing  = "Null"
+    sndMaybe (Just e) = snd e
     
     
-    (x:xs) = map (BC.split '>' . fst) ls           
-    [parent_category,name_category] = 
-       if length categorys == 1 then "Null" : categorys else categorys
+    --(x:xs) = map (BC.split '>' . fst) ls           
+    --[parent_category,name_category] = 
+       --if length categorys == 1 then "Null" : categorys else categorys
 
 
 
