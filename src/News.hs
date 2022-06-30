@@ -17,6 +17,7 @@ import GHC.Generics
 --import System.IO.Unsafe                (unsafePerformIO)
 import User
 import Category
+import Photo
 -- import Debug.Trace
 
 
@@ -141,15 +142,17 @@ createNews True auth ls
     categoryId = getValue "category_id"     
     content = getValue "content"
     isPublished = getValue "is_published"
-    photo = "1, 2"  -- ------------------------------------------  It needs to be done. 
+    photo = buildPhotoIdString $ map sendPhotoToDB ["aaa", "bbb"]-- ----  It needs to be done. 
     getValue str = sndMaybe . LT.find (\(x,y) -> x == str) $ ls'
     sndMaybe Nothing  = "Null"
     sndMaybe (Just e) = snd e
     
+buildPhotoIdString :: [BC.ByteString] -> BC.ByteString    
+buildPhotoIdString [] = ""
+buildPhotoIdString [x] = x
+buildPhotoIdString (x:xs) = x <> ", " <> buildPhotoIdString xs
     
-    --(x:xs) = map (BC.split '>' . fst) ls           
-    --[parent_category,name_category] = 
-       --if length categorys == 1 then "Null" : categorys else categorys
+
 
 
 
