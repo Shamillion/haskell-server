@@ -26,8 +26,9 @@ getNews :: Query -> Maybe (Query, Query) -> Query
 getNews auth str = if str == Nothing 
   then "404"
   else
-  "SELECT substring(title from 1 for 12), (news.creation_date :: TEXT), \
-   \ (author :: TEXT), name_category, substring(content from 1 for 12), \ 
+  "SELECT (news_id :: TEXT), substring(title from 1 for 12), \
+   \ (news.creation_date :: TEXT), (author :: TEXT), \ 
+   \ name_category, substring(content from 1 for 12), \ 
    \ (photo :: TEXT), (is_published :: TEXT) \
    \ FROM news \ 
    \ INNER JOIN category ON news.category_id = category.category_id \
@@ -36,13 +37,14 @@ getNews auth str = if str == Nothing
    \ FROM users ) author ON news.user_id = author.user_id \                        
    \ WHERE (is_published = TRUE OR is_published = FALSE AND \
    \ author.user_id = " <> auth <> ") AND " <> fltr <>  -- WHERE title LIKE '%' 
-   " GROUP BY title, news.creation_date, author, author.name_user, \
+   " GROUP BY news_id, title, news.creation_date, author, author.name_user, \
    \ name_category, photo, content, is_published "  <> srt
    where 
      Just (fltr,srt) = str
 
 data News = News
-  { title         :: T.Text
+  { news_id       :: Int
+  , title         :: T.Text
   , creation_date :: T.Text
   , author        :: User
   , category      :: [T.Text]   
@@ -53,14 +55,15 @@ data News = News
    deriving (Show, Generic, ToJSON)
 
 errorNews :: News
-errorNews =  News "error" "error" errorUser ["error"] "error" ["error"] False  
+errorNews =  News 0 "error" "error" errorUser ["error"] "error" ["error"] False  
 
 parseNews :: [T.Text] -> News
 parseNews ls
-  | length ls /= 7 = errorNews
-  | otherwise = News n1 n2 author cats n5 pht isPbl 
+  | length ls /= 8 = errorNews
+  | otherwise = News n n1 n2 author cats n5 pht isPbl 
   where 
-    [n1,n2,n3,n4,n5,n6,n7] = ls
+    [n0,n1,n2,n3,n4,n5,n6,n7] = ls
+    n = read $ T.unpack n0
     splitText = T.splitOn "," . T.tail . T.init 
     author = parseUser $ splitText n3
     cats = getParentCategories n4
@@ -142,7 +145,8 @@ createNews True auth ls
     categoryId = getValue "category_id"     
     content = getValue "content"
     isPublished = getValue "is_published"
-    photo = buildPhotoIdString $ map sendPhotoToDB ["aaa", "bbb"]-- ----  It needs to be done. 
+    photo = buildPhotoIdString . map (sendPhotoToDB . snd) . 
+                                 filter ((=="photo") . fst) $ ls' 
     getValue str = sndMaybe . LT.find (\(x,y) -> x == str) $ ls'
     sndMaybe Nothing  = "Null"
     sndMaybe (Just e) = snd e

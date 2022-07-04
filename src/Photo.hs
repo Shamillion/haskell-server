@@ -43,7 +43,7 @@ sendPhotoToDB :: BC.ByteString -> BC.ByteString
 sendPhotoToDB str = unsafePerformIO $ do
   conn <- connectPostgreSQL "host='localhost' port=5432 dbname='haskellserverlite' \
                              \ user='haskell' password='haskell'"
-  -- val <- execute conn  "INSERT INTO photo (image) VALUES (?);" [str]
+  val <- execute conn "INSERT INTO photo (image) VALUES (?);" [str]
   num <- query_ conn "SELECT max(photo_id) FROM photo;" :: IO [[Int]]
   let [[num']] = num
   pure . BC.pack . show $ num' 
