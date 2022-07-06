@@ -24,6 +24,7 @@ import           Category
 import           News
 import           Auth
 import           Photo
+import           Config
 
 
 
@@ -46,7 +47,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
   where
     reqMtd = requestMethod req
     [entity] = pathInfo req 
-    authId = authForGetNews req
+    authId = authorID req
     arr = queryString  req
     method = setMethodNews . queryToQueryText $ arr
     adm = isAdmin req
@@ -65,8 +66,7 @@ app req respond = do
   case qry of
     "404" -> responds status403 "text/plain" "404 Not Found"
     _     -> do                    
-      conn <- connectPostgreSQL "host='localhost' port=5432 \ 
-               \ dbname='haskellserverlite' user='haskell' password='haskell'"
+      conn <- connectDB
       val <- case requestMethod req of
         "GET" -> query_ conn qry :: IO [[T.Text]]         
         _     -> (\x -> [[T.pack $ show x]]) <$> execute_ conn qry 

@@ -15,6 +15,7 @@ import GHC.Generics
 import System.IO.Unsafe          (unsafePerformIO)
 --import Auth
 --import User
+import Config
 
 
 
@@ -43,8 +44,7 @@ parseCategory ls@(ic:pc:nc:ys)
 
 getParentCategories :: T.Text -> [T.Text] 
 getParentCategories cat = unsafePerformIO $ do
-  conn <- connectPostgreSQL "host='localhost' port=5432 dbname='haskellserverlite' \
-                             \ user='haskell' password='haskell'"
+  conn <- connectDB
   ls <- query_ conn $ getCategory' :: IO [[T.Text]]
   let buildingList pc = do
         let val = LT.find (\(x:y:xy) -> y == head pc) ls 

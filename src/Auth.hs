@@ -15,7 +15,7 @@ import qualified Network.Wai            as W
 import qualified Data.Text              as T
 import System.IO.Unsafe          (unsafePerformIO)
 import User
-
+import Config
 
 
 
@@ -27,8 +27,7 @@ checkAuth ls =
       case decodeLogAndPass of
         Left x -> Left x
         Right [x,y] -> isEmptyList $ unsafePerformIO $ do
-          conn <- connectPostgreSQL "host='localhost' port=5432 \ 
-                 \ dbname='haskellserverlite' user='haskell' password='haskell'"       
+          conn <- connectDB       
           let qry = getUser $ Query $ 
                          "WHERE login = '" <> x <> "' AND pass = '" <> y <> "'"  
           print qry                                               
@@ -42,8 +41,8 @@ checkAuth ls =
     isEmptyList [] = Left "No such user in DB"      
     isEmptyList ul = Right ul
 
-authForGetNews :: W.Request -> Query
-authForGetNews req = 
+authorID :: W.Request -> Query
+authorID req = 
   case checkAuth (requestHeaders req) of     
     Right [u] -> fromString $ show $ user_id u    
     _         -> Query $ "Null" 

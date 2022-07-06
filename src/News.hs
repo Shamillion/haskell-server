@@ -14,11 +14,12 @@ import qualified Data.Text as T
 import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.ByteString.Char8      as BC
 import GHC.Generics
---import System.IO.Unsafe                (unsafePerformIO)
+import System.IO.Unsafe                (unsafePerformIO)
 import User
 import Category
 import Photo
 -- import Debug.Trace
+import Config
 
 
 
@@ -117,10 +118,7 @@ setFiltersNews ((mthd, param):xs)
     fromMaybe (Just e) =  fromString $ T.unpack e
     fromMaybe Nothing  = "Null"
     creationDate x = "News.creation_date " <> x <> " '" <> fromMaybe param <> "'"
-
-
-
-
+    
 
 --'.../news?title=Text&category_id=3&content=Text&
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
@@ -157,7 +155,30 @@ buildPhotoIdString [x] = x
 buildPhotoIdString (x:xs) = x <> ", " <> buildPhotoIdString xs
     
 
-
+--editNews :: Query -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+--editNews _ [] = "404"
+--editNews auth ls 
+  -- | not authorNews = "404"
+  -- | otherwise = Query $ "404" 
+  --where
+    --notAuthor  
+    
+authorNews :: BC.ByteString -> BC.ByteString -> Bool
+authorNews authId newsId = 
+  unsafePerformIO $ do 
+    conn <- connectDB
+    ls <- query conn  "SELECT news_id FROM news WHERE user_id = ? AND \
+                                \ news_id = ?;" (authId , newsId) :: IO [[Int]] 
+    pure $ ls /= []            
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
 
 

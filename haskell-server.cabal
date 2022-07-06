@@ -27,6 +27,7 @@ library
   exposed-modules:
       Auth
       Category
+      Config
       Db
       Lib
       News
