@@ -155,13 +155,23 @@ buildPhotoIdString [x] = x
 buildPhotoIdString (x:xs) = x <> ", " <> buildPhotoIdString xs
     
 
---editNews :: Query -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
---editNews _ [] = "404"
---editNews auth ls 
-  -- | not authorNews = "404"
-  -- | otherwise = Query $ "404" 
-  --where
-    --notAuthor  
+editNews :: Query -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+editNews _ [] = "404"
+editNews auth ls 
+   | not author = "404"
+   | otherwise = Query $ "UPDATE news SET " <> buildChanges ls' <> 
+                         " WHERE news_id = " <> newsId <> ";"
+  where
+    author = authorNews (fromQuery auth) newsId
+    newsId = case LT.find (\(x,y) -> x == "news_id") ls of
+               Just (_, Just n) -> n
+               _                -> "0" 
+    ls' = LT.filter (\(x,y) -> elem x fields && y /= Nothing) ls    
+    fields = ["title", "category_id", "photo", "content", "is_published"]    
+    fromMaybe (Just e) = e
+    fromMaybe Nothing  = "Null"
+    
+    
     
 authorNews :: BC.ByteString -> BC.ByteString -> Bool
 authorNews authId newsId = 
@@ -172,7 +182,17 @@ authorNews authId newsId =
     pure $ ls /= []            
     
     
-    
+buildChanges :: [(BC.ByteString, Maybe BC.ByteString)] -> BC.ByteString    
+buildChanges [] = ""
+buildChanges [(x,y)] = x <> " = " <> q <> fromMaybe y <> q
+  where 
+    q = if elem x fields then "'" else "" 
+    fields = ["title", "content"] 
+    fromMaybe (Just e) = e
+    fromMaybe Nothing  = "Null"
+buildChanges ((x,y):xs) = buildChanges [(x,y)] <> ", " <> buildChanges xs 
+
+       
     
     
     

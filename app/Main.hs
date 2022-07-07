@@ -37,6 +37,7 @@ setQueryAndRespond :: W.Request -> (DB.Query, ([[T.Text]] -> LC.ByteString))
 setQueryAndRespond req = case (reqMtd, entity) of
   ("GET",  "news") -> (getNews authId method, encode . (map parseNews))
   ("POST", "news") -> (createNews athr authId arr, \[[x]] -> encode x)
+  ("PUT",  "news") -> (editNews authId arr, \[[x]] -> encode x)
   ("GET",  "user") -> (getUser "", encode . (map parseUser))
   ("POST", "user") -> (createUser adm arr, \[[x]] -> encode x)
   ("GET",  "category") -> (getCategory, encode . (map parseCategory))
