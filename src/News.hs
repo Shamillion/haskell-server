@@ -131,9 +131,9 @@ createNews True auth ls
   | otherwise = Query $
       "INSERT INTO news (title, creation_date, user_id, category_id, photo, \ 
       \ content, is_published) \
-      \ VALUES ('" <> title <> "', NOW(), " <> fromQuery auth <> ", " <> categoryId <>
-        ", " <> "'{" <> photo <> "}', '" <> content <> "', " 
-        <> isPublished <> ");"
+      \ VALUES ('" <> title <> "', NOW(), " <> fromQuery auth <> ", " <> 
+        categoryId <> ", " <> photoIDLs ls' <> ", '" <> content <> 
+        "', " <> isPublished <> ");"
   where
     nothingInLs = any (\(x,y) -> y == Nothing) ls 
     ls' = map (fromMaybe <$>) ls
@@ -143,31 +143,41 @@ createNews True auth ls
     categoryId = getValue "category_id"     
     content = getValue "content"
     isPublished = getValue "is_published"
-    photo = buildPhotoIdString . map (sendPhotoToDB . snd) . 
-                                 filter ((=="photo") . fst) $ ls' 
     getValue str = sndMaybe . LT.find (\(x,y) -> x == str) $ ls'
     sndMaybe Nothing  = "Null"
     sndMaybe (Just e) = snd e
     
+
+photoIDLs :: [(BC.ByteString, BC.ByteString)] -> BC.ByteString 
+photoIDLs = (\x -> "'{" <> x <> "}'") . buildPhotoIdString . 
+                         map (sendPhotoToDB . snd) . filter ((=="photo") . fst) 
+
 buildPhotoIdString :: [BC.ByteString] -> BC.ByteString    
 buildPhotoIdString [] = ""
 buildPhotoIdString [x] = x
 buildPhotoIdString (x:xs) = x <> ", " <> buildPhotoIdString xs
     
-
+    
+    --news?news_id=(id news needed to edit)&title=Text&category_id=3&
+--       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
+--          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
 editNews :: Query -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 editNews _ [] = "404"
 editNews auth ls 
    | not author = "404"
-   | otherwise = Query $ "UPDATE news SET " <> buildChanges ls' <> 
+   | otherwise = Query $ "UPDATE news SET " <>  photo' <> buildChanges ls' <> 
                          " WHERE news_id = " <> newsId <> ";"
   where
     author = authorNews (fromQuery auth) newsId
     newsId = case LT.find (\(x,y) -> x == "news_id") ls of
                Just (_, Just n) -> n
                _                -> "0" 
-    ls' = LT.filter (\(x,y) -> elem x fields && y /= Nothing) ls    
-    fields = ["title", "category_id", "photo", "content", "is_published"]    
+    ls' = map (fromMaybe <$>) $ 
+               LT.filter (\(x,y) -> elem x fields && y /= Nothing) ls    
+    fields = ["title", "category_id", "content", "is_published"]
+    photo' = if elem "photo" (map fst ls) 
+               then "photo = " <> photoIDLs (map (fromMaybe <$>) ls) <> ", " 
+               else ""   
     fromMaybe (Just e) = e
     fromMaybe Nothing  = "Null"
     
@@ -182,14 +192,12 @@ authorNews authId newsId =
     pure $ ls /= []            
     
     
-buildChanges :: [(BC.ByteString, Maybe BC.ByteString)] -> BC.ByteString    
+buildChanges :: [(BC.ByteString, BC.ByteString)] -> BC.ByteString    
 buildChanges [] = ""
-buildChanges [(x,y)] = x <> " = " <> q <> fromMaybe y <> q
+buildChanges [(x,y)] = x <> " = " <> q <> y <> q
   where 
     q = if elem x fields then "'" else "" 
     fields = ["title", "content"] 
-    fromMaybe (Just e) = e
-    fromMaybe Nothing  = "Null"
 buildChanges ((x,y):xs) = buildChanges [(x,y)] <> ", " <> buildChanges xs 
 
        
