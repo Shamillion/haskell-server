@@ -11,6 +11,7 @@ import Database.PostgreSQL.Simple as S
 import Database.PostgreSQL.Simple.Types
 import Data.Monoid                     ((<>))
 import qualified Data.Text as T 
+import Data.Text.Encoding            (encodeUtf8)
 import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.ByteString.Char8      as BC
 import GHC.Generics
@@ -39,7 +40,7 @@ getNews auth str = if str == Nothing
    \ WHERE (is_published = TRUE OR is_published = FALSE AND \
    \ author.user_id = " <> auth <> ") AND " <> fltr <>  -- WHERE title LIKE '%' 
    " GROUP BY news_id, title, news.creation_date, author, author.name_user, \
-   \ name_category, photo, content, is_published "  <> srt
+   \ name_category, photo, content, is_published "  <> srt <> ";"
    where 
      Just (fltr,srt) = str
 
@@ -75,25 +76,26 @@ parseNews ls
 setMethodNews :: [(T.Text, Maybe T.Text)] -> Maybe (Query, Query)
 setMethodNews ls = do
   a <- filterNews
-  b <- sortNews
+  b <- sortNewsLimitOffset
   pure (a,b)
   where
-    filterNews = setFiltersNews $ LT.filter ((/="sort_by") . fst) ls
+    filterNews = setFiltersNews $ LT.filter ((`notElem` fields) . fst) ls
+    fields = ["sort_by", "limit", "offset"]
     sortNews = 
       case findSort of
         [("sort_by", Just x)] -> sortBy x
-        _ -> pure ";"
+        _ -> pure ""
     findSort = LT.filter ((=="sort_by") . fst) ls
+    sortNewsLimitOffset = fmap (<> setLimitAndOffset ls) sortNews
 
 sortBy :: T.Text -> Maybe Query 
-sortBy mthd = fromString <$> ("ORDER BY " <>) <$>
+sortBy mthd = ("ORDER BY " <>) <$>
   case mthd of   
-   "date"     -> Just $ "creation_date;"
-   "author"   -> Just $ "author.name_user;"   
-   "category" -> Just $ "name_category;"
-   "photo"    -> Just $ "CARDINALITY(photo);" 
+   "date"     -> Just $ "creation_date"
+   "author"   -> Just $ "author.name_user"   
+   "category" -> Just $ "name_category"
+   "photo"    -> Just $ "CARDINALITY(photo)" 
    _          -> Nothing
-
 
 
 setFiltersNews :: [(T.Text, Maybe T.Text)] -> Maybe Query   
@@ -108,16 +110,29 @@ setFiltersNews ((mthd, param):xs)
         "created_at"    -> Just $ creationDate "="
         "created_until" -> Just $ creationDate "<"
         "created_since" -> Just $ creationDate ">="
-        "author"   -> Just $ "name_user = '" <> fromMaybe param <> "'" 
-        "category" -> Just $ "News.category_id = " <> fromMaybe param
-        "title"    -> Just $ "title ILIKE '%" <> fromMaybe param <> "%'" 
-        "content"  -> Just $ "content ILIKE '%" <> fromMaybe param <> "%'" 
+        "author"   -> Just $ "name_user = '" <> fromMaybe' param <> "'" 
+        "category" -> Just $ "News.category_id = " <> fromMaybe' param
+        "title"    -> Just $ "title ILIKE '%" <> fromMaybe' param <> "%'" 
+        "content"  -> Just $ "content ILIKE '%" <> fromMaybe' param <> "%'" 
         "search"   -> Just $ "(content || name_user || name_category) ILIKE '%"  
-                                                      <> fromMaybe param <> "%'" 
-        _ -> Nothing            
-    fromMaybe (Just e) =  fromString $ T.unpack e
-    fromMaybe Nothing  = "Null"
-    creationDate x = "News.creation_date " <> x <> " '" <> fromMaybe param <> "'"
+                                                     <> fromMaybe' param <> "%'" 
+        _ -> Nothing 
+    fromMaybe' = fromString . T.unpack . fromMaybe            
+    creationDate x = "News.creation_date " <> x <> " '" <> 
+                                              fromMaybe' param <> "'"
+  
+setLimitAndOffset :: [(T.Text, Maybe T.Text)] -> Query 
+setLimitAndOffset ls = Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst 
+  where
+    ofst = case LT.find ((== "offset") . fst) ls of
+               Just (_, Just n) -> encodeUtf8 n
+               _                -> "0"
+    lmt  = case LT.find ((== "limit") . fst) ls of
+               Just (_, Just n) -> ordNum n
+               _                -> num
+    num  = BC.pack $ show limitElem
+    ordNum x = 
+      if (read $ T.unpack x) > limitElem then num else encodeUtf8 x
     
 
 --'.../news?title=Text&category_id=3&content=Text&
@@ -137,8 +152,6 @@ createNews True auth ls
   where
     nothingInLs = any (\(x,y) -> y == Nothing) ls 
     ls' = map (fromMaybe <$>) ls
-    fromMaybe (Just e) = e
-    fromMaybe Nothing  = "Null"
     title = getValue "title"
     categoryId = getValue "category_id"     
     content = getValue "content"
@@ -178,11 +191,8 @@ editNews auth ls
     photo' = if elem "photo" (map fst ls) 
                then "photo = " <> photoIDLs (map (fromMaybe <$>) ls) <> ", " 
                else ""   
-    fromMaybe (Just e) = e
-    fromMaybe Nothing  = "Null"
-    
-    
-    
+  
+  
 authorNews :: BC.ByteString -> BC.ByteString -> Bool
 authorNews authId newsId = 
   unsafePerformIO $ do 

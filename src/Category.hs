@@ -83,8 +83,6 @@ editCategory True ls
     categorys = map ((filter (/= "")) <$>) fls'       
     fls''@((method,[name,new_name]):xs) = map (\x -> if length (snd x) < 2 
                                        then ("404", ["",""]) else x) categorys
-    fromMaybe (Just e) = e
-    fromMaybe Nothing  = "???"
     checkQuery lq = if elem "404" lq then "404" else mconcat lq
     buildQuery (method,[name,new_name]) = 
       case method of
@@ -101,7 +99,8 @@ editCategory True ls
           \ WHERE name_category = '" <> name <> "'; " 
         _ -> "404"
 
-
+fromMaybe (Just e) = e
+fromMaybe Nothing  = "???"
 
 
 
