@@ -38,9 +38,9 @@ setQueryAndRespond req = case (reqMtd, entity) of
   ("GET",  "news") -> (getNews authId method, encode . (map parseNews))
   ("POST", "news") -> (createNews athr authId arr, \[[x]] -> encode x)
   ("PUT",  "news") -> (editNews authId arr, \[[x]] -> encode x)
-  ("GET",  "user") -> (getUser "", encode . (map parseUser))
+  ("GET",  "user") -> (getUser limitOffset, encode . (map parseUser))
   ("POST", "user") -> (createUser adm arr, \[[x]] -> encode x)
-  ("GET",  "category") -> (getCategory, encode . (map parseCategory))
+  ("GET",  "category") -> (getCategory limitOffset, encode . (map parseCategory))
   ("POST", "category") -> (createCategory adm arr, \[[x]] -> encode x)
   ("PUT",  "category") -> (editCategory adm arr, \[[x]] -> encode x)
   ("GET",  "photo")  -> (getPhoto arr, decodeImage)
@@ -51,6 +51,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
     authId = authorID req
     arr = queryString  req
     method = setMethodNews . queryToQueryText $ arr
+    limitOffset = setLimitAndOffset . queryToQueryText $ arr
     adm = isAdmin req
     athr = isAuthor req 
 

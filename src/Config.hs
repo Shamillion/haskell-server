@@ -9,4 +9,4 @@ connectDB :: IO Connection
 connectDB = connectPostgreSQL "host='localhost' port=5432 \
                \ dbname='haskellserverlite' user='haskell' password='haskell'"
 
-limitElem = 5
+limitElem = 20

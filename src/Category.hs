@@ -19,9 +19,9 @@ import Config
 
 
 
-getCategory :: Query
-getCategory = "SELECT (category_id :: TEXT), parent_category, \
-              \ name_category FROM category;"
+getCategory :: Query -> Query
+getCategory limitOffset = "SELECT (category_id :: TEXT), parent_category, \
+              \ name_category FROM category " <> limitOffset <> ";"
               
 getCategory' :: Query
 getCategory' = "SELECT parent_category, name_category FROM category;"              

@@ -13,9 +13,9 @@ import qualified Data.ByteString.Char8 as BC
 
 
 getUser :: Query -> Query
-getUser str = "SELECT  (user_id :: TEXT), name_user, (creation_date :: TEXT), \
-   \ (is_admin :: TEXT), (is_author :: TEXT) \
-   \ FROM users " <> str <> ";" 
+getUser limitOffset = "SELECT  (user_id :: TEXT), name_user, \
+   \ (creation_date :: TEXT), (is_admin :: TEXT), (is_author :: TEXT) \
+   \ FROM users " <> limitOffset <> ";" 
 
 data User = User
   { user_id        :: Int
