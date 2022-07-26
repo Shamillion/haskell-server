@@ -42,6 +42,7 @@ library
     , base >=4.7 && <5
     , base64-bytestring
     , bytestring
+    , cryptonite
     , http-conduit
     , http-types
     , postgresql-simple
@@ -63,6 +64,7 @@ executable haskell-server-exe
     , base >=4.7 && <5
     , base64-bytestring
     , bytestring
+    , cryptonite
     , haskell-server
     , http-conduit
     , http-types
@@ -86,6 +88,7 @@ test-suite haskell-server-test
     , base >=4.7 && <5
     , base64-bytestring
     , bytestring
+    , cryptonite
     , haskell-server
     , http-conduit
     , http-types

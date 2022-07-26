@@ -2,11 +2,12 @@
 
 module Auth where
 
+import Crypto.KDF.BCrypt (validatePassword)
 import           Network.Wai
 --import qualified Data.ByteString.Lazy as L
 import Network.HTTP.Types.Header
 import qualified Data.ByteString.Base64 as BB
-import Data.ByteString.Char8          (split)
+import Data.ByteString.Char8   as BC       (split, pack)
 --import Data.ByteString.UTF8 (toString)
 import Data.String          (fromString)
 import Database.PostgreSQL.Simple
@@ -29,17 +30,24 @@ checkAuth ls =
         Right [x,y] -> isEmptyList $ unsafePerformIO $ do
           conn <- connectDB       
           let qry = getUser $ Query $ 
-                         "WHERE login = '" <> x <> "' AND pass = '" <> y <> "'"  
+                         "WHERE login = '" <> x <> "'"  
           print qry                                               
           userList <- query_ conn $ qry :: IO [[T.Text]] 
           print userList
-          pure $ map parseUser userList
+          pure $ checkPassword y userList       
   where
     fls = filter  ((=="Authorization") . fst) ls
     [(hdr, str)] = fls
-    decodeLogAndPass = (split ':') <$> (BB.decode . last . split ' ' $ str)
+    decodeLogAndPass = (split ':') <$> (BB.decode . last . BC.split ' ' $ str)
     isEmptyList [] = Left "No such user in DB"      
     isEmptyList ul = Right ul
+    checkPassword _ [] = []
+    checkPassword p (u:_)
+      | u == [] = []
+      | otherwise = 
+          if (validatePassword p $ (\(h:_) -> BC.pack $ T.unpack h) $ reverse u)
+          then [parseUser u]
+          else [] 
 
 authorID :: W.Request -> Query
 authorID req = 

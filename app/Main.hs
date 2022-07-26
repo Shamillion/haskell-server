@@ -43,7 +43,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
   ("GET",  "category") -> (getCategory limitOffset, encode . (map parseCategory))
   ("POST", "category") -> (createCategory adm arr, \[[x]] -> encode x)
   ("PUT",  "category") -> (editCategory adm arr, \[[x]] -> encode x)
-  ("GET",  "photo")  -> (getPhoto arr, decodeImage)
+  ("GET",  "photo")  -> (getPhoto arr, decodeImage)  
   _                -> ("404", \x -> "404")
   where
     reqMtd = requestMethod req

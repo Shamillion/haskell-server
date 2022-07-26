@@ -24,6 +24,7 @@ dependencies:
 - aeson
 - base64-bytestring
 - bytestring
+- cryptonite
 - http-conduit
 - http-types
 - text

@@ -2,20 +2,24 @@
 
 module User where
 
+import Crypto.KDF.BCrypt (hashPassword, validatePassword)
 import Data.Aeson
 import Data.Monoid                     ((<>))
 import Database.PostgreSQL.Simple
 import qualified Data.Text as T 
 import Database.PostgreSQL.Simple.Types 
 import qualified Data.ByteString.Char8 as BC 
+import System.IO.Unsafe                (unsafePerformIO)
 
 
+import Config
+import Data.Char (ord)
 
 
 getUser :: Query -> Query
-getUser limitOffset = "SELECT  (user_id :: TEXT), name_user, \
-   \ (creation_date :: TEXT), (is_admin :: TEXT), (is_author :: TEXT) \
-   \ FROM users " <> limitOffset <> ";" 
+getUser str = "SELECT  (user_id :: TEXT), name_user, \
+   \ (creation_date :: TEXT), (is_admin :: TEXT), (is_author :: TEXT), pass \
+   \ FROM users " <> str <> ";" 
 
 data User = User
   { user_id        :: Int
@@ -41,10 +45,10 @@ errorUser = User 0 "error" "error" False False
 
 parseUser :: [T.Text] -> User
 parseUser ls
-  | length ls /= 5 = errorUser
+  | length ls /= 6 = errorUser
   | otherwise = User id u2 u3 isAdm isAth
   where     
-    [u1,u2,u3,u4,u5] = ls
+    [u1,u2,u3,u4,u5,u6] = ls
     id = read $ T.unpack u1 :: Int
     isAdm = u4 == "t" || u4 == "true"
     isAth = u5 == "t" || u5 == "true"
@@ -70,9 +74,26 @@ createUser _ ls
     fromMaybe Nothing  = "Nothing"
 
 
+--cryptoPass :: Int -> BC.ByteString -> BC.ByteString
+--cryptoPass n str = 
+  --unsafePerformIO $ hashPassword (mod n 7 + 4) str 
 
 
-
+--passwordToHash :: Query          -- Turned passwords to hash in DB 
+--passwordToHash = unsafePerformIO $ do
+  --conn <- connectDB
+  --ls <- query_ conn "SELECT  (user_id :: TEXT), name_user, pass FROM users;" :: IO [[BC.ByteString]]
+  --let hp = map fun ls
+      --qry (f,s) = "UPDATE users SET pass = '" <> s <> "' \
+                               -- \ WHERE user_id = " <> f <> ";"
+      --hp' = map (\p -> execute_ conn $ Query $ qry p) hp
+  --x <- sequence hp'
+  --print x    
+  --pure "SELECT name_user FROM users;"
+  --where
+    --fun (x1:x2:x3:xs) = 
+      --(x1, cryptoPass (sum $ map ord $ BC.unpack x2) x3) 
+  
 
 
 
