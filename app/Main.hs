@@ -14,7 +14,7 @@ import           Data.Text.Encoding        (encodeUtf8)
 --import qualified Data.Text.Lazy.Encoding as LE   (encodeUtf8)
 import           GHC.Generics
 import           Network.HTTP.Simple        
-import           Network.HTTP.Types        (status200, status403, status404, 
+import           Network.HTTP.Types        (status200, status406, status404, 
                                                               queryToQueryText)
 import           Network.Wai                as W
 import           Network.Wai.Handler.Warp        (run)
@@ -66,7 +66,8 @@ app req respond = do
   print $ queryString req 
   print qry
   case qry of
-    "404" -> responds status403 "text/plain" "404 Not Found"
+    "404" -> responds status404 "text/plain" "404 Not Found.\n"
+    "406" -> responds status406 "text/plain" "This login is already in use.\n"
     _     -> do                    
       conn <- connectDB
       val <- case requestMethod req of

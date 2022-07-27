@@ -2,18 +2,17 @@
 
 module User where
 
-import Crypto.KDF.BCrypt (hashPassword, validatePassword)
+import Crypto.KDF.BCrypt (hashPassword)
 import Data.Aeson
+import Data.Char                       (ord)
 import Data.Monoid                     ((<>))
 import Database.PostgreSQL.Simple
 import qualified Data.Text as T 
 import Database.PostgreSQL.Simple.Types 
 import qualified Data.ByteString.Char8 as BC 
 import System.IO.Unsafe                (unsafePerformIO)
-
-
 import Config
-import Data.Char (ord)
+
 
 
 getUser :: Query -> Query
@@ -60,24 +59,34 @@ createUser False _ = "404"
 createUser _ ls 
   | ls == [] || (map fst ls) /= checkList = "404"
   | searchNothing = "404"
+  | not (checkUniqLogin login) = "406"
   | otherwise = Query $
       "INSERT INTO users (name_user, login, pass, \
       \       creation_date, is_admin, is_author) \
-      \ VALUES ('" <> name_user <> "', '" <> login <> "', '" <> pass <> 
+      \ VALUES ('" <> name_user <> "', '" <> login <> "', '" <> pass' <> 
                 "', NOW(), '" <> is_admin <> "', '" <> is_author <> "');"
   where
     checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
     sndList = map (fromMaybe . snd) ls
     searchNothing = elem "Nothing" sndList
     [name_user, login, pass, is_admin, is_author] = map (fromMaybe . snd) ls
+    pass' = cryptoPass (sum . map ord . BC.unpack $ name_user) pass    
     fromMaybe (Just e) = e
     fromMaybe Nothing  = "Nothing"
 
 
---cryptoPass :: Int -> BC.ByteString -> BC.ByteString
---cryptoPass n str = 
-  --unsafePerformIO $ hashPassword (mod n 7 + 4) str 
+cryptoPass :: Int -> BC.ByteString -> BC.ByteString
+cryptoPass n str = 
+  unsafePerformIO $ hashPassword (mod n 7 + 4) str 
 
+
+checkUniqLogin :: BC.ByteString -> Bool
+checkUniqLogin str = unsafePerformIO $ do
+  conn <- connectDB
+  ls <- query_ conn $ Query $ "SELECT name_user FROM users \
+                      \ WHERE login = '" <> str <> "';" :: IO [[BC.ByteString]]
+  print ls
+  pure $ ls == []                   
 
 --passwordToHash :: Query          -- Turned passwords to hash in DB 
 --passwordToHash = unsafePerformIO $ do
@@ -85,7 +94,7 @@ createUser _ ls
   --ls <- query_ conn "SELECT  (user_id :: TEXT), name_user, pass FROM users;" :: IO [[BC.ByteString]]
   --let hp = map fun ls
       --qry (f,s) = "UPDATE users SET pass = '" <> s <> "' \
-                               -- \ WHERE user_id = " <> f <> ";"
+                     -- \ WHERE user_id = " <> f <> ";"
       --hp' = map (\p -> execute_ conn $ Query $ qry p) hp
   --x <- sequence hp'
   --print x    
@@ -95,6 +104,6 @@ createUser _ ls
       --(x1, cryptoPass (sum $ map ord $ BC.unpack x2) x3) 
   
 
-
+ -- SELECT user_id, name_user FROM users WHERE login = 'Logan';
 
 
