@@ -66,8 +66,15 @@ app req respond = do
   print $ queryString req 
   print qry
   case qry of
-    "404" -> responds status404 "text/plain" "404 Not Found.\n"
-    "406" -> responds status406 "text/plain" "This login is already in use.\n"
+    "404"   -> responds status404 "text/plain" "404 Not Found.\n"
+    "406uu" -> responds status406 "text/plain" "This login is already in use.\n"
+    "406cu" -> responds status406 "text/plain" "This category already exists.\n"
+    "406cn" -> responds status406 "text/plain" "There is no such category.\n"
+    "406cp" -> responds status406 "text/plain" "There is no such parent \
+                                                                   \category.\n"
+    "406ce" -> responds status406 "text/plain" "A category cannot be a parent \
+                                                                  \to itself.\n"
+                                                                      
     _     -> do                    
       conn <- connectDB
       val <- case requestMethod req of

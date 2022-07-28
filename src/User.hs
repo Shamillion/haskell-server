@@ -59,7 +59,7 @@ createUser False _ = "404"
 createUser _ ls 
   | ls == [] || (map fst ls) /= checkList = "404"
   | searchNothing = "404"
-  | not (checkUniqLogin login) = "406"
+  | not (checkUniqLogin login) = "406uu"
   | otherwise = Query $
       "INSERT INTO users (name_user, login, pass, \
       \       creation_date, is_admin, is_author) \

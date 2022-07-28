@@ -59,6 +59,8 @@ createCategory False _ = "404"
 createCategory _ [] = "404"
 createCategory True ls 
   | categorys == [] = "404" 
+  | not (checkUniqCategory name_category) = "406cu"
+  | checkUniqCategory parent_category = "406cp"
   | otherwise = Query $
       "INSERT INTO category (name_category, parent_category) \
       \ VALUES ('" <> name_category <> "', '" <> parent_category <> "');"
@@ -76,6 +78,10 @@ editCategory False _ = "404"
 editCategory _ [] = "404"
 editCategory True ls 
   | fls == [] = "404" 
+  | checkUniqCategory name = "406cn"
+  | method == "change_name" && not (checkUniqCategory new_name) = "406cu"
+  | method == "change_parent" && checkUniqCategory new_name = "406cp"
+  | method == "change_parent" && name == new_name = "406ce"
   | otherwise = Query $ checkQuery $ map buildQuery fls''               
   where
     fls = filter ((/="???") . snd) $ map (fmap fromMaybe) ls 
@@ -102,7 +108,13 @@ editCategory True ls
 fromMaybe (Just e) = e
 fromMaybe Nothing  = "???"
 
-
+checkUniqCategory :: BC.ByteString -> Bool
+checkUniqCategory str = unsafePerformIO $ do
+  conn <- connectDB
+  ls <- query_ conn $ Query $ "SELECT name_category FROM category WHERE \
+                     \ name_category = '" <> str <> "';" :: IO [[BC.ByteString]]
+  print ls
+  pure $ ls == []
 
 
 
