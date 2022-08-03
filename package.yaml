@@ -28,6 +28,7 @@ dependencies:
 - http-conduit
 - http-types
 - text
+- time
 - utf8-string
 - wai
 - warp

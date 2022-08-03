@@ -47,6 +47,7 @@ library
     , http-types
     , postgresql-simple
     , text
+    , time
     , utf8-string
     , wai
     , warp
@@ -70,6 +71,7 @@ executable haskell-server-exe
     , http-types
     , postgresql-simple
     , text
+    , time
     , utf8-string
     , wai
     , warp
@@ -94,6 +96,7 @@ test-suite haskell-server-test
     , http-types
     , postgresql-simple
     , text
+    , time
     , utf8-string
     , wai
     , warp

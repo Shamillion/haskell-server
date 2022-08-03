@@ -1,0 +1,14 @@
+{
+  "dbHost" : "localhost", 
+  "comment_db" : "db is Data Base",             
+  "dbPort"      : 5432,
+  "dbname"      : "haskellserverlite",
+  "dbUser"      : "haskell",
+  "dbPassword"  : "haskell",    
+  "maxElem" : 20,  
+  "comment_maxElem" : "The maximum number of elements in the server response", 
+  "priorityLevel"  : "INFO",
+  "comment_priorityLevel" : "DEBUG || INFO || WARNING || ERROR",
+  "logOutput"      : "cons",
+  "comment_logOutput" : "file || cons"
+}
