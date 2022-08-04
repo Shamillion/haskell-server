@@ -7,6 +7,7 @@ module Config where
 import Data.Aeson
 import qualified Data.ByteString.Lazy      as L
 import           Database.PostgreSQL.Simple 
+import qualified System.IO                 as I
 import           System.IO.Unsafe                              (unsafePerformIO)
 import           GHC.Generics                                          (Generic)
 import           Data.Monoid                                              ((<>))
@@ -22,8 +23,8 @@ data Configuration = Configuration -- Data type for the configuration file.
   , dbUser :: String 
   , dbPassword :: String 
   , maxElem :: Int
---  , priorityLevel :: Priority
---  , logOutput :: T.Text
+  , priorityLevel :: Priority
+  , logOutput :: String
   }
   deriving (Show, Generic, FromJSON)
  
@@ -39,8 +40,8 @@ getConfiguration fileName =              -- Function reads configuration
       Left e  -> do
         let str = t ++ " UTC   " ++ "ERROR  " ++ " - " ++ e
         print str
-  --      hPutStrLn file str
-  --      hFlush file
+        I.hPutStrLn file str
+        I.hFlush file
         pure obj
 
 errorConfig :: Configuration   -- The object is used when the configuration
@@ -52,8 +53,8 @@ errorConfig =                  --   file is read unsuccessfully.
     , dbUser = "Error"
     , dbPassword = "Error"
     , maxElem  = 0
- --   , priorityLevel = ERROR
- --   , logOutput = "cons"
+    , priorityLevel = ERROR
+    , logOutput = "cons"
     }
 
 configuration :: Configuration              -- Try to read configuration file.
@@ -76,8 +77,54 @@ connectInfo =
     , connectPassword = dbPassword configuration
     }
 
+limitElem = maxElem configuration
 
 connectDB :: IO Connection
 connectDB = connect connectInfo
 
-limitElem = maxElem configuration
+
+
+
+
+
+
+data Priority = DEBUG | INFO | WARNING | ERROR -- Data type for the logger.
+  deriving (Show, Eq, Ord, Generic, FromJSON)
+  
+file :: I.Handle                                -- Get Handle for the logfile.
+file  = unsafePerformIO $ I.openFile "../log.log" I.AppendMode
+
+writingLine :: Priority -> String -> IO () -- Function writes log
+writingLine lvl str =                      --       information down.
+  if (lvl >= logLevel) 
+    then do
+      t <- time
+      let string = t ++ " UTC   " ++ fun lvl ++ " - " ++ str
+      case out of
+        "file" -> do
+          I.hPutStrLn file string
+          I.hFlush file
+        _ -> print string
+    else pure ()
+ where
+  out = logOutput configuration
+  fun val = case val of
+    DEBUG -> "DEBUG  "
+    INFO -> "INFO   "
+    WARNING -> "WARNING"
+    ERROR -> "ERROR  "  
+  
+logLevel :: Priority                             -- Logging level.
+logLevel =  priorityLevel configuration
+
+
+
+
+
+
+
+
+
+
+  
+  
