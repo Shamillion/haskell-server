@@ -17,7 +17,8 @@ import           Data.Word                                              (Word16)
 
 
 data Configuration = Configuration -- Data type for the configuration file.
-  { dbHost :: String  
+  { serverPort :: Int
+  , dbHost :: String  
   , dbPort :: Word16
   , dbname :: String 
   , dbUser :: String 
@@ -47,7 +48,8 @@ getConfiguration fileName =              -- Function reads configuration
 errorConfig :: Configuration   -- The object is used when the configuration
 errorConfig =                  --   file is read unsuccessfully.
   Configuration 
-    { dbHost = "Error"
+    { serverPort = 0
+    , dbHost = "Error"
     , dbPort = 0
     , dbname = "Error"
     , dbUser = "Error"
@@ -80,22 +82,19 @@ connectInfo =
 limitElem = maxElem configuration
 
 connectDB :: IO Connection
-connectDB = connect connectInfo
+connectDB = do 
+  writingLine DEBUG $ show connectInfo
+  connect connectInfo
 
 
-
-
-
-
-
-data Priority = DEBUG | INFO | WARNING | ERROR -- Data type for the logger.
+data Priority = DEBUG | INFO | WARNING | ERROR      -- Data type for the logger.
   deriving (Show, Eq, Ord, Generic, FromJSON)
   
-file :: I.Handle                                -- Get Handle for the logfile.
+file :: I.Handle                                  -- Get Handle for the logfile.
 file  = unsafePerformIO $ I.openFile "../log.log" I.AppendMode
 
-writingLine :: Priority -> String -> IO () -- Function writes log
-writingLine lvl str =                      --       information down.
+writingLine :: Priority -> String -> IO ()               -- Function writes log
+writingLine lvl str =                                    --    information down.
   if (lvl >= logLevel) 
     then do
       t <- time
@@ -113,11 +112,15 @@ writingLine lvl str =                      --       information down.
     INFO -> "INFO   "
     WARNING -> "WARNING"
     ERROR -> "ERROR  "  
+ 
+writingLineDebug :: (Show a) => a -> IO ()  
+writingLineDebug s = writingLine DEBUG $ show s
   
-logLevel :: Priority                             -- Logging level.
+logLevel :: Priority                                           -- Logging level.
 logLevel =  priorityLevel configuration
 
-
+port :: Int                                                  -- TCP port number.
+port =  serverPort configuration
 
 
 

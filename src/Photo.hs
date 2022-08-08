@@ -31,15 +31,14 @@ getPhoto (x:xs) = Query $
       then "SELECT image FROM photo WHERE photo_id = " <> n <> ";"
       else "404"
 
+
 decodeImage :: [[T.Text]] -> LC.ByteString
 decodeImage [] = "404"
 decodeImage [[img]] = decodeLenient . LC.fromStrict . encodeUtf8 $ img'
   where
     img' = T.drop 1 . T.dropWhile (/=',') $ img
-
-
-
-
+    
+    
 sendPhotoToDB :: BC.ByteString -> BC.ByteString
 sendPhotoToDB str = unsafePerformIO $ do
   conn <- connectDB

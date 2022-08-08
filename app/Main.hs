@@ -59,12 +59,12 @@ setQueryAndRespond req = case (reqMtd, entity) of
 app :: Application
 app req respond = do
   let (qry,resp) = setQueryAndRespond req
-  print $ requestMethod req  
-  print $ requestHeaders req 
-  print $ checkAuth $ requestHeaders req  
-  print $ pathInfo req 
-  print $ queryString req 
-  print qry
+  writingLineDebug $ requestMethod req  
+  writingLineDebug $ requestHeaders req 
+  writingLineDebug $ checkAuth $ requestHeaders req  
+  writingLineDebug $ pathInfo req 
+  writingLineDebug $ queryString req 
+  writingLineDebug qry
   case qry of
     "404"   -> responds status404 "text/plain" "404 Not Found.\n"
     "406uu" -> responds status406 "text/plain" "This login is already in use.\n"
@@ -80,7 +80,7 @@ app req respond = do
       val <- case requestMethod req of
         "GET" -> query_ conn qry :: IO [[T.Text]]         
         _     -> (\x -> [[T.pack $ show x]]) <$> execute_ conn qry 
-      print val 
+      writingLineDebug val 
       let hdr = if pathInfo req == ["photo"] 
                   then  getHdr val'
                   else  "text/plain" 
@@ -96,7 +96,6 @@ app req respond = do
                                                                      
 
 main = do
-  --  visitorCount <- newMVar 0
-  --  run 4200 $ application visitorCount 
-  run 4200 app
- -- print defaultConnectInfo
+  writingLine INFO "Server is started."
+  run port app
+ 

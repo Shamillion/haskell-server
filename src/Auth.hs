@@ -26,14 +26,15 @@ checkAuth ls =
   if fls == [] then Left "No Authorization"
     else 
       case decodeLogAndPass of
-        Left x -> Left x
+        Left x -> unsafePerformIO $ do 
+                  writingLine ERROR x 
+                  pure $ Left x
         Right [x,y] -> isEmptyList $ unsafePerformIO $ do
           conn <- connectDB       
-          let qry = getUser $ Query $ 
-                         "WHERE login = '" <> x <> "'"  
-          print qry                                               
+          let qry = getUser $ Query $ "WHERE login = '" <> x <> "'"  
+          writingLineDebug qry                                               
           userList <- query_ conn $ qry :: IO [[T.Text]] 
-          print userList
+          writingLineDebug userList
           pure $ checkPassword y userList       
   where
     fls = filter  ((=="Authorization") . fst) ls
