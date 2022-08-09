@@ -46,6 +46,7 @@ getParentCategories :: T.Text -> [T.Text]
 getParentCategories cat = unsafePerformIO $ do
   conn <- connectDB
   ls <- query_ conn $ getCategory' :: IO [[T.Text]]
+  writingLineDebug ls
   let buildingList pc = do
         let val = LT.find (\(x:y:xy) -> y == head pc) ls 
         case val of
@@ -105,15 +106,13 @@ editCategory True ls
           \ WHERE name_category = '" <> name <> "'; " 
         _ -> "404"
 
-fromMaybe (Just e) = e
-fromMaybe Nothing  = "???"
 
 checkUniqCategory :: BC.ByteString -> Bool
 checkUniqCategory str = unsafePerformIO $ do
   conn <- connectDB
   ls <- query_ conn $ Query $ "SELECT name_category FROM category WHERE \
                      \ name_category = '" <> str <> "';" :: IO [[BC.ByteString]]
-  print ls
+  writingLineDebug ls
   pure $ ls == []
 
 

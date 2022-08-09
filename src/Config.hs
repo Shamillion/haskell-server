@@ -83,7 +83,8 @@ limitElem = maxElem configuration
 
 connectDB :: IO Connection
 connectDB = do 
-  writingLine DEBUG $ show connectInfo
+  writingLine INFO "Sent a request to the database."
+  writingLineDebug connectInfo
   connect connectInfo
 
 
@@ -122,6 +123,10 @@ logLevel =  priorityLevel configuration
 port :: Int                                                  -- TCP port number.
 port =  serverPort configuration
 
+
+
+fromMaybe (Just e) = e
+fromMaybe Nothing  = "???"
 
 
 

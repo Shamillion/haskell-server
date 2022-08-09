@@ -58,6 +58,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
        
 app :: Application
 app req respond = do
+  writingLine INFO "Received a request."
   let (qry,resp) = setQueryAndRespond req
   writingLineDebug $ requestMethod req  
   writingLineDebug $ requestHeaders req 
@@ -84,7 +85,8 @@ app req respond = do
       let hdr = if pathInfo req == ["photo"] 
                   then  getHdr val'
                   else  "text/plain" 
-          [[val']] = val                                
+          [[val']] = val 
+      writingLine INFO "Sent a response to the request."                                   
       responds status200 hdr $ resp val     
   where
     responds sts hdr = respond . responseLBS sts [("Content-Type", hdr)]  

@@ -68,11 +68,9 @@ createUser _ ls
   where
     checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
     sndList = map (fromMaybe . snd) ls
-    searchNothing = elem "Nothing" sndList
+    searchNothing = elem "???" sndList
     [name_user, login, pass, is_admin, is_author] = map (fromMaybe . snd) ls
     pass' = cryptoPass (sum . map ord . BC.unpack $ name_user) pass    
-    fromMaybe (Just e) = e
-    fromMaybe Nothing  = "Nothing"
 
 
 cryptoPass :: Int -> BC.ByteString -> BC.ByteString
@@ -85,7 +83,7 @@ checkUniqLogin str = unsafePerformIO $ do
   conn <- connectDB
   ls <- query_ conn $ Query $ "SELECT name_user FROM users \
                       \ WHERE login = '" <> str <> "';" :: IO [[BC.ByteString]]
-  print ls
+  writingLineDebug ls
   pure $ ls == []                   
 
 --passwordToHash :: Query          -- Turned passwords to hash in DB 
@@ -102,8 +100,3 @@ checkUniqLogin str = unsafePerformIO $ do
   --where
     --fun (x1:x2:x3:xs) = 
       --(x1, cryptoPass (sum $ map ord $ BC.unpack x2) x3) 
-  
-
- -- SELECT user_id, name_user FROM users WHERE login = 'Logan';
-
-
