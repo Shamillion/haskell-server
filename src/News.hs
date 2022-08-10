@@ -21,6 +21,7 @@ import Category
 import Photo
 -- import Debug.Trace
 import Config
+import Lib
 
 
 
@@ -35,7 +36,7 @@ getNews auth str = if str == Nothing
    \ FROM news \ 
    \ INNER JOIN category ON news.category_id = category.category_id \
    \ INNER JOIN ( SELECT  user_id, name_user, users.creation_date, is_admin, \
-   \ is_author \
+   \ is_author, login \
    \ FROM users ) author ON news.user_id = author.user_id \                        
    \ WHERE (is_published = TRUE OR is_published = FALSE AND \
    \ author.user_id = " <> auth <> ") AND " <> fltr <>  -- WHERE title LIKE '%' 

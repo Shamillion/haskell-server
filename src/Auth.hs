@@ -17,7 +17,7 @@ import qualified Data.Text              as T
 import System.IO.Unsafe          (unsafePerformIO)
 import User
 import Config
-
+import Lib                                                               (last')
 
 
 
@@ -39,7 +39,7 @@ checkAuth ls =
   where
     fls = filter  ((=="Authorization") . fst) ls
     [(hdr, str)] = fls
-    decodeLogAndPass = (split ':') <$> (BB.decode . last . BC.split ' ' $ str)
+    decodeLogAndPass = (split ':') <$> (BB.decode . last' . BC.split ' ' $ str)
     isEmptyList [] = Left "No such user in DB"      
     isEmptyList ul = Right ul
     checkPassword _ [] = []

@@ -12,7 +12,7 @@ import Database.PostgreSQL.Simple.Types
 import qualified Data.ByteString.Char8 as BC 
 import System.IO.Unsafe                (unsafePerformIO)
 import Config
-
+import Lib
 
 
 getUser :: Query -> Query

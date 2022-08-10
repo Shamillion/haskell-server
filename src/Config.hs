@@ -123,16 +123,5 @@ logLevel =  priorityLevel configuration
 port :: Int                                                  -- TCP port number.
 port =  serverPort configuration
 
-
-
-fromMaybe (Just e) = e
-fromMaybe Nothing  = "???"
-
-
-
-
-
-
-
-  
-  
+--fromMaybe (Just e) = e
+--fromMaybe Nothing  = "???"

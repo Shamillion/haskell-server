@@ -13,10 +13,11 @@ import qualified Data.Text as T
 import qualified Data.ByteString.Char8  as BC     
 import GHC.Generics 
 import System.IO.Unsafe          (unsafePerformIO)
+import Text.Read                 (readMaybe) 
 --import Auth
 --import User
 import Config
-
+import Lib                                                    (head', fromMaybe)
 
 
 getCategory :: Query -> Query
@@ -39,7 +40,12 @@ errorCategory =  Category 0 "error" "error"
 parseCategory :: [T.Text] -> Category
 parseCategory ls@(ic:pc:nc:ys)
   | length ls /= 3 = errorCategory
-  | otherwise = Category (read $ T.unpack ic :: Int) pc nc  
+  | idCat == 0 = errorCategory
+  | otherwise = Category idCat pc nc 
+  where
+    idCat = case (readMaybe $ T.unpack ic) of              
+              Just x -> (x :: Int) 
+              _      -> 0
     
 
 getParentCategories :: T.Text -> [T.Text] 
@@ -48,9 +54,9 @@ getParentCategories cat = unsafePerformIO $ do
   ls <- query_ conn $ getCategory' :: IO [[T.Text]]
   writingLineDebug ls
   let buildingList pc = do
-        let val = LT.find (\(x:y:xy) -> y == head pc) ls 
+        let val = LT.find (\(x:y:xy) -> y == head' pc) ls 
         case val of
-          Just el -> buildingList (head el : pc)
+          Just el -> buildingList (head' el : pc)
           _       -> pc 
   pure $ filter (/="Null") $ buildingList [cat]
 
