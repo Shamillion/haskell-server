@@ -13,11 +13,10 @@ import qualified Data.Text as T
 import qualified Data.ByteString.Char8  as BC     
 import GHC.Generics 
 import System.IO.Unsafe          (unsafePerformIO)
-import Text.Read                 (readMaybe) 
 --import Auth
 --import User
 import Config
-import Lib                                                    (head', fromMaybe)
+import Lib                                           (head', fromMaybe, readNum)
 
 
 getCategory :: Query -> Query
@@ -43,9 +42,7 @@ parseCategory ls@(ic:pc:nc:ys)
   | idCat == 0 = errorCategory
   | otherwise = Category idCat pc nc 
   where
-    idCat = case (readMaybe $ T.unpack ic) of              
-              Just x -> (x :: Int) 
-              _      -> 0
+    idCat = readNum ic
     
 
 getParentCategories :: T.Text -> [T.Text] 

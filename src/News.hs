@@ -63,11 +63,12 @@ errorNews =  News 0 "error" "error" errorUser ["error"] "error" ["error"] False
 parseNews :: [T.Text] -> News
 parseNews ls
   | length ls /= 8 = errorNews
-  | otherwise = News n n1 n2 author cats n5 pht isPbl 
+  | idNws == 0 = errorNews
+  | otherwise = News idNws n1 n2 author cats n5 pht isPbl 
   where 
     [n0,n1,n2,n3,n4,n5,n6,n7] = ls
-    n = read $ T.unpack n0
-    splitText = T.splitOn "," . T.tail . T.init 
+    idNws = readNum n0
+    splitText = splitOnTxt "," . tailTxt . initTxt 
     author = parseUser $ splitText n3
     cats = getParentCategories n4
     pht = map ("/photo?get_photo=" <>) $ splitText n6

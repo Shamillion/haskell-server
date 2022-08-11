@@ -12,7 +12,7 @@ import Database.PostgreSQL.Simple.Types
 import qualified Data.ByteString.Char8 as BC 
 import System.IO.Unsafe                (unsafePerformIO)
 import Config
-import Lib
+import Lib                                                  (fromMaybe, readNum)
 
 
 getUser :: Query -> Query
@@ -45,10 +45,11 @@ errorUser = User 0 "error" "error" False False
 parseUser :: [T.Text] -> User
 parseUser ls
   | length ls /= 6 = errorUser
-  | otherwise = User id u2 u3 isAdm isAth
+  | idUsr == 0 = errorUser
+  | otherwise = User idUsr u2 u3 isAdm isAth
   where     
     [u1,u2,u3,u4,u5,u6] = ls
-    id = read $ T.unpack u1 :: Int
+    idUsr = readNum u1 
     isAdm = u4 == "t" || u4 == "true"
     isAth = u5 == "t" || u5 == "true"
 
