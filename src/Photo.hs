@@ -12,7 +12,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding        (encodeUtf8)
 import           Data.ByteString.Base64.Lazy    (decodeLenient)
 import           Data.Monoid                     ((<>))
-import System.IO.Unsafe          (unsafePerformIO)
+import System.IO.Unsafe                           (unsafePerformIO)
 import Config
 
 
@@ -44,6 +44,7 @@ sendPhotoToDB str = unsafePerformIO $ do
   conn <- connectDB
   val <- execute conn "INSERT INTO photo (image) VALUES (?);" [str]
   num <- query_ conn "SELECT max(photo_id) FROM photo;" :: IO [[Int]]
+  close conn
   let [[num']] = num
   pure . BC.pack . show $ num' 
 

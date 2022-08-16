@@ -34,6 +34,7 @@ checkAuth ls =
           let qry = getUser $ Query $ "WHERE login = '" <> x <> "'"  
           writingLineDebug qry                                               
           userList <- query_ conn $ qry :: IO [[T.Text]] 
+          close conn
           writingLineDebug userList
           pure $ checkPassword y userList       
   where
@@ -46,7 +47,7 @@ checkAuth ls =
     checkPassword p (u:_)
       | u == [] = []
       | otherwise = 
-          if (validatePassword p $ (\(h:_) -> BC.pack $ T.unpack h) $ reverse u)
+          if (validatePassword p $ BC.pack . T.unpack . last' $ u)
           then [parseUser u]
           else [] 
 

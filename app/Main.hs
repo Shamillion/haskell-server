@@ -1,18 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+--{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 
 module Main where
 
 import Data.Aeson
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as LC
-import           Control.Concurrent.MVar
+--import           Control.Concurrent.MVar
 --import           Control.Monad                   (join)
 import           Data.Monoid               ((<>))
 import           qualified Data.Text as T 
 import           Data.Text.Encoding        (encodeUtf8)
 --import qualified Data.Text.Lazy.Encoding as LE   (encodeUtf8)
-import           GHC.Generics
+--import           GHC.Generics
 import           Network.HTTP.Simple        
 import           Network.HTTP.Types        (status200, status406, status404, 
                                                               queryToQueryText)
@@ -82,6 +82,7 @@ app req respond = do
         "GET" -> query_ conn qry :: IO [[T.Text]]         
         _     -> (\x -> [[T.pack $ show x]]) <$> execute_ conn qry 
       writingLineDebug val 
+      close conn
       let hdr = if pathInfo req == ["photo"] 
                   then  getHdr val'
                   else  "text/plain" 

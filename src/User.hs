@@ -84,6 +84,7 @@ checkUniqLogin str = unsafePerformIO $ do
   conn <- connectDB
   ls <- query_ conn $ Query $ "SELECT name_user FROM users \
                       \ WHERE login = '" <> str <> "';" :: IO [[BC.ByteString]]
+  close conn
   writingLineDebug ls
   pure $ ls == []                   
 

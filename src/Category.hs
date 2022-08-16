@@ -49,6 +49,7 @@ getParentCategories :: T.Text -> [T.Text]
 getParentCategories cat = unsafePerformIO $ do
   conn <- connectDB
   ls <- query_ conn $ getCategory' :: IO [[T.Text]]
+  close conn
   writingLineDebug ls
   let buildingList pc = do
         let val = LT.find (\(x:y:xy) -> y == head' pc) ls 
@@ -115,6 +116,7 @@ checkUniqCategory str = unsafePerformIO $ do
   conn <- connectDB
   ls <- query_ conn $ Query $ "SELECT name_category FROM category WHERE \
                      \ name_category = '" <> str <> "';" :: IO [[BC.ByteString]]
+  close conn
   writingLineDebug ls
   pure $ ls == []
 

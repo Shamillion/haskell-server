@@ -201,6 +201,7 @@ authorNews authId newsId =
     conn <- connectDB
     ls <- query conn  "SELECT news_id FROM news WHERE user_id = ? AND \
                                 \ news_id = ?;" (authId , newsId) :: IO [[Int]] 
+    close conn
     pure $ ls /= []            
     
     
