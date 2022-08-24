@@ -95,10 +95,20 @@ app req respond = do
     
 
 
+
+
+checkDB :: DB.Query
+checkDB = 
+  "SELECT table_name FROM information_schema.tables \
+  \ WHERE table_schema NOT IN ('information_schema','pg_catalog');"
     
                                                                      
 
 main = do
+  conn <- connectDB
+  t <- query_ conn checkDB :: IO [[T.Text]] 
+  close conn
+  print $ concat t
   writingLine INFO "Server is started."
   run port app
  

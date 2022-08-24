@@ -30,6 +30,7 @@ library
       Config
       Db
       Lib
+      MigrationsDB
       News
       Photo
       User
