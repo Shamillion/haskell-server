@@ -25,7 +25,7 @@ import           News
 import           Auth
 import           Photo
 import           Config
-
+import           MigrationsDB (checkDB)
 
 
 
@@ -97,18 +97,11 @@ app req respond = do
 
 
 
-checkDB :: DB.Query
-checkDB = 
-  "SELECT table_name FROM information_schema.tables \
-  \ WHERE table_schema NOT IN ('information_schema','pg_catalog');"
     
                                                                      
 
 main = do
-  conn <- connectDB
-  t <- query_ conn checkDB :: IO [[T.Text]] 
-  close conn
-  print $ concat t
+  checkDB 1
   writingLine INFO "Server is started."
   run port app
  
