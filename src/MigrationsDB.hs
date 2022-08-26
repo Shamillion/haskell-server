@@ -16,9 +16,9 @@ import qualified Data.Text as T
 import Config
 
 
-checkDB :: Int -> IO ()
+checkDB :: Int -> IO (Int)
 checkDB num
-  | num > 2 = writingLine ERROR "Error Database!" 
+  | num > 2 = writingLine ERROR "Error Database!" >> pure num
   | otherwise = do
       writingLine INFO "Checking Database..."
       conn <- connectDB
@@ -30,12 +30,14 @@ checkDB num
         then do
           close conn
           writingLine INFO "Database is OK."
+          pure num
         else do
-         -- mapM_ (execute_ conn) lq
+          mapM_ (execute_ conn) lq
           writingLine INFO "Database has been created."
           close conn
           checkDB (num + 1)       
       writingLine DEBUG "Checking database has been successfully."
+      pure num
       where
         qry = "SELECT table_name FROM information_schema.tables \
               \ WHERE table_schema NOT IN ('information_schema','pg_catalog');"

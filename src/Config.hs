@@ -104,7 +104,7 @@ writingLine lvl str =                                    --    information down.
         "file" -> do
           I.hPutStrLn file string
           I.hFlush file
-        _ -> print string
+        _ -> putStrLn string
     else pure ()
  where
   out = logOutput configuration

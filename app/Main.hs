@@ -101,7 +101,11 @@ app req respond = do
                                                                      
 
 main = do
-  checkDB 1
-  writingLine INFO "Server is started."
-  run port app
+  x <- checkDB 1
+  writingLine DEBUG $ "checkDB was runing " <> show x <> " times."
+  if x > 2 
+    then print "Error Database! Server can not be started!"
+    else do
+      writingLine INFO "Server is started."
+      run port app
  
