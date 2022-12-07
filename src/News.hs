@@ -123,8 +123,8 @@ setFiltersNews ((mthd, param):xs)
     creationDate x = "News.creation_date " <> x <> " '" <> 
                                               fromMaybe' param <> "'"
   
-setLimitAndOffset :: [(T.Text, Maybe T.Text)] -> Query 
-setLimitAndOffset ls = Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst 
+setLimitAndOffsetWith :: Int -> [(T.Text, Maybe T.Text)] -> Query 
+setLimitAndOffsetWith val ls = Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst 
   where
     ofst = case LT.find ((== "offset") . fst) ls of
                Just (_, Just n) -> encodeUtf8 n
@@ -132,9 +132,13 @@ setLimitAndOffset ls = Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst
     lmt  = case LT.find ((== "limit") . fst) ls of
                Just (_, Just n) -> ordNum n
                _                -> num
-    num  = BC.pack $ show limitElem
+    num  = BC.pack $ show val
     ordNum x = 
-      if (read $ T.unpack x) > limitElem then num else encodeUtf8 x
+      if (read $ T.unpack x) > val then num else encodeUtf8 x
+      
+      
+setLimitAndOffset :: [(T.Text, Maybe T.Text)] -> Query 
+setLimitAndOffset = setLimitAndOffsetWith limitElem      
     
 
 --'.../news?title=Text&category_id=3&content=Text&
@@ -146,7 +150,7 @@ createNews _ _ [] = "404"
 createNews True auth ls 
   | nothingInLs = "404" 
   | otherwise = Query $
-      "INSERT INTO news (title, creation_date, user_id, category_id, photo, \ 
+      "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
       \ content, is_published) \
       \ VALUES ('" <> title <> "', NOW(), " <> fromQuery auth <> ", " <> 
         categoryId <> ", " <> photoIDLs ls' <> ", '" <> content <> 
