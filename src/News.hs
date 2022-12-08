@@ -9,13 +9,14 @@ import Data.List as LT               (find, filter)
 import Data.String                   (fromString)
 import Database.PostgreSQL.Simple as S
 import Database.PostgreSQL.Simple.Types
-import Data.Monoid                     ((<>))
+import Data.Monoid                   ((<>))
 import qualified Data.Text as T 
 import Data.Text.Encoding            (encodeUtf8)
 import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.ByteString.Char8      as BC
 import GHC.Generics
-import System.IO.Unsafe                (unsafePerformIO)
+import System.IO.Unsafe              (unsafePerformIO)
+import Text.Read                     (readMaybe)
 import User
 import Category
 import Photo
@@ -126,15 +127,17 @@ setFiltersNews ((mthd, param):xs)
 setLimitAndOffsetWith :: Int -> [(T.Text, Maybe T.Text)] -> Query 
 setLimitAndOffsetWith val ls = Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst 
   where
-    ofst = case LT.find ((== "offset") . fst) ls of
-               Just (_, Just n) -> encodeUtf8 n
-               _                -> "0"
-    lmt  = case LT.find ((== "limit") . fst) ls of
-               Just (_, Just n) -> ordNum n
-               _                -> num
-    num  = BC.pack $ show val
-    ordNum x = 
-      if (read $ T.unpack x) > val then num else encodeUtf8 x
+    ofst = listToValue "offset" (max 0) 0
+    lmt  = listToValue "limit" lessVal val
+    getMaybe wrd f =
+      LT.find ((== wrd) . fst) ls >>= snd >>= readMaybe . T.unpack >>= pure . f
+    listToValue wrd f x = toByteString $
+      case getMaybe wrd f of
+        Just n -> n
+        _      -> x  
+    lessVal x = if x > 0 && x < val then x else val 
+    toByteString = BC.pack . show                                 
+      
       
       
 setLimitAndOffset :: [(T.Text, Maybe T.Text)] -> Query 
