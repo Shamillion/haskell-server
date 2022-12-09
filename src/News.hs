@@ -76,8 +76,8 @@ parseNews ls
     isPbl = n7 == "true" || n7 == "t" 
     
 
-setMethodNews :: [(T.Text, Maybe T.Text)] -> Maybe (Query, Query)
-setMethodNews ls = do
+setMethodNews :: Int -> [(T.Text, Maybe T.Text)] -> Maybe (Query, Query)
+setMethodNews num ls = do
   a <- filterNews
   b <- sortNewsLimitOffset
   pure (a,b)
@@ -89,7 +89,7 @@ setMethodNews ls = do
         [("sort_by", Just x)] -> sortBy x
         _ -> pure ""
     findSort = LT.filter ((=="sort_by") . fst) ls
-    sortNewsLimitOffset = fmap (<> setLimitAndOffset ls) sortNews
+    sortNewsLimitOffset = fmap (<> setLimitAndOffsetWith num ls) sortNews
 
 sortBy :: T.Text -> Maybe Query 
 sortBy mthd = ("ORDER BY " <>) <$>

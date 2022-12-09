@@ -4,7 +4,7 @@ import Test.Hspec
 import Test.QuickCheck
 import Database.PostgreSQL.Simple.Types 
 import Lib  (readNum)
-import News (setLimitAndOffsetWith) 
+import News (setLimitAndOffsetWith, setMethodNews) 
 
 
 testsFunctionReadNum = do
@@ -51,12 +51,16 @@ testsFunctionSetLimitAndOffsetWith = do
     setLimitAndOffsetWith 20 [("offset",Just "S")] `shouldBe` 
       Query " LIMIT 20 OFFSET 0"       
 
+testsFunctionSetMethodNews = do                          -- Int -> [(T.Text, Maybe T.Text)] -> Maybe (Query, Query)
+  it "list is empty" $                                
+    setMethodNews 20 [] `shouldBe` Just ("title LIKE '%'"," LIMIT 20 OFFSET 0") 
 
 
 main :: IO ()
 main = hspec $ do
   describe "Check function readNum"      testsFunctionReadNum
   describe "Check setLimitAndOffsetWith" testsFunctionSetLimitAndOffsetWith
+  describe "Check setMethodNews"         testsFunctionSetMethodNews
          
         
         
