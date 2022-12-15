@@ -59,22 +59,24 @@ getParentCategories cat = unsafePerformIO $ do
   pure $ filter (/="Null") $ buildingList [cat]
 
 --'.../category?aaa>bbb'   aaa - parent category's name,  bbb - category's name 
-createCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
-createCategory False _ = "404"
-createCategory _ [] = "404"
-createCategory True ls 
+createCategoryWith :: (BC.ByteString -> Bool) -> Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+createCategoryWith _ False _ = "404"
+createCategoryWith _ _ [] = "404"
+createCategoryWith checkUniq True ls 
   | categorys == [] = "404" 
-  | not (checkUniqCategory name_category) = "406cu"
-  | checkUniqCategory parent_category = "406cp"
+  | not (checkUniq name_category) = "406cu"
+  | checkUniq parent_category = "406cp"
   | otherwise = Query $
       "INSERT INTO category (name_category, parent_category) \
       \ VALUES ('" <> name_category <> "', '" <> parent_category <> "');"
   where
     (x:xs) = map (BC.split '>' . fst) ls 
     categorys = filter (/= "") x       
-    [parent_category,name_category] = 
+    (parent_category : name_category : noMatter) = 
        if length categorys == 1 then "Null" : categorys else categorys
-        
+
+createCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+createCategory = createCategoryWith checkUniqCategory       
 
 -- '.../category?change_name=aaa>bbb'    aaa - old category's name,  bbb - new category's name
 -- '.../category?change_parent=aaa>bbb'  aaa - category's name,  bbb - new parent category's name
