@@ -1,13 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module TestsFunctionsCategory 
-  (testsFunctionCreateCategoryWith) 
+  ( testsFunctionCreateCategoryWith
+  , testsFunctionEditCategoryWith
+  ) 
 where
 
 import Test.Hspec
 import Test.QuickCheck
 import Database.PostgreSQL.Simple.Types
-import Category (createCategoryWith)
+import Category (createCategoryWith, editCategoryWith)
 
 
 
@@ -81,3 +83,15 @@ testsFunctionCreateCategoryWith = do
   it "Without both categories" $                               
     createCategory' True [(">",Nothing)] 
       `shouldBe` Query "404" 
+
+editCategory' = editCategoryWith testUniqCategory
+
+testsFunctionEditCategoryWith = do                            -- [("change_name",Just "aaa>bbb")]
+  it "User is not admin" $                               
+    editCategory' False [("Cars>Wheels",Nothing)] `shouldBe` Query "404" 
+  it "User is not admin and list is empty" $                               
+    editCategory' False [] `shouldBe` Query "404"     
+  it "User is admin and list is empty" $                               
+    editCategory' True [] `shouldBe` Query "404" 
+
+

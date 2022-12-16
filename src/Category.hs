@@ -80,14 +80,14 @@ createCategory = createCategoryWith checkUniqCategory
 
 -- '.../category?change_name=aaa>bbb'    aaa - old category's name,  bbb - new category's name
 -- '.../category?change_parent=aaa>bbb'  aaa - category's name,  bbb - new parent category's name
-editCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
-editCategory False _ = "404"
-editCategory _ [] = "404"
-editCategory True ls 
+editCategoryWith :: (BC.ByteString -> Bool) -> Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+editCategoryWith _ False _ = "404"
+editCategoryWith _ _ [] = "404"
+editCategoryWith checkUniq True ls 
   | fls == [] = "404" 
-  | checkUniqCategory name = "406cn"
-  | method == "change_name" && not (checkUniqCategory new_name) = "406cu"
-  | method == "change_parent" && checkUniqCategory new_name = "406cp"
+  | checkUniq name = "406cn"
+  | method == "change_name" && not (checkUniq new_name) = "406cu"
+  | method == "change_parent" && checkUniq new_name = "406cp"
   | method == "change_parent" && name == new_name = "406ce"
   | otherwise = Query $ checkQuery $ map buildQuery fls''               
   where
@@ -112,6 +112,8 @@ editCategory True ls
           \ WHERE name_category = '" <> name <> "'; " 
         _ -> "404"
 
+editCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+editCategory = editCategoryWith checkUniqCategory
 
 checkUniqCategory :: BC.ByteString -> Bool
 checkUniqCategory str = unsafePerformIO $ do
