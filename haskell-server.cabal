@@ -82,6 +82,8 @@ test-suite haskell-server-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      TestsFunctionsCategory
+      TestsFunctionsNews
       Paths_haskell_server
   hs-source-dirs:
       test
