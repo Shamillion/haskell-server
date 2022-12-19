@@ -84,7 +84,8 @@ editCategoryWith :: (BC.ByteString -> Bool) -> Bool -> [(BC.ByteString, Maybe BC
 editCategoryWith _ False _ = "404"
 editCategoryWith _ _ [] = "404"
 editCategoryWith checkUniq True ls 
-  | fls == [] = "404" 
+  | fls == [] = "404"
+  | elem "" [name,new_name] = "404"
   | checkUniq name = "406cn"
   | method == "change_name" && not (checkUniq new_name) = "406cu"
   | method == "change_parent" && checkUniq new_name = "406cp"
@@ -94,7 +95,7 @@ editCategoryWith checkUniq True ls
     fls = filter ((/="???") . snd) $ map (fmap fromMaybe) ls 
     fls' = map (fmap (BC.split '>')) fls 
     categorys = map ((filter (/= "")) <$>) fls'       
-    fls''@((method,[name,new_name]):xs) = map (\x -> if length (snd x) < 2 
+    fls''@((method,[name,new_name]):xs) = map (\x -> if length (snd x) /= 2 
                                        then ("404", ["",""]) else x) categorys
     checkQuery lq = if elem "404" lq then "404" else mconcat lq
     buildQuery (method,[name,new_name]) = 

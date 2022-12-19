@@ -88,10 +88,86 @@ editCategory' = editCategoryWith testUniqCategory
 
 testsFunctionEditCategoryWith = do                            -- [("change_name",Just "aaa>bbb")]
   it "User is not admin" $                               
-    editCategory' False [("Cars>Wheels",Nothing)] `shouldBe` Query "404" 
+    editCategory' False [("change_name",Just "existeCategory>newCategory")] 
+      `shouldBe` Query "404" 
   it "User is not admin and list is empty" $                               
     editCategory' False [] `shouldBe` Query "404"     
   it "User is admin and list is empty" $                               
     editCategory' True [] `shouldBe` Query "404" 
-
-
+  it "Unknown method" $                               
+    editCategory' True [("changeName",Just "existeCategory>newCategory")] 
+      `shouldBe` Query "404"     
+  it "Without old name" $                               
+    editCategory' True [("change_name",Just ">newCategory")] 
+      `shouldBe` Query "404"
+  it "Without new name" $                               
+    editCategory' True [("change_name",Just "existeCategory>")] 
+      `shouldBe` Query "404"       
+  it "Without both names" $                               
+    editCategory' True [("change_name",Just ">")] 
+      `shouldBe` Query "404"
+  it "Syntax error" $                               
+    editCategory' True [("change_name",Just "existeCategorynewCategory")] 
+      `shouldBe` Query "404"      
+  it "Syntax error 2" $                               
+    editCategory' True [("change_name",Just "existeCategory>>newCategory")] 
+      `shouldBe` Query "UPDATE category \
+                       \ SET   parent_category = 'newCategory' \
+                       \ WHERE parent_category = 'existeCategory'; \
+                       \ UPDATE category \
+                       \ SET   name_category = 'newCategory' \
+                       \ WHERE name_category = 'existeCategory'; "    
+  it "With 3 category's name" $                               
+    editCategory' True [( "change_name"
+                        , Just "existeCategory>newCategory>newCategory_2"
+                        )] 
+      `shouldBe` Query "404"                  
+  it "With Nothing" $                               
+    editCategory' True [("change_name",Nothing)] 
+      `shouldBe` Query "404"
+  it "Two elements in list" $                               
+    editCategory' True [ ("change_name",Just "existeCategory>newCategory")
+                       , ("change_name",Just "existeCategory>newCategory_2") 
+                       ] 
+      `shouldBe` Query "UPDATE category \
+                       \ SET   parent_category = 'newCategory' \
+                       \ WHERE parent_category = 'existeCategory'; \
+                       \ UPDATE category \
+                       \ SET   name_category = 'newCategory' \
+                       \ WHERE name_category = 'existeCategory'; \
+                       \UPDATE category \
+                       \ SET   parent_category = 'newCategory_2' \
+                       \ WHERE parent_category = 'existeCategory'; \
+                       \ UPDATE category \
+                       \ SET   name_category = 'newCategory_2' \
+                       \ WHERE name_category = 'existeCategory'; "             
+  it "Two elements in list and Nothing" $                               
+    editCategory' True [ ("change_name",Just "existeCategory>newCategory")
+                       , ("change_name",Just "existeCategory>newCategory_2") 
+                       , ("change_name",Nothing)
+                       ] 
+      `shouldBe` Query "UPDATE category \
+                       \ SET   parent_category = 'newCategory' \
+                       \ WHERE parent_category = 'existeCategory'; \
+                       \ UPDATE category \
+                       \ SET   name_category = 'newCategory' \
+                       \ WHERE name_category = 'existeCategory'; \
+                       \UPDATE category \
+                       \ SET   parent_category = 'newCategory_2' \
+                       \ WHERE parent_category = 'existeCategory'; \
+                       \ UPDATE category \
+                       \ SET   name_category = 'newCategory_2' \
+                       \ WHERE name_category = 'existeCategory'; "      
+  it "Three elements in list. One element with error in method." $                               
+    editCategory' True [ ("change_name",Just "existeCategory>newCategory")
+                       , ("change_name",Just "existeCategory>newCategory_2") 
+                       , ("changeName",Just "existeCategory>newCategory_3")
+                       ] 
+      `shouldBe` Query "404"     
+  it "Three elements in list. One element with error in category's names." $                               
+    editCategory' True [ ("change_name",Just "existeCategory>newCategory")
+                       , ("change_name",Just "existeCategory>newCategory_2") 
+                       , ("change_name",Just "existeCategorynewCategory_3")
+                       ] 
+      `shouldBe` Query "404"      
+      
