@@ -92,7 +92,7 @@ editCategoryWith checkUniq True ls
   | method == "change_parent" && name == new_name = "406ce"
   | otherwise = Query $ checkQuery $ map buildQuery fls''               
   where
-    fls = filter ((/="???") . snd) $ map (fmap fromMaybe) ls 
+    fls = filter ((/="???") . snd) $ map (fmap fromMaybe) $ take 1 ls 
     fls' = map (fmap (BC.split '>')) fls 
     categorys = map ((filter (/= "")) <$>) fls'       
     fls''@((method,[name,new_name]):xs) = map (\x -> if length (snd x) /= 2 

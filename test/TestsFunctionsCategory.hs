@@ -134,16 +134,9 @@ testsFunctionEditCategoryWith = do                            -- [("change_name"
                        \ WHERE parent_category = 'existCategory'; \
                        \ UPDATE category \
                        \ SET   name_category = 'newCategory' \
-                       \ WHERE name_category = 'existCategory'; \
-                       \UPDATE category \
-                       \ SET   parent_category = 'newCategory_2' \
-                       \ WHERE parent_category = 'existCategory'; \
-                       \ UPDATE category \
-                       \ SET   name_category = 'newCategory_2' \
-                       \ WHERE name_category = 'existCategory'; "             
-  it "Two elements in list and Nothing" $                               
-    editCategory' True [ ("change_name",Just "existCategory>newCategory")
-                       , ("change_name",Just "existCategory>newCategory_2") 
+                       \ WHERE name_category = 'existCategory'; "
+  it "Two elements in list with Nothing" $                               
+    editCategory' True [ ("change_name",Just "existCategory>newCategory")                       
                        , ("change_name",Nothing)
                        ] 
       `shouldBe` Query "UPDATE category \
@@ -151,25 +144,7 @@ testsFunctionEditCategoryWith = do                            -- [("change_name"
                        \ WHERE parent_category = 'existCategory'; \
                        \ UPDATE category \
                        \ SET   name_category = 'newCategory' \
-                       \ WHERE name_category = 'existCategory'; \
-                       \UPDATE category \
-                       \ SET   parent_category = 'newCategory_2' \
-                       \ WHERE parent_category = 'existCategory'; \
-                       \ UPDATE category \
-                       \ SET   name_category = 'newCategory_2' \
-                       \ WHERE name_category = 'existCategory'; "      
-  it "Three elements in list. One element with error in method." $                               
-    editCategory' True [ ("change_name",Just "existCategory>newCategory")
-                       , ("change_name",Just "existCategory>newCategory_2") 
-                       , ("changeName",Just "existCategory>newCategory_3")
-                       ] 
-      `shouldBe` Query "404"     
-  it "Three elements in list. One element with error in category's names." $                               
-    editCategory' True [ ("change_name",Just "existCategory>newCategory")
-                       , ("change_name",Just "existCategory>newCategory_2") 
-                       , ("change_name",Just "existeCategorynewCategory_3")
-                       ] 
-      `shouldBe` Query "404"
+                       \ WHERE name_category = 'existCategory'; "                      
   it "Method is change_name: such category already exists" $                               
     editCategory' True [("change_name",Just "parentCategory>existCategory")] 
       `shouldBe` Query "406cu"   
@@ -186,23 +161,8 @@ testsFunctionEditCategoryWith = do                            -- [("change_name"
                        \ WHERE parent_category = 'existCategory'; \
                        \ UPDATE category \
                        \ SET   name_category = 'newCategory' \
-                       \ WHERE name_category = 'existCategory'; "                
-  it "Method is change_name: two elements in list, everything is all right" $                               
-    editCategory' True [ ("change_name",Just "existCategory>newCategory")
-                       , ("change_name",Just "existCategory>newCategory_2") 
-                       ] 
-      `shouldBe` Query "UPDATE category \
-                       \ SET   parent_category = 'newCategory' \
-                       \ WHERE parent_category = 'existCategory'; \
-                       \ UPDATE category \
-                       \ SET   name_category = 'newCategory' \
-                       \ WHERE name_category = 'existCategory'; \
-                       \UPDATE category \
-                       \ SET   parent_category = 'newCategory_2' \
-                       \ WHERE parent_category = 'existCategory'; \
-                       \ UPDATE category \
-                       \ SET   name_category = 'newCategory_2' \
-                       \ WHERE name_category = 'existCategory'; "       
+                       \ WHERE name_category = 'existCategory'; "  
+                           
   it "Method is change_parent: names of category and parent \
       \category are the same" $                               
     editCategory' True [("change_parent",Just "existCategory>existCategory")] 
@@ -219,20 +179,19 @@ testsFunctionEditCategoryWith = do                            -- [("change_name"
       `shouldBe` Query "UPDATE category \
                        \ SET parent_category = 'parentCategory' \
                        \ WHERE name_category = 'existCategory'; "                
-  it "Method is change_parent: two elements in list, everything is all right" $                               
+  it "Method is change_parent: two elements in list" $                               
     editCategory' True [ ("change_parent",Just "existCategory>parentCategory")
                        , ("change_parent",Just "parentCategory>Null") 
                        ] 
       `shouldBe` Query "UPDATE category \
                        \ SET parent_category = 'parentCategory' \
-                       \ WHERE name_category = 'existCategory'; \
-                       \UPDATE category \
-                       \ SET parent_category = 'Null' \
-                       \ WHERE name_category = 'parentCategory'; "       
-            
-      
-      
-      
+                       \ WHERE name_category = 'existCategory'; "       
+  it "Method is change_parent: with 'Nothing'"$                               
+    editCategory' True [("change_parent",Nothing)] 
+      `shouldBe` Query "404"            
+  
+     
+   
       
       
       
