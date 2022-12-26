@@ -65,7 +65,7 @@ createCategoryWith _ _ [] = "404"
 createCategoryWith checkUniq True ls 
   | categorys == [] = "404" 
   | not (checkUniq name_category) = "406cu"
-  | checkUniq parent_category = "406cp"
+  | checkUniq parent_category && parent_category /= "Null" = "406cp"
   | otherwise = Query $
       "INSERT INTO category (name_category, parent_category) \
       \ VALUES ('" <> name_category <> "', '" <> parent_category <> "');"
@@ -88,7 +88,8 @@ editCategoryWith checkUniq True ls
   | elem "" [name,new_name] = "404"
   | checkUniq name = "406cn"
   | method == "change_name" && not (checkUniq new_name) = "406cu"
-  | method == "change_parent" && checkUniq new_name = "406cp"
+  | method == "change_parent" && 
+         checkUniq new_name && new_name /= "Null" = "406cp"
   | method == "change_parent" && name == new_name = "406ce"
   | otherwise = Query $ checkQuery $ map buildQuery fls''               
   where

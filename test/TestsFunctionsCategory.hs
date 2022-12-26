@@ -161,8 +161,7 @@ testsFunctionEditCategoryWith = do                            -- [("change_name"
                        \ WHERE parent_category = 'existCategory'; \
                        \ UPDATE category \
                        \ SET   name_category = 'newCategory' \
-                       \ WHERE name_category = 'existCategory'; "  
-                           
+                       \ WHERE name_category = 'existCategory'; "                            
   it "Method is change_parent: names of category and parent \
       \category are the same" $                               
     editCategory' True [("change_parent",Just "existCategory>existCategory")] 
@@ -189,7 +188,9 @@ testsFunctionEditCategoryWith = do                            -- [("change_name"
   it "Method is change_parent: with 'Nothing'"$                               
     editCategory' True [("change_parent",Nothing)] 
       `shouldBe` Query "404"            
-  
+  it "Method is change_parent: this category doesn't exist" $                               
+    editCategory' True [("change_parent",Just "newCategory>parentCategory")] 
+      `shouldBe` Query "406cn"  
      
    
       

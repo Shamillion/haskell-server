@@ -22,11 +22,11 @@ testsFunctionReadNum = do
 
 main :: IO ()
 main = hspec $ do
-  --describe "Check function readNum"      testsFunctionReadNum
- -- describe "Check setLimitAndOffsetWith" testsFunctionSetLimitAndOffsetWith
- -- describe "Check setMethodNews"         testsFunctionSetMethodNews
-  --describe "Check createCategoryWith"    testsFunctionCreateCategoryWith 
-  describe "Check editCategoryWith"    testsFunctionEditCategoryWith      
+  describe "Check function readNum"      testsFunctionReadNum
+  describe "Check setLimitAndOffsetWith" testsFunctionSetLimitAndOffsetWith
+  describe "Check setMethodNews"         testsFunctionSetMethodNews
+  describe "Check createCategoryWith"    testsFunctionCreateCategoryWith 
+  describe "Check editCategoryWith"      testsFunctionEditCategoryWith      
         
         
         
