@@ -33,7 +33,9 @@ splitOnTxt :: T.Text -> T.Text -> [T.Text]
 splitOnTxt _ "" = []
 splitOnTxt c txt = T.splitOn c txt
 
-
+drawOut []    = ""
+drawOut [[]]  = ""
+drawOut [[x]] = x
 
 
 

@@ -26,7 +26,7 @@ import           Auth
 import           Photo
 import           Config
 import           MigrationsDB (checkDB)
-
+import           Lib          (drawOut)
 
 
 
@@ -36,13 +36,13 @@ import           MigrationsDB (checkDB)
 setQueryAndRespond :: W.Request -> (DB.Query, ([[T.Text]] -> LC.ByteString))
 setQueryAndRespond req = case (reqMtd, entity) of
   ("GET",  "news") -> (getNews authId method, encode . (map parseNews))
-  ("POST", "news") -> (createNews athr authId arr, \[[x]] -> encode x)
-  ("PUT",  "news") -> (editNews authId arr, \[[x]] -> encode x)
+  ("POST", "news") -> (createNews athr authId arr, encodeWith)
+  ("PUT",  "news") -> (editNews authId arr, encodeWith)
   ("GET",  "user") -> (getUser limitOffset, encode . (map parseUser))
-  ("POST", "user") -> (createUser adm arr, \[[x]] -> encode x)
+  ("POST", "user") -> (createUser adm arr, encodeWith)
   ("GET",  "category") -> (getCategory limitOffset, encode . (map parseCategory))
-  ("POST", "category") -> (createCategory adm arr, \[[x]] -> encode x)
-  ("PUT",  "category") -> (editCategory adm arr, \[[x]] -> encode x)
+  ("POST", "category") -> (createCategory adm arr, encodeWith)
+  ("PUT",  "category") -> (editCategory adm arr, encodeWith)
   ("GET",  "photo")  -> (getPhoto arr, decodeImage)  
   _                -> ("404", \x -> "404")
   where
@@ -54,6 +54,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
     limitOffset = setLimitAndOffset . queryToQueryText $ arr
     adm = isAdmin req
     athr = isAuthor req 
+    encodeWith = encode . drawOut
 
        
 app :: Application
@@ -86,7 +87,7 @@ app req respond = do
       let hdr = if pathInfo req == ["photo"] 
                   then  getHdr val'
                   else  "text/plain" 
-          [[val']] = val 
+          val' = drawOut val 
       writingLine INFO "Sent a response to the request."                                   
       responds status200 hdr $ resp val     
   where
