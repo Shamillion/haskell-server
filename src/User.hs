@@ -5,7 +5,7 @@ module User where
 import Crypto.KDF.BCrypt (hashPassword)
 import Data.Aeson
 import Data.Char                       (ord)
-import Data.Monoid                     ((<>))
+--import Data.Monoid                     ((<>))
 import Database.PostgreSQL.Simple
 import qualified Data.Text as T 
 import Database.PostgreSQL.Simple.Types 

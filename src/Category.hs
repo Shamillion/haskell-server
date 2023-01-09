@@ -7,8 +7,8 @@ module Category where
 import Data.Aeson
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.Types 
-import Data.Monoid               ((<>))
-import Data.List as LT           (find, filter) 
+-- import Data.Monoid               ((<>))
+import Data.List as LT           (find) 
 import qualified Data.Text as T
 import qualified Data.ByteString.Char8  as BC     
 import GHC.Generics 
@@ -37,12 +37,13 @@ errorCategory :: Category
 errorCategory =  Category 0 "error" "error" 
 
 parseCategory :: [T.Text] -> Category
-parseCategory ls@(ic:pc:nc:ys)
+parseCategory ls
   | length ls /= 3 = errorCategory
   | idCat == 0 = errorCategory
   | otherwise = Category idCat pc nc 
   where
     idCat = readNum ic
+    (ic:pc:nc:_) = ls
     
 
 getParentCategories :: T.Text -> [T.Text] 
@@ -52,7 +53,7 @@ getParentCategories cat = unsafePerformIO $ do
   close conn
   writingLineDebug ls
   let buildingList pc = do
-        let val = LT.find (\(x:y:xy) -> y == head' pc) ls 
+        let val = LT.find (\(_:y:_) -> y == head' pc) ls 
         case val of
           Just el -> buildingList (head' el : pc)
           _       -> pc 
@@ -64,15 +65,15 @@ createCategoryWith _ False _ = "404"
 createCategoryWith _ _ [] = "404"
 createCategoryWith checkUniq True ls 
   | categorys == [] = "404" 
-  | not (checkUniq name_category) = "406cu"
-  | checkUniq parent_category && parent_category /= "Null" = "406cp"
+  | not (checkUniq nameCategory) = "406cu"
+  | checkUniq parentCategory && parentCategory /= "Null" = "406cp"
   | otherwise = Query $
       "INSERT INTO category (name_category, parent_category) \
-      \ VALUES ('" <> name_category <> "', '" <> parent_category <> "');"
+      \ VALUES ('" <> nameCategory <> "', '" <> parentCategory <> "');"
   where
-    (x:xs) = map (BC.split '>' . fst) ls 
+    (x:_) = map (BC.split '>' . fst) ls 
     categorys = filter (/= "") x       
-    (parent_category : name_category : noMatter) = 
+    (parentCategory : nameCategory : _) = 
        if length categorys == 1 then "Null" : categorys else categorys
 
 createCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
@@ -96,23 +97,24 @@ editCategoryWith checkUniq True ls
     fls = filter ((/="???") . snd) $ map (fmap fromMaybe) $ take 1 ls 
     fls' = map (fmap (BC.split '>')) fls 
     categorys = map ((filter (/= "")) <$>) fls'       
-    fls''@((method,[name,new_name]):xs) = map (\x -> if length (snd x) /= 2 
+    fls''@((method,[name,new_name]):_) = map (\x -> if length (snd x) /= 2 
                                        then ("404", ["",""]) else x) categorys
     checkQuery lq = if elem "404" lq then "404" else mconcat lq
-    buildQuery (method,[name,new_name]) = 
-      case method of
+    buildQuery (meth,[nm,new_nm]) = 
+      case meth of
         "change_name" ->     
           "UPDATE category \
-          \ SET   parent_category = '" <> new_name <> "' \
-          \ WHERE parent_category = '" <> name <> "'; \
+          \ SET   parent_category = '" <> new_nm <> "' \
+          \ WHERE parent_category = '" <> nm <> "'; \
           \ UPDATE category \
-          \ SET   name_category = '" <> new_name <> "' \
-          \ WHERE name_category = '" <> name <> "'; "    
+          \ SET   name_category = '" <> new_nm <> "' \
+          \ WHERE name_category = '" <> nm <> "'; "    
         "change_parent" -> 
           "UPDATE category \
-          \ SET parent_category = '" <> new_name <> "' \
-          \ WHERE name_category = '" <> name <> "'; " 
+          \ SET parent_category = '" <> new_nm <> "' \
+          \ WHERE name_category = '" <> nm <> "'; " 
         _ -> "404"
+    buildQuery (_,_) = "404"   
 
 editCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 editCategory = editCategoryWith checkUniqCategory

@@ -3,15 +3,18 @@
 module Lib where
 
 import qualified Data.Text as T
+import Data.String               (IsString)
 import Text.Read                 (readMaybe) 
 
-
+fromMaybe :: Data.String.IsString a => Maybe a -> a
 fromMaybe (Just e) = e
 fromMaybe Nothing  = "???"
 
+head' :: Data.String.IsString a => [a] -> a
 head' [] = "???"
 head' ls = head ls
 
+last' :: Data.String.IsString a => [a] -> a
 last' [] = "???"
 last' ls = last ls
 
@@ -33,10 +36,11 @@ splitOnTxt :: T.Text -> T.Text -> [T.Text]
 splitOnTxt _ "" = []
 splitOnTxt c txt = T.splitOn c txt
 
+drawOut :: Data.String.IsString a => [[a]] -> a
 drawOut []    = ""
-drawOut [[]]  = ""
-drawOut [[x]] = x
-
-
+drawOut ([]:_)  = ""
+drawOut ([x]:_) = x
+drawOut [(_:_:_)] = ""
+drawOut ((_:_:_):_:_) = ""
 
 
