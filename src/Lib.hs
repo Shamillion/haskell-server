@@ -37,10 +37,10 @@ splitOnTxt _ "" = []
 splitOnTxt c txt = T.splitOn c txt
 
 drawOut :: Data.String.IsString a => [[a]] -> a
-drawOut []    = ""
+drawOut []      = ""
 drawOut ([]:_)  = ""
 drawOut ([x]:_) = x
-drawOut [(_:_:_)] = ""
-drawOut ((_:_:_):_:_) = ""
+drawOut (_:_)   = ""
+
 
 

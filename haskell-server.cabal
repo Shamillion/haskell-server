@@ -28,7 +28,6 @@ library
       Auth
       Category
       Config
-      Db
       Lib
       MigrationsDB
       News

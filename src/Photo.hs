@@ -11,7 +11,7 @@ import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.Text as T 
 import           Data.Text.Encoding        (encodeUtf8)
 import           Data.ByteString.Base64.Lazy    (decodeLenient)
-import           Data.Monoid                     ((<>))
+--import           Data.Monoid                     ((<>))
 import System.IO.Unsafe                           (unsafePerformIO)
 import Config
 
@@ -22,7 +22,7 @@ import Config
 
 getPhoto :: [(BC.ByteString, Maybe BC.ByteString)] -> Query
 getPhoto [] = "404"
-getPhoto (x:xs) = Query $
+getPhoto (x:_) = Query $
   case x of
   (_, Nothing) -> "404"
   (_, Just "") -> "404"
@@ -34,15 +34,15 @@ getPhoto (x:xs) = Query $
 
 decodeImage :: [[T.Text]] -> LC.ByteString
 decodeImage [] = "404"
-decodeImage [[img]] = decodeLenient . LC.fromStrict . encodeUtf8 $ img'
-  where
-    img' = T.drop 1 . T.dropWhile (/=',') $ img
+decodeImage ([img]:_) = decodeLenient . LC.fromStrict . encodeUtf8 $ img'
+  where img' = T.drop 1 . T.dropWhile (/=',') $ img
+decodeImage (_:_) = "404"  
     
     
 sendPhotoToDB :: BC.ByteString -> BC.ByteString
 sendPhotoToDB str = unsafePerformIO $ do
   conn <- connectDB
-  val <- execute conn "INSERT INTO photo (image) VALUES (?);" [str]
+  _ <- execute conn "INSERT INTO photo (image) VALUES (?);" [str]
   num <- query_ conn "SELECT max(photo_id) FROM photo;" :: IO [[Int]]
   close conn
   let [[num']] = num

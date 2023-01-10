@@ -1,12 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Test.Hspec
-import Test.QuickCheck
-import Database.PostgreSQL.Simple.Types 
+import Test.Hspec (SpecWith, it, shouldBe, hspec, describe)
+--import Test.QuickCheck
+--import Database.PostgreSQL.Simple.Types 
 import Lib  (readNum)
 import TestsFunctionsNews
 import TestsFunctionsCategory
 
+testsFunctionReadNum :: SpecWith ()
 testsFunctionReadNum = do
   it "turns the Text to Int" $ do
     readNum "23" `shouldBe` (23 :: Int)

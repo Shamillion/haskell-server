@@ -36,10 +36,11 @@ checkAuth ls =
           userList <- query_ conn $ qry :: IO [[T.Text]] 
           close conn
           writingLineDebug userList
-          pure $ checkPassword y userList       
+          pure $ checkPassword y userList 
+        _ -> Left "No Authorization"       
   where
     fls = filter  ((=="Authorization") . fst) ls
-    [(hdr, str)] = fls
+    [(_, str)] = fls
     decodeLogAndPass = (split ':') <$> (BB.decode . last' . BC.split ' ' $ str)
     isEmptyList [] = Left "No such user in DB"      
     isEmptyList ul = Right ul

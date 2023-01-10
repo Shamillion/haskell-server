@@ -10,7 +10,7 @@ import           Database.PostgreSQL.Simple
 import qualified System.IO                 as I
 import           System.IO.Unsafe                              (unsafePerformIO)
 import           GHC.Generics                                          (Generic)
-import           Data.Monoid                                              ((<>))
+--import           Data.Monoid                                              ((<>))
 import           Data.Time                                      (getCurrentTime)
 --import qualified Data.Text as T
 import           Data.Word                                              (Word16)
@@ -63,7 +63,7 @@ configuration :: Configuration              -- Try to read configuration file.
 configuration =
   case getConfiguration "../config.json" of
     Right v -> v
-    Left e  -> errorConfig
+    Left _  -> errorConfig
 
 time :: IO String                             -- Get current time for the logger.
 time = take 19 . show <$> getCurrentTime
@@ -79,6 +79,7 @@ connectInfo =
     , connectPassword = dbPassword configuration
     }
 
+limitElem :: Int
 limitElem = maxElem configuration
 
 connectDB :: IO Connection

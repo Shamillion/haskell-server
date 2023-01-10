@@ -6,18 +6,23 @@ module TestsFunctionsCategory
   ) 
 where
 
-import Test.Hspec
-import Test.QuickCheck
+import Test.Hspec (SpecWith, it, shouldBe)
+--import Test.QuickCheck
 import Database.PostgreSQL.Simple.Types
+import Data.String               (IsString)
+import Data.ByteString.Internal (ByteString) 
 import Category (createCategoryWith, editCategoryWith)
 
 
 
-
+testUniqCategory :: (Eq a, Data.String.IsString a) => a -> Bool
 testUniqCategory e = notElem e ["parentCategory", "Null", "existCategory"]
+
+createCategory' :: Bool -> [(ByteString, Maybe ByteString)] -> Query
 
 createCategory' = createCategoryWith testUniqCategory
 
+testsFunctionCreateCategoryWith :: SpecWith ()
 testsFunctionCreateCategoryWith = do           
   it "User is not admin" $                               
     createCategory' False [("Cars>Wheels",Nothing)] `shouldBe` Query "404" 
@@ -84,8 +89,11 @@ testsFunctionCreateCategoryWith = do
     createCategory' True [(">",Nothing)] 
       `shouldBe` Query "404" 
 
+editCategory' :: Bool -> [(ByteString, Maybe ByteString)] -> Query
 editCategory' = editCategoryWith testUniqCategory
 
+
+testsFunctionEditCategoryWith :: SpecWith ()
 testsFunctionEditCategoryWith = do                            -- [("change_name",Just "aaa>bbb")]
   it "User is not admin" $                               
     editCategory' False [("change_name",Just "existCategory>newCategory")] 
@@ -192,17 +200,3 @@ testsFunctionEditCategoryWith = do                            -- [("change_name"
     editCategory' True [("change_parent",Just "newCategory>parentCategory")] 
       `shouldBe` Query "406cn"  
      
-   
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-            
-      

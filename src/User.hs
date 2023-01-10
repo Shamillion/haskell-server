@@ -30,13 +30,13 @@ data User = User
    deriving Show
 
 instance ToJSON User where
-  toJSON (User user_id name_user creation_date' is_admin is_author) =
+  toJSON (User userId nameUser creationDate isAdmin isAuthor) =
     object
-      [ "user_id"       .= user_id
-      , "name_user"     .= name_user      
-      , "creation_date" .= creation_date'
-      , "is_admin"      .= is_admin
-      , "is_author"     .= is_author
+      [ "user_id"       .= userId
+      , "name_user"     .= nameUser      
+      , "creation_date" .= creationDate
+      , "is_admin"      .= isAdmin
+      , "is_author"     .= isAuthor
       ]   
  
 errorUser :: User
@@ -48,7 +48,7 @@ parseUser ls
   | idUsr == 0 = errorUser
   | otherwise = User idUsr u2 u3 isAdm isAth
   where     
-    [u1,u2,u3,u4,u5,u6] = ls
+    [u1,u2,u3,u4,u5,_] = ls
     idUsr = readNum u1 
     isAdm = u4 == "t" || u4 == "true"
     isAth = u5 == "t" || u5 == "true"
@@ -64,14 +64,14 @@ createUser _ ls
   | otherwise = Query $
       "INSERT INTO users (name_user, login, pass, \
       \       creation_date, is_admin, is_author) \
-      \ VALUES ('" <> name_user <> "', '" <> login <> "', '" <> pass' <> 
-                "', NOW(), '" <> is_admin <> "', '" <> is_author <> "');"
+      \ VALUES ('" <> nameUser <> "', '" <> login <> "', '" <> pass' <> 
+                "', NOW(), '" <> isAdmin <> "', '" <> isAuthor <> "');"
   where
     checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
     sndList = map (fromMaybe . snd) ls
     searchNothing = elem "???" sndList
-    [name_user, login, pass, is_admin, is_author] = map (fromMaybe . snd) ls
-    pass' = cryptoPass (sum . map ord . BC.unpack $ name_user) pass    
+    [nameUser, login, pass, isAdmin, isAuthor] = map (fromMaybe . snd) ls
+    pass' = cryptoPass (sum . map ord . BC.unpack $ nameUser) pass    
 
 
 cryptoPass :: Int -> BC.ByteString -> BC.ByteString

@@ -7,12 +7,12 @@ module News where
 import Data.Aeson
 import Data.List as LT               (find, filter) 
 import Data.String                   (fromString)
-import Database.PostgreSQL.Simple as S
-import Database.PostgreSQL.Simple.Types
-import Data.Monoid                   ((<>))
+import Database.PostgreSQL.Simple (query, close)
+import Database.PostgreSQL.Simple.Types 
+-- import Data.Monoid                   ((<>))
 import qualified Data.Text as T 
-import Data.Text.Encoding            (encodeUtf8)
-import qualified Data.ByteString.Lazy.Char8 as LC
+-- import Data.Text.Encoding            (encodeUtf8)
+-- import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.ByteString.Char8      as BC
 import GHC.Generics
 import System.IO.Unsafe              (unsafePerformIO)
@@ -65,12 +65,12 @@ parseNews :: [T.Text] -> News
 parseNews ls
   | length ls /= 8 = errorNews
   | idNws == 0 = errorNews
-  | otherwise = News idNws n1 n2 author cats n5 pht isPbl 
+  | otherwise = News idNws n1 n2 athr cats n5 pht isPbl 
   where 
     [n0,n1,n2,n3,n4,n5,n6,n7] = ls
     idNws = readNum n0
     splitText = splitOnTxt "," . tailTxt . initTxt 
-    author = parseUser $ splitText n3
+    athr = parseUser $ splitText n3
     cats = getParentCategories n4
     pht = map ("/photo?get_photo=" <>) $ splitText n6
     isPbl = n7 == "true" || n7 == "t" 
@@ -155,17 +155,17 @@ createNews True auth ls
   | otherwise = Query $
       "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
       \ content, is_published) \
-      \ VALUES ('" <> title <> "', NOW(), " <> fromQuery auth <> ", " <> 
-        categoryId <> ", " <> photoIDLs ls' <> ", '" <> content <> 
+      \ VALUES ('" <> titleNws <> "', NOW(), " <> fromQuery auth <> ", " <> 
+        categoryId <> ", " <> photoIDLs ls' <> ", '" <> contentNws <> 
         "', " <> isPublished <> ");"
   where
-    nothingInLs = any (\(x,y) -> y == Nothing) ls 
+    nothingInLs = any (\(_,y) -> y == Nothing) ls 
     ls' = map (fromMaybe <$>) ls
-    title = getValue "title"
+    titleNws = getValue "title"
     categoryId = getValue "category_id"     
-    content = getValue "content"
+    contentNws = getValue "content"
     isPublished = getValue "is_published"
-    getValue str = sndMaybe . LT.find (\(x,y) -> x == str) $ ls'
+    getValue str = sndMaybe . LT.find (\(x,_) -> x == str) $ ls'
     sndMaybe Nothing  = "Null"
     sndMaybe (Just e) = snd e
     
@@ -186,12 +186,12 @@ buildPhotoIdString (x:xs) = x <> ", " <> buildPhotoIdString xs
 editNews :: Query -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 editNews _ [] = "404"
 editNews auth ls 
-   | not author = "404"
+   | not author' = "404"
    | otherwise = Query $ "UPDATE news SET " <>  photo' <> buildChanges ls' <> 
                          " WHERE news_id = " <> newsId <> ";"
   where
-    author = authorNews (fromQuery auth) newsId
-    newsId = case LT.find (\(x,y) -> x == "news_id") ls of
+    author' = authorNews (fromQuery auth) newsId
+    newsId = case LT.find (\(x,_) -> x == "news_id") ls of
                Just (_, Just n) -> n
                _                -> "0" 
     ls' = map (fromMaybe <$>) $ 

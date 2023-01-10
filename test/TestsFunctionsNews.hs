@@ -6,11 +6,12 @@ module TestsFunctionsNews
   ) 
 where
 
-import Test.Hspec
-import Test.QuickCheck
+import Test.Hspec (SpecWith, it, shouldBe)
+--import Test.QuickCheck
 import Database.PostgreSQL.Simple.Types
 import News (setLimitAndOffsetWith, setMethodNews) 
 
+testsFunctionSetLimitAndOffsetWith :: SpecWith ()
 testsFunctionSetLimitAndOffsetWith = do
   it "limit and offset have not set in request" $                                
     setLimitAndOffsetWith 20 [] `shouldBe` Query " LIMIT 20 OFFSET 0"  
@@ -48,6 +49,7 @@ testsFunctionSetLimitAndOffsetWith = do
     setLimitAndOffsetWith 20 [("offset",Just "S")] `shouldBe` 
       Query " LIMIT 20 OFFSET 0"       
 
+testsFunctionSetMethodNews :: SpecWith ()
 testsFunctionSetMethodNews = do                          
   it "list is empty" $                                
     setMethodNews 20 [] `shouldBe` Just ("title LIKE '%'"," LIMIT 20 OFFSET 0") 

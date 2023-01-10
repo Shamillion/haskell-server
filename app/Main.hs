@@ -4,16 +4,16 @@
 module Main where
 
 import Data.Aeson
-import qualified Data.ByteString.Lazy as L
+--import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as LC
 --import           Control.Concurrent.MVar
 --import           Control.Monad                   (join)
-import           Data.Monoid               ((<>))
+--import           Data.Monoid               ((<>))
 import           qualified Data.Text as T 
 import           Data.Text.Encoding        (encodeUtf8)
 --import qualified Data.Text.Lazy.Encoding as LE   (encodeUtf8)
 --import           GHC.Generics
-import           Network.HTTP.Simple        
+--import           Network.HTTP.Simple        
 import           Network.HTTP.Types        (status200, status406, status404, 
                                                               queryToQueryText)
 import           Network.Wai                as W
@@ -44,7 +44,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
   ("POST", "category") -> (createCategory adm arr, encodeWith)
   ("PUT",  "category") -> (editCategory adm arr, encodeWith)
   ("GET",  "photo")  -> (getPhoto arr, decodeImage)  
-  _                -> ("404", \x -> "404")
+  _                -> ("404", \_ -> "404")
   where
     reqMtd = requestMethod req
     [entity] = pathInfo req 
@@ -100,12 +100,12 @@ app req respond = do
 
     
                                                                      
-
+main :: IO ()
 main = do
   x <- checkDB 1
   writingLine DEBUG $ "checkDB was runing " <> show x <> " times."
   if x > 2 
-    then print "Error Database! Server can not be started!"
+    then print ("Error Database! Server can not be started!" :: String)
     else do
       writingLine INFO "Server is started."
       run port app
