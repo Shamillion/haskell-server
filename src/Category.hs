@@ -49,7 +49,7 @@ parseCategory ls
 getParentCategories :: T.Text -> [T.Text] 
 getParentCategories cat = unsafePerformIO $ do
   conn <- connectDB
-  ls <- query_ conn $ getCategory' :: IO [[T.Text]]
+  ls <- query_ conn getCategory' :: IO [[T.Text]]
   close conn
   writingLineDebug ls
   let buildingList pc = do
@@ -64,7 +64,7 @@ createCategoryWith :: (BC.ByteString -> Bool) -> Bool -> [(BC.ByteString, Maybe 
 createCategoryWith _ False _ = "404"
 createCategoryWith _ _ [] = "404"
 createCategoryWith checkUniq True ls 
-  | categorys == [] = "404" 
+  | null categorys = "404" 
   | not (checkUniq nameCategory) = "406cu"
   | checkUniq parentCategory && parentCategory /= "Null" = "406cp"
   | otherwise = Query $
@@ -85,8 +85,8 @@ editCategoryWith :: (BC.ByteString -> Bool) -> Bool -> [(BC.ByteString, Maybe BC
 editCategoryWith _ False _ = "404"
 editCategoryWith _ _ [] = "404"
 editCategoryWith checkUniq True ls 
-  | fls == [] = "404"
-  | elem "" [name,new_name] = "404"
+  | null fls = "404"
+  | "" `elem` [name,new_name] = "404"
   | checkUniq name = "406cn"
   | method == "change_name" && not (checkUniq new_name) = "406cu"
   | method == "change_parent" && 
@@ -96,10 +96,10 @@ editCategoryWith checkUniq True ls
   where
     fls = filter ((/="???") . snd) $ map (fmap fromMaybe) $ take 1 ls 
     fls' = map (fmap (BC.split '>')) fls 
-    categorys = map ((filter (/= "")) <$>) fls'       
+    categorys = map (filter (/= "") <$>) fls'       
     fls''@((method,[name,new_name]):_) = map (\x -> if length (snd x) /= 2 
                                        then ("404", ["",""]) else x) categorys
-    checkQuery lq = if elem "404" lq then "404" else mconcat lq
+    checkQuery lq = if "404" `elem` lq then "404" else mconcat lq
     buildQuery (meth,[nm,new_nm]) = 
       case meth of
         "change_name" ->     
@@ -126,7 +126,7 @@ checkUniqCategory str = unsafePerformIO $ do
                      \ name_category = '" <> str <> "';" :: IO [[BC.ByteString]]
   close conn
   writingLineDebug ls
-  pure $ ls == []
+  pure $ null ls
 
 
 

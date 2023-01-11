@@ -23,7 +23,7 @@ import Lib                                                               (last')
 
 checkAuth :: RequestHeaders -> Either String [User]
 checkAuth ls = 
-  if fls == [] then Left "No Authorization"
+  if null fls then Left "No Authorization"
     else 
       case decodeLogAndPass of
         Left x -> unsafePerformIO $ do 
@@ -33,7 +33,7 @@ checkAuth ls =
           conn <- connectDB       
           let qry = getUser $ Query $ "WHERE login = '" <> x <> "'"  
           writingLineDebug qry                                               
-          userList <- query_ conn $ qry :: IO [[T.Text]] 
+          userList <- query_ conn qry :: IO [[T.Text]] 
           close conn
           writingLineDebug userList
           pure $ checkPassword y userList 
@@ -41,22 +41,20 @@ checkAuth ls =
   where
     fls = filter  ((=="Authorization") . fst) ls
     [(_, str)] = fls
-    decodeLogAndPass = (split ':') <$> (BB.decode . last' . BC.split ' ' $ str)
+    decodeLogAndPass = split ':' <$> (BB.decode . last' . BC.split ' ' $ str)
     isEmptyList [] = Left "No such user in DB"      
     isEmptyList ul = Right ul
     checkPassword _ [] = []
     checkPassword p (u:_)
-      | u == [] = []
+      | null u = []
       | otherwise = 
-          if (validatePassword p $ BC.pack . T.unpack . last' $ u)
-          then [parseUser u]
-          else [] 
+          [parseUser u | validatePassword p $ BC.pack . T.unpack . last' $ u]
 
 authorID :: W.Request -> Query
 authorID req = 
   case checkAuth (requestHeaders req) of     
     Right [u] -> fromString $ show $ user_id u    
-    _         -> Query $ "Null" 
+    _         -> Query "Null" 
   
 isAdmin :: W.Request -> Bool
 isAdmin req = 

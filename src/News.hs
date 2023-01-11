@@ -27,7 +27,7 @@ import Lib
 
 
 getNews :: Query -> Maybe (Query, Query) -> Query
-getNews auth str = if str == Nothing 
+getNews auth str = if isNothing str
   then "404"
   else
   "SELECT (news_id :: TEXT), substring(title from 1 for 12), \
@@ -94,17 +94,17 @@ setMethodNews num ls = do
 sortBy :: T.Text -> Maybe Query 
 sortBy mthd = ("ORDER BY " <>) <$>
   case mthd of   
-   "date"     -> Just $ "creation_date"
-   "author"   -> Just $ "author.name_user"   
-   "category" -> Just $ "name_category"
-   "photo"    -> Just $ "CARDINALITY(photo)" 
+   "date"     -> Just "creation_date"
+   "author"   -> Just "author.name_user"   
+   "category" -> Just "name_category"
+   "photo"    -> Just "CARDINALITY(photo)" 
    _          -> Nothing
 
 
 setFiltersNews :: [(T.Text, Maybe T.Text)] -> Maybe Query   
 setFiltersNews [] = pure "title LIKE '%'" 
 setFiltersNews ((mthd, param):xs) 
-      | xs == [] = choiceFilter 
+      | null xs = choiceFilter 
       | otherwise = choiceFilter >>= nextStep   
   where
     nextStep n = ((n <> " AND ") <>) <$> setFiltersNews xs
@@ -129,8 +129,8 @@ setLimitAndOffsetWith val ls = Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst
   where
     ofst = listToValue "offset" (max 0) 0
     lmt  = listToValue "limit" lessVal val
-    getMaybe wrd f =
-      LT.find ((== wrd) . fst) ls >>= snd >>= readMaybe . T.unpack >>= pure . f
+    getMaybe wrd f = 
+      (LT.find ((== wrd) . fst) ls >>= snd >>= readMaybe . T.unpack) <&> f   
     listToValue wrd f x = toByteString $
       case getMaybe wrd f of
         Just n -> n
@@ -159,7 +159,7 @@ createNews True auth ls
         categoryId <> ", " <> photoIDLs ls' <> ", '" <> contentNws <> 
         "', " <> isPublished <> ");"
   where
-    nothingInLs = any (\(_,y) -> y == Nothing) ls 
+    nothingInLs = any (\(_,y) -> isNothing y) ls 
     ls' = map (fromMaybe <$>) ls
     titleNws = getValue "title"
     categoryId = getValue "category_id"     
@@ -195,9 +195,9 @@ editNews auth ls
                Just (_, Just n) -> n
                _                -> "0" 
     ls' = map (fromMaybe <$>) $ 
-               LT.filter (\(x,y) -> elem x fields && y /= Nothing) ls    
+               LT.filter (\(x,y) -> elem x fields && isJust y) ls    
     fields = ["title", "category_id", "content", "is_published"]
-    photo' = if elem "photo" (map fst ls) 
+    photo' = if "photo" `elem` map fst ls 
                then "photo = " <> photoIDLs (map (fromMaybe <$>) ls) <> ", " 
                else ""   
   
@@ -216,7 +216,7 @@ buildChanges :: [(BC.ByteString, BC.ByteString)] -> BC.ByteString
 buildChanges [] = ""
 buildChanges [(x,y)] = x <> " = " <> q <> y <> q
   where 
-    q = if elem x fields then "'" else "" 
+    q = if x `elem` fields then "'" else "" 
     fields = ["title", "content"] 
 buildChanges ((x,y):xs) = buildChanges [(x,y)] <> ", " <> buildChanges xs 
 

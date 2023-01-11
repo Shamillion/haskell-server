@@ -20,7 +20,7 @@ last' ls = last ls
 
 readNum :: T.Text -> Int
 readNum n = 
-  case (readMaybe $ T.unpack n) of              
+  case readMaybe $ T.unpack n of              
     Just x -> x  
     _      -> 0
 

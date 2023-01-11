@@ -93,11 +93,12 @@ data Priority = DEBUG | INFO | WARNING | ERROR      -- Data type for the logger.
   deriving (Show, Eq, Ord, Generic, FromJSON)
   
 file :: I.Handle                                  -- Get Handle for the logfile.
+{-# NOINLINE file #-}
 file  = unsafePerformIO $ I.openFile "../log.log" I.AppendMode
 
 writingLine :: Priority -> String -> IO ()               -- Function writes log
 writingLine lvl str =                                    --    information down.
-  if (lvl >= logLevel) 
+  if lvl >= logLevel 
     then do
       t <- time
       let string = t ++ " UTC   " ++ fun lvl ++ " - " ++ str
