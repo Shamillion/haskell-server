@@ -2,22 +2,19 @@
 
 module Auth where
 
-import Crypto.KDF.BCrypt (validatePassword)
-import           Network.Wai
---import qualified Data.ByteString.Lazy as L
-import Network.HTTP.Types.Header
+import Crypto.KDF.BCrypt                (validatePassword)
 import qualified Data.ByteString.Base64 as BB
-import Data.ByteString.Char8   as BC       (split, pack)
---import Data.ByteString.UTF8 (toString)
-import Data.String          (fromString)
-import Database.PostgreSQL.Simple
-import Database.PostgreSQL.Simple.Types 
-import qualified Network.Wai            as W
+import qualified Data.ByteString.Char8  as BC       
+import Database.PostgreSQL.Simple       (close, query_) 
+import Database.PostgreSQL.Simple.Types (Query(..))
+import Data.String                      (fromString)
 import qualified Data.Text              as T
-import System.IO.Unsafe          (unsafePerformIO)
-import User
-import Config
-import Lib                                                               (last')
+import Network.HTTP.Types.Header        (RequestHeaders)
+import qualified Network.Wai            as W
+import System.IO.Unsafe                 (unsafePerformIO)
+import User                             (User(..), getUser, parseUser)
+import Config        (Priority(ERROR), writingLine, writingLineDebug, connectDB)
+import Lib                              (last')
 
 
 
@@ -41,7 +38,7 @@ checkAuth ls =
   where
     fls = filter  ((=="Authorization") . fst) ls
     [(_, str)] = fls
-    decodeLogAndPass = split ':' <$> (BB.decode . last' . BC.split ' ' $ str)
+    decodeLogAndPass = BC.split ':' <$> (BB.decode . last' . BC.split ' ' $ str)
     isEmptyList [] = Left "No such user in DB"      
     isEmptyList ul = Right ul
     checkPassword _ [] = []
@@ -52,19 +49,19 @@ checkAuth ls =
 
 authorID :: W.Request -> Query
 authorID req = 
-  case checkAuth (requestHeaders req) of     
+  case checkAuth (W.requestHeaders req) of     
     Right [u] -> fromString $ show $ user_id u    
     _         -> Query "Null" 
   
 isAdmin :: W.Request -> Bool
 isAdmin req = 
-  case checkAuth (requestHeaders req) of     
+  case checkAuth (W.requestHeaders req) of     
     Right [u] -> is_admin u    
     _         -> False   
   
 isAuthor :: W.Request -> Bool
 isAuthor req = 
-  case checkAuth (requestHeaders req) of     
+  case checkAuth (W.requestHeaders req) of     
     Right [u] -> is_author u    
     _         -> False  
   

@@ -58,7 +58,7 @@ parseUser ls
 createUser :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 createUser False _ = "404"
 createUser _ ls 
-  | ls == [] || (map fst ls) /= checkList = "404"
+  | null ls || map fst ls /= checkList = "404"
   | searchNothing = "404"
   | not (checkUniqLogin login) = "406uu"
   | otherwise = Query $
@@ -69,7 +69,7 @@ createUser _ ls
   where
     checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
     sndList = map (fromMaybe . snd) ls
-    searchNothing = elem "???" sndList
+    searchNothing = "???" `elem` sndList
     [nameUser, login, pass, isAdmin, isAuthor] = map (fromMaybe . snd) ls
     pass' = cryptoPass (sum . map ord . BC.unpack $ nameUser) pass    
 
@@ -86,7 +86,7 @@ checkUniqLogin str = unsafePerformIO $ do
                       \ WHERE login = '" <> str <> "';" :: IO [[BC.ByteString]]
   close conn
   writingLineDebug ls
-  pure $ ls == []                   
+  pure $ null ls                   
 
 --passwordToHash :: Query          -- Turned passwords to hash in DB 
 --passwordToHash = unsafePerformIO $ do

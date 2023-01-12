@@ -25,7 +25,7 @@ checkDB num
       writingLineDebug qry
       db <- query_ conn qry :: IO [[T.Text]] 
       writingLineDebug db  
-      let k = all (`elem` (concat db)) ["users","news","category","photo"]
+      let k = all (`elem` concat db) ["users","news","category","photo"]
       _ <- if k 
              then do
                close conn

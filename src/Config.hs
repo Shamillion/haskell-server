@@ -4,15 +4,13 @@
 module Config where
 
 
-import Data.Aeson
-import qualified Data.ByteString.Lazy      as L
-import           Database.PostgreSQL.Simple 
-import qualified System.IO                 as I
+import Data.Aeson                                       (eitherDecode, FromJSON)
+import qualified Data.ByteString.Lazy       as L
+import qualified Database.PostgreSQL.Simple as PS
+import qualified System.IO                  as I
 import           System.IO.Unsafe                              (unsafePerformIO)
 import           GHC.Generics                                          (Generic)
---import           Data.Monoid                                              ((<>))
 import           Data.Time                                      (getCurrentTime)
---import qualified Data.Text as T
 import           Data.Word                                              (Word16)
 
 
@@ -69,24 +67,24 @@ time :: IO String                             -- Get current time for the logger
 time = take 19 . show <$> getCurrentTime
 
 
-connectInfo :: ConnectInfo
+connectInfo :: PS.ConnectInfo
 connectInfo =
-  ConnectInfo
-    { connectHost = dbHost configuration
-    , connectPort = dbPort configuration
-    , connectDatabase = dbname configuration
-    , connectUser = dbUser configuration
-    , connectPassword = dbPassword configuration
+  PS.ConnectInfo
+    { PS.connectHost = dbHost configuration
+    , PS.connectPort = dbPort configuration
+    , PS.connectDatabase = dbname configuration
+    , PS.connectUser = dbUser configuration
+    , PS.connectPassword = dbPassword configuration
     }
 
 limitElem :: Int
 limitElem = maxElem configuration
 
-connectDB :: IO Connection
+connectDB :: IO PS.Connection
 connectDB = do 
   writingLine INFO "Sent a request to the database."
   writingLineDebug connectInfo
-  connect connectInfo
+  PS.connect connectInfo
 
 
 data Priority = DEBUG | INFO | WARNING | ERROR      -- Data type for the logger.

@@ -33,18 +33,18 @@ import           Lib          (drawOut)
 
 
 
-setQueryAndRespond :: W.Request -> (DB.Query, ([[T.Text]] -> LC.ByteString))
+setQueryAndRespond :: W.Request -> (DB.Query, [[T.Text]] -> LC.ByteString)
 setQueryAndRespond req = case (reqMtd, entity) of
-  ("GET",  "news") -> (getNews authId method, encode . (map parseNews))
+  ("GET",  "news") -> (getNews authId method, encode . map parseNews)
   ("POST", "news") -> (createNews athr authId arr, encodeWith)
   ("PUT",  "news") -> (editNews authId arr, encodeWith)
-  ("GET",  "user") -> (getUser limitOffset, encode . (map parseUser))
+  ("GET",  "user") -> (getUser limitOffset, encode . map parseUser)
   ("POST", "user") -> (createUser adm arr, encodeWith)
-  ("GET",  "category") -> (getCategory limitOffset, encode . (map parseCategory))
+  ("GET",  "category") -> (getCategory limitOffset, encode . map parseCategory)
   ("POST", "category") -> (createCategory adm arr, encodeWith)
   ("PUT",  "category") -> (editCategory adm arr, encodeWith)
   ("GET",  "photo")  -> (getPhoto arr, decodeImage)  
-  _                -> ("404", \_ -> "404")
+  _                -> ("404", const "404")
   where
     reqMtd = requestMethod req
     [entity] = pathInfo req 

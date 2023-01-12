@@ -4,25 +4,23 @@
 module News where
 
 
-import Data.Aeson
+import Data.Aeson                    (ToJSON)
+import Data.Functor                  ((<&>)) 
 import Data.List as LT               (find, filter) 
+import Data.Maybe                    (isJust, isNothing)
 import Data.String                   (fromString)
-import Database.PostgreSQL.Simple (query, close)
-import Database.PostgreSQL.Simple.Types 
--- import Data.Monoid                   ((<>))
+import Database.PostgreSQL.Simple    (query, close)
+import Database.PostgreSQL.Simple.Types  (Query(..)) 
 import qualified Data.Text as T 
--- import Data.Text.Encoding            (encodeUtf8)
--- import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.ByteString.Char8      as BC
-import GHC.Generics
+import GHC.Generics                  (Generic)
 import System.IO.Unsafe              (unsafePerformIO)
 import Text.Read                     (readMaybe)
-import User
-import Category
-import Photo
--- import Debug.Trace
-import Config
-import Lib
+import User                          (User, errorUser, parseUser)
+import Category                      (getParentCategories)
+import Photo                         (sendPhotoToDB)
+import Config                        (connectDB, limitElem)
+import Lib                           (readNum, splitOnTxt, tailTxt, initTxt, fromMaybe)
 
 
 

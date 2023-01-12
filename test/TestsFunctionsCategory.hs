@@ -16,7 +16,7 @@ import Category (createCategoryWith, editCategoryWith)
 
 
 testUniqCategory :: (Eq a, Data.String.IsString a) => a -> Bool
-testUniqCategory e = notElem e ["parentCategory", "Null", "existCategory"]
+testUniqCategory e = e `notElem` ["parentCategory", "Null", "existCategory"]
 
 createCategory' :: Bool -> [(ByteString, Maybe ByteString)] -> Query
 
