@@ -4,19 +4,16 @@
 module Category where
 
 
-import Data.Aeson
-import Database.PostgreSQL.Simple
-import Database.PostgreSQL.Simple.Types 
--- import Data.Monoid               ((<>))
-import Data.List as LT           (find) 
-import qualified Data.Text as T
-import qualified Data.ByteString.Char8  as BC     
-import GHC.Generics 
-import System.IO.Unsafe          (unsafePerformIO)
---import Auth
---import User
-import Config
-import Lib                                           (head', fromMaybe, readNum)
+import Data.Aeson                       (ToJSON)
+import qualified Data.ByteString.Char8  as BC
+import Data.List as LT                  (find)
+import Database.PostgreSQL.Simple       (close, query_)
+import Database.PostgreSQL.Simple.Types (Query(..))
+import qualified Data.Text              as T     
+import GHC.Generics                     (Generic)
+import System.IO.Unsafe                 (unsafePerformIO)
+import Config                           (connectDB, writingLineDebug)
+import Lib                              (head', fromMaybe, readNum)
 
 
 getCategory :: Query -> Query

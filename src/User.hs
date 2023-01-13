@@ -2,17 +2,16 @@
 
 module User where
 
-import Crypto.KDF.BCrypt (hashPassword)
-import Data.Aeson
-import Data.Char                       (ord)
---import Data.Monoid                     ((<>))
-import Database.PostgreSQL.Simple
+import Crypto.KDF.BCrypt                (hashPassword)
+import Data.Aeson                       (object, ToJSON, toJSON, (.=))
+import qualified Data.ByteString.Char8  as BC 
+import Data.Char                        (ord)
+import Database.PostgreSQL.Simple       (close, query_)
+import Database.PostgreSQL.Simple.Types (Query(..))
 import qualified Data.Text as T 
-import Database.PostgreSQL.Simple.Types 
-import qualified Data.ByteString.Char8 as BC 
-import System.IO.Unsafe                (unsafePerformIO)
-import Config
-import Lib                                                  (fromMaybe, readNum)
+import System.IO.Unsafe                 (unsafePerformIO)
+import Config                           (connectDB, writingLineDebug)
+import Lib                              (fromMaybe, readNum)
 
 
 getUser :: Query -> Query

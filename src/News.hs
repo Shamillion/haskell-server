@@ -5,23 +5,22 @@ module News where
 
 
 import Data.Aeson                    (ToJSON)
+import qualified Data.ByteString.Char8 as BC
 import Data.Functor                  ((<&>)) 
 import Data.List as LT               (find, filter) 
 import Data.Maybe                    (isJust, isNothing)
-import Data.String                   (fromString)
 import Database.PostgreSQL.Simple    (query, close)
 import Database.PostgreSQL.Simple.Types  (Query(..)) 
+import Data.String                   (fromString)
 import qualified Data.Text as T 
-import qualified Data.ByteString.Char8      as BC
 import GHC.Generics                  (Generic)
 import System.IO.Unsafe              (unsafePerformIO)
 import Text.Read                     (readMaybe)
-import User                          (User, errorUser, parseUser)
 import Category                      (getParentCategories)
-import Photo                         (sendPhotoToDB)
 import Config                        (connectDB, limitElem)
 import Lib                           (readNum, splitOnTxt, tailTxt, initTxt, fromMaybe)
-
+import Photo                         (sendPhotoToDB)
+import User                          (User, errorUser, parseUser)
 
 
 getNews :: Query -> Maybe (Query, Query) -> Query

@@ -3,17 +3,16 @@
 
 module Photo where
 
-import           Data.Char                  (isDigit)
-import Database.PostgreSQL.Simple
-import Database.PostgreSQL.Simple.Types 
-import qualified Data.ByteString.Char8 as BC 
-import qualified Data.ByteString.Lazy.Char8 as LC
-import qualified Data.Text as T 
-import           Data.Text.Encoding        (encodeUtf8)
 import           Data.ByteString.Base64.Lazy    (decodeLenient)
---import           Data.Monoid                     ((<>))
-import System.IO.Unsafe                           (unsafePerformIO)
-import Config
+import           Data.Char                      (isDigit)
+import qualified Data.ByteString.Char8          as BC 
+import qualified Data.ByteString.Lazy.Char8     as LC
+import           Database.PostgreSQL.Simple     (close, execute, query_)
+import           Database.PostgreSQL.Simple.Types (Query(..))
+import qualified Data.Text                      as T 
+import           Data.Text.Encoding             (encodeUtf8)
+import           System.IO.Unsafe               (unsafePerformIO)
+import           Config                         (connectDB)
 
 
 

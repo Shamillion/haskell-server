@@ -3,30 +3,24 @@
 
 module Main where
 
-import Data.Aeson
---import qualified Data.ByteString.Lazy as L
+import Data.Aeson                           (encode)
 import qualified Data.ByteString.Lazy.Char8 as LC
---import           Control.Concurrent.MVar
---import           Control.Monad                   (join)
---import           Data.Monoid               ((<>))
-import           qualified Data.Text as T 
-import           Data.Text.Encoding        (encodeUtf8)
---import qualified Data.Text.Lazy.Encoding as LE   (encodeUtf8)
---import           GHC.Generics
---import           Network.HTTP.Simple        
-import           Network.HTTP.Types        (status200, status406, status404, 
-                                                              queryToQueryText)
+import           Database.PostgreSQL.Simple as DB 
+import qualified Data.Text                  as T 
+import           Data.Text.Encoding         (encodeUtf8)       
+import           Network.HTTP.Types         (status200, status406, status404, queryToQueryText)
 import           Network.Wai                as W
-import           Network.Wai.Handler.Warp        (run)
-import           Database.PostgreSQL.Simple as DB    
-import           User
-import           Category
-import           News
-import           Auth
-import           Photo
-import           Config
-import           MigrationsDB (checkDB)
-import           Lib          (drawOut)
+import           Network.Wai.Handler.Warp   (run)
+import           Auth                       (authorID, checkAuth, isAuthor, isAdmin)
+import           Category                   (createCategory, editCategory, getCategory, parseCategory)
+import           Config                     (connectDB, limitElem, port, Priority(..), writingLine, writingLineDebug)
+import           Lib                        (drawOut)
+import           MigrationsDB               (checkDB)
+import           News                       (createNews, editNews, getNews, parseNews, setMethodNews, setLimitAndOffset)
+import           Photo                      (decodeImage, getPhoto)
+import           User                       (createUser, getUser, parseUser)
+
+
 
 
 

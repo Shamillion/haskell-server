@@ -6,10 +6,9 @@ module TestsFunctionsNews
   ) 
 where
 
-import Test.Hspec (SpecWith, it, shouldBe)
---import Test.QuickCheck
-import Database.PostgreSQL.Simple.Types
-import News (setLimitAndOffsetWith, setMethodNews) 
+import Database.PostgreSQL.Simple.Types (Query(..))
+import Test.Hspec                       (SpecWith, it, shouldBe)
+import News                             (setLimitAndOffsetWith, setMethodNews) 
 
 testsFunctionSetLimitAndOffsetWith :: SpecWith ()
 testsFunctionSetLimitAndOffsetWith = do

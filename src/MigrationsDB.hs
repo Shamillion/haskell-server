@@ -3,17 +3,10 @@
 
 module MigrationsDB where
 
---import           Data.Char                  (isDigit)
-import Database.PostgreSQL.Simple
---import Database.PostgreSQL.Simple.Types 
---import qualified Data.ByteString.Char8 as BC 
---import qualified Data.ByteString.Lazy.Char8 as LC
-import qualified Data.Text as T 
---import           Data.Text.Encoding        (encodeUtf8)
---import           Data.ByteString.Base64.Lazy    (decodeLenient)
---import           Data.Monoid                     ((<>))
---import System.IO.Unsafe                           (unsafePerformIO)
-import Config
+
+import Database.PostgreSQL.Simple (close, execute_, query_, Query)
+import qualified Data.Text        as T 
+import Config                     (connectDB, Priority(..), writingLine, writingLineDebug) 
 
 
 checkDB :: Int -> IO Int

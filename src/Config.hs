@@ -4,14 +4,16 @@
 module Config where
 
 
-import Data.Aeson                                       (eitherDecode, FromJSON)
+import           Data.Aeson                 (eitherDecode, FromJSON)
 import qualified Data.ByteString.Lazy       as L
 import qualified Database.PostgreSQL.Simple as PS
+import           Data.Time                  (getCurrentTime)
+import           Data.Word                  (Word16)
+import           GHC.Generics               (Generic)
 import qualified System.IO                  as I
-import           System.IO.Unsafe                              (unsafePerformIO)
-import           GHC.Generics                                          (Generic)
-import           Data.Time                                      (getCurrentTime)
-import           Data.Word                                              (Word16)
+import           System.IO.Unsafe           (unsafePerformIO)
+
+
 
 
 data Configuration = Configuration -- Data type for the configuration file.

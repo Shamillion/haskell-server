@@ -12,9 +12,9 @@ import qualified Data.Text              as T
 import Network.HTTP.Types.Header        (RequestHeaders)
 import qualified Network.Wai            as W
 import System.IO.Unsafe                 (unsafePerformIO)
-import User                             (User(..), getUser, parseUser)
 import Config        (Priority(ERROR), writingLine, writingLineDebug, connectDB)
 import Lib                              (last')
+import User                             (User(..), getUser, parseUser)
 
 
 

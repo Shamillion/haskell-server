@@ -6,12 +6,11 @@ module TestsFunctionsCategory
   ) 
 where
 
-import Test.Hspec (SpecWith, it, shouldBe)
---import Test.QuickCheck
-import Database.PostgreSQL.Simple.Types
-import Data.String               (IsString)
-import Data.ByteString.Internal (ByteString) 
-import Category (createCategoryWith, editCategoryWith)
+import Data.ByteString.Internal         (ByteString) 
+import Data.String                      (IsString)
+import Database.PostgreSQL.Simple.Types (Query(..))
+import Test.Hspec                       (SpecWith, it, shouldBe)
+import Category                         (createCategoryWith, editCategoryWith)
 
 
 

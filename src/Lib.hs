@@ -2,9 +2,9 @@
 
 module Lib where
 
+import Data.String         (IsString)
 import qualified Data.Text as T
-import Data.String               (IsString)
-import Text.Read                 (readMaybe) 
+import Text.Read           (readMaybe) 
 
 fromMaybe :: Data.String.IsString a => Maybe a -> a
 fromMaybe (Just e) = e
