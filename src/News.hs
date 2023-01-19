@@ -22,7 +22,7 @@ import Lib                           (readNum, splitOnTxt, tailTxt, initTxt, fro
 import Photo                         (sendPhotoToDB)
 import User                          (User, errorUser, parseUser)
 
-
+-- Creating a database query to get a list of news.
 getNews :: Query -> Maybe (Query, Query) -> Query
 getNews auth str = if isNothing str
   then "404"
@@ -88,6 +88,7 @@ setMethodNews num ls = do
     findSort = LT.filter ((=="sort_by") . fst) ls
     sortNewsLimitOffset = fmap (<> setLimitAndOffsetWith num ls) sortNews
 
+-- Processing of the "sort_by=..." part of the request.
 sortBy :: T.Text -> Maybe Query 
 sortBy mthd = ("ORDER BY " <>) <$>
   case mthd of   
@@ -97,7 +98,7 @@ sortBy mthd = ("ORDER BY " <>) <$>
    "photo"    -> Just "CARDINALITY(photo)" 
    _          -> Nothing
 
-
+-- Processing parts of the request for filtering and searching.
 setFiltersNews :: [(T.Text, Maybe T.Text)] -> Maybe Query   
 setFiltersNews [] = pure "title LIKE '%'" 
 setFiltersNews ((mthd, param):xs) 
@@ -136,12 +137,12 @@ setLimitAndOffsetWith val ls = Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst
     toByteString = BC.pack . show                                 
       
       
-      
 setLimitAndOffset :: [(T.Text, Maybe T.Text)] -> Query 
 setLimitAndOffset = setLimitAndOffsetWith limitElem      
     
 
---'.../news?title=Text&category_id=3&content=Text&
+-- Request example: 
+-- '.../news?title=Text&category_id=3&content=Text&
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
 createNews :: Bool -> Query -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
@@ -166,18 +167,20 @@ createNews True auth ls
     sndMaybe Nothing  = "Null"
     sndMaybe (Just e) = snd e
     
-
+-- Puts the photos from the query into the database and 
+--  returns a list from the ID.
 photoIDLs :: [(BC.ByteString, BC.ByteString)] -> BC.ByteString 
 photoIDLs = (\x -> "'{" <> x <> "}'") . buildPhotoIdString . 
                          map (sendPhotoToDB . snd) . filter ((=="photo") . fst) 
+
 
 buildPhotoIdString :: [BC.ByteString] -> BC.ByteString    
 buildPhotoIdString [] = ""
 buildPhotoIdString [x] = x
 buildPhotoIdString (x:xs) = x <> ", " <> buildPhotoIdString xs
     
-    
-    --news?news_id=(id news needed to edit)&title=Text&category_id=3&
+-- Request example:     
+--    news?news_id=(id news needed to edit)&title=Text&category_id=3&
 --       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
 editNews :: Query -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
@@ -198,7 +201,7 @@ editNews auth ls
                then "photo = " <> photoIDLs (map (fromMaybe <$>) ls) <> ", " 
                else ""   
   
-  
+-- Checks whether this user is the author of this news.  
 authorNews :: BC.ByteString -> BC.ByteString -> Bool
 authorNews authId newsId = 
   unsafePerformIO $ do 
@@ -208,7 +211,7 @@ authorNews authId newsId =
     close conn
     pure $ ls /= []            
     
-    
+-- Creates a row with updated news fields.    
 buildChanges :: [(BC.ByteString, BC.ByteString)] -> BC.ByteString    
 buildChanges [] = ""
 buildChanges [(x,y)] = x <> " = " <> q <> y <> q

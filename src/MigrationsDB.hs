@@ -8,7 +8,7 @@ import Database.PostgreSQL.Simple (close, execute_, query_, Query)
 import qualified Data.Text        as T 
 import Config                     (connectDB, Priority(..), writingLine, writingLineDebug) 
 
-
+-- Checking the availability of the necessary tables in the database.
 checkDB :: Int -> IO Int
 checkDB num
   | num > 2 = writingLine ERROR "Error Database!" >> pure num

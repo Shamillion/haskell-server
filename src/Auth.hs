@@ -17,7 +17,7 @@ import Lib                              (last')
 import User                             (User(..), getUser, parseUser)
 
 
-
+-- Returns the user with the username and password from the request.
 checkAuth :: RequestHeaders -> Either String [User]
 checkAuth ls = 
   if null fls then Left "No Authorization"
@@ -47,18 +47,21 @@ checkAuth ls =
       | otherwise = 
           [parseUser u | validatePassword p $ BC.pack . T.unpack . last' $ u]
 
+-- Returns the user ID.
 authorID :: W.Request -> Query
 authorID req = 
   case checkAuth (W.requestHeaders req) of     
     Right [u] -> fromString $ show $ user_id u    
     _         -> Query "Null" 
-  
+ 
+-- Checks the administrator rights of the user.  
 isAdmin :: W.Request -> Bool
 isAdmin req = 
   case checkAuth (W.requestHeaders req) of     
     Right [u] -> is_admin u    
     _         -> False   
-  
+
+-- Checks the user's ability to create news.  
 isAuthor :: W.Request -> Bool
 isAuthor req = 
   case checkAuth (W.requestHeaders req) of     

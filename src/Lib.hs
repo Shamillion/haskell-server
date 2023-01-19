@@ -36,6 +36,7 @@ splitOnTxt :: T.Text -> T.Text -> [T.Text]
 splitOnTxt _ "" = []
 splitOnTxt c txt = T.splitOn c txt
 
+-- Pulls a value from a list of lists.
 drawOut :: Data.String.IsString a => [[a]] -> a
 drawOut []      = ""
 drawOut ([]:_)  = ""

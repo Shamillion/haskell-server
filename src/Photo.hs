@@ -18,7 +18,7 @@ import           Config                         (connectDB)
 
 
 
-
+-- Creating a query to the database to get one photo.
 getPhoto :: [(BC.ByteString, Maybe BC.ByteString)] -> Query
 getPhoto [] = "404"
 getPhoto (x:_) = Query $
@@ -30,14 +30,14 @@ getPhoto (x:_) = Query $
       then "SELECT image FROM photo WHERE photo_id = " <> n <> ";"
       else "404"
 
-
+-- Decoding photos from Base64.
 decodeImage :: [[T.Text]] -> LC.ByteString
 decodeImage [] = "404"
 decodeImage ([img]:_) = decodeLenient . LC.fromStrict . encodeUtf8 $ img'
   where img' = T.drop 1 . T.dropWhile (/=',') $ img
 decodeImage (_:_) = "404"  
     
-    
+-- The function sends the photo to the database and returns its ID in the table.    
 sendPhotoToDB :: BC.ByteString -> BC.ByteString
 sendPhotoToDB str = unsafePerformIO $ do
   conn <- connectDB

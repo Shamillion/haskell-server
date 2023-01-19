@@ -15,8 +15,8 @@ import           System.IO.Unsafe           (unsafePerformIO)
 
 
 
-
-data Configuration = Configuration -- Data type for the configuration file.
+-- Data type for the configuration file.
+data Configuration = Configuration 
   { serverPort :: Int
   , dbHost :: String  
   , dbPort :: Word16
@@ -29,10 +29,10 @@ data Configuration = Configuration -- Data type for the configuration file.
   }
   deriving (Show, Generic, FromJSON)
  
-
+ -- Function reads configuration information from file.
 getConfiguration :: String -> Either String Configuration
-getConfiguration fileName =              -- Function reads configuration
-  unsafePerformIO $ do                   --  information from file.
+getConfiguration fileName =             
+  unsafePerformIO $ do                  
     t <- time
     content <- L.readFile fileName
     let obj = eitherDecode content
@@ -45,8 +45,10 @@ getConfiguration fileName =              -- Function reads configuration
         I.hFlush file
         pure obj
 
-errorConfig :: Configuration   -- The object is used when the configuration
-errorConfig =                  --   file is read unsuccessfully.
+-- The object is used when the configuration
+--   file is read unsuccessfully.
+errorConfig :: Configuration   
+errorConfig =                  
   Configuration 
     { serverPort = 0
     , dbHost = "Error"
@@ -59,16 +61,19 @@ errorConfig =                  --   file is read unsuccessfully.
     , logOutput = "cons"
     }
 
-configuration :: Configuration              -- Try to read configuration file.
+-- Try to read configuration file.
+configuration :: Configuration              
 configuration =
   case getConfiguration "../config.json" of
     Right v -> v
     Left _  -> errorConfig
 
-time :: IO String                             -- Get current time for the logger.
+-- Get current time for the logger.
+time :: IO String                             
 time = take 19 . show <$> getCurrentTime
 
 
+-- Parameters for connecting to the database.
 connectInfo :: PS.ConnectInfo
 connectInfo =
   PS.ConnectInfo
@@ -79,25 +84,29 @@ connectInfo =
     , PS.connectPassword = dbPassword configuration
     }
 
+-- Maximum number of items returned by the database in response to a request.
 limitElem :: Int
 limitElem = maxElem configuration
 
+-- Establishing a connection to the database.
 connectDB :: IO PS.Connection
 connectDB = do 
   writingLine INFO "Sent a request to the database."
   writingLineDebug connectInfo
   PS.connect connectInfo
 
-
-data Priority = DEBUG | INFO | WARNING | ERROR      -- Data type for the logger.
+-- Data type for the logger.
+data Priority = DEBUG | INFO | WARNING | ERROR      
   deriving (Show, Eq, Ord, Generic, FromJSON)
-  
-file :: I.Handle                                  -- Get Handle for the logfile.
+
+ -- Get Handle for the logfile.  
+file :: I.Handle                                 
 {-# NOINLINE file #-}
 file  = unsafePerformIO $ I.openFile "../log.log" I.AppendMode
 
-writingLine :: Priority -> String -> IO ()               -- Function writes log
-writingLine lvl str =                                    --    information down.
+-- Function writes log information down.
+writingLine :: Priority -> String -> IO ()               
+writingLine lvl str =                                    
   if lvl >= logLevel 
     then do
       t <- time
@@ -118,10 +127,12 @@ writingLine lvl str =                                    --    information down.
  
 writingLineDebug :: (Show a) => a -> IO ()  
 writingLineDebug s = writingLine DEBUG $ show s
-  
-logLevel :: Priority                                           -- Logging level.
+ 
+-- Logging level.  
+logLevel :: Priority                                           
 logLevel =  priorityLevel configuration
 
-port :: Int                                                  -- TCP port number.
+-- TCP port number.
+port :: Int                                                  
 port =  serverPort configuration
 

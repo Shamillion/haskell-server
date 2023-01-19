@@ -26,7 +26,7 @@ import           User                       (createUser, getUser, parseUser)
 
 
 
-
+-- Defining the type of request and creating a response.
 setQueryAndRespond :: W.Request -> (DB.Query, [[T.Text]] -> LC.ByteString)
 setQueryAndRespond req = case (reqMtd, entity) of
   ("GET",  "news") -> (getNews authId method, encode . map parseNews)

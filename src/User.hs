@@ -14,6 +14,7 @@ import Config                           (connectDB, writingLineDebug)
 import Lib                              (fromMaybe, readNum)
 
 
+-- Creating a database query to get a list of users
 getUser :: Query -> Query
 getUser str = "SELECT  (user_id :: TEXT), name_user, \
    \ (creation_date :: TEXT), (is_admin :: TEXT), (is_author :: TEXT), pass \
@@ -53,7 +54,8 @@ parseUser ls
     isAth = u5 == "t" || u5 == "true"
 
 
--- /user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true   (strict order) 
+-- Request example (strict order):  
+-- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'   
 createUser :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 createUser False _ = "404"
 createUser _ ls 
@@ -73,11 +75,12 @@ createUser _ ls
     pass' = cryptoPass (sum . map ord . BC.unpack $ nameUser) pass    
 
 
+-- Create a bcrypt hash for a password.
 cryptoPass :: Int -> BC.ByteString -> BC.ByteString
 cryptoPass n str = 
   unsafePerformIO $ hashPassword (mod n 7 + 4) str 
 
-
+-- Checking the uniqueness of the login in the database.
 checkUniqLogin :: BC.ByteString -> Bool
 checkUniqLogin str = unsafePerformIO $ do
   conn <- connectDB

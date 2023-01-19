@@ -16,10 +16,12 @@ import Config                           (connectDB, writingLineDebug)
 import Lib                              (head', fromMaybe, readNum)
 
 
+-- Creating a database query to get a list of catygories.
 getCategory :: Query -> Query
 getCategory limitOffset = "SELECT (category_id :: TEXT), parent_category, \
               \ name_category FROM category " <> limitOffset <> ";"
-              
+         
+-- For getParentCategories.              
 getCategory' :: Query
 getCategory' = "SELECT parent_category, name_category FROM category;"              
 
@@ -56,7 +58,10 @@ getParentCategories cat = unsafePerformIO $ do
           _       -> pc 
   pure $ filter (/="Null") $ buildingList [cat]
 
---'.../category?aaa>bbb'   aaa - parent category's name,  bbb - category's name 
+-- Request example: 
+--  '.../category?aaa>bbb'   
+--      aaa - parent category's name,  
+--      bbb - category's name. 
 createCategoryWith :: (BC.ByteString -> Bool) -> Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 createCategoryWith _ False _ = "404"
 createCategoryWith _ _ [] = "404"
@@ -76,8 +81,13 @@ createCategoryWith checkUniq True ls
 createCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 createCategory = createCategoryWith checkUniqCategory       
 
--- '.../category?change_name=aaa>bbb'    aaa - old category's name,  bbb - new category's name
--- '.../category?change_parent=aaa>bbb'  aaa - category's name,  bbb - new parent category's name
+-- Request examples:
+--   Changing the category name: '.../category?change_name=aaa>bbb'    
+--      aaa - old category's name, 
+--      bbb - new category's name.
+--   Changing the parent category: '.../category?change_parent=aaa>bbb'  
+--      aaa - category's name,  
+--      bbb - new parent category's name.
 editCategoryWith :: (BC.ByteString -> Bool) -> Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 editCategoryWith _ False _ = "404"
 editCategoryWith _ _ [] = "404"
@@ -116,6 +126,7 @@ editCategoryWith checkUniq True ls
 editCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 editCategory = editCategoryWith checkUniqCategory
 
+-- Checking the uniqueness of the category name in the database.
 checkUniqCategory :: BC.ByteString -> Bool
 checkUniqCategory str = unsafePerformIO $ do
   conn <- connectDB
