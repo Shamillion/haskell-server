@@ -64,7 +64,7 @@ errorConfig =
 -- Try to read configuration file.
 configuration :: Configuration              
 configuration =
-  case getConfiguration "../config.json" of
+  case getConfiguration "config.json" of
     Right v -> v
     Left _  -> errorConfig
 
