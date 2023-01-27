@@ -4,9 +4,14 @@
 module MigrationsDB where
 
 
-import Database.PostgreSQL.Simple (close, execute_, query_, Query)
+import qualified Data.ByteString.Char8  as BC
+import Data.Char                        (ord)
+import Database.PostgreSQL.Simple (close, execute_, query_)
+import Database.PostgreSQL.Simple.Types (Query(..))
 import qualified Data.Text        as T 
 import Config                     (connectDB, Priority(..), writingLine, writingLineDebug) 
+import User                       (cryptoPass)
+
 
 -- Checking the availability of the necessary tables in the database.
 checkDB :: Int -> IO Int
@@ -34,14 +39,14 @@ checkDB num
       where
         qry = "SELECT table_name FROM information_schema.tables \
               \ WHERE table_schema NOT IN ('information_schema','pg_catalog');"
-        lq = [createTableUsers, createTableCategory, 
+        lq = [createTableUsers, addAdmin, createTableCategory, 
                                     createTableNews, createTablePhoto]
 
 
 
 createTableUsers :: Query
 createTableUsers =
-  "CREATE TABLE users( \
+  "CREATE TABLE IF NOT EXISTS users( \
   \ user_id SERIAL PRIMARY KEY, \
   \ name_user VARCHAR(30), \
   \ login VARCHAR(30), \
@@ -50,11 +55,18 @@ createTableUsers =
   \ is_admin  BOOLEAN, \
   \ is_author BOOLEAN );" 
 
-
+addAdmin :: Query
+addAdmin =  Query $
+  "INSERT INTO users \
+  \ (user_id, name_user, login, pass, creation_date, is_admin, is_author) \
+  \ VALUES (1, 'Adam', 'Adam', '" <>  pass' <> "', NOW(), TRUE, FALSE) \
+  \ ON CONFLICT DO NOTHING;"
+  where
+    pass' = cryptoPass (sum . map ord . BC.unpack $ "Adam") "sixthDay"
 
 createTableCategory :: Query
 createTableCategory = 
-  "CREATE TABLE category( \
+  "CREATE TABLE IF NOT EXISTS category( \
   \ category_id SERIAL PRIMARY KEY, \
   \ name_category VARCHAR(100), \
   \ parent_category VARCHAR(100) );"
@@ -62,7 +74,7 @@ createTableCategory =
 
 createTableNews :: Query
 createTableNews = 
-  "CREATE TABLE news( \
+  "CREATE TABLE IF NOT EXISTS news( \
   \ news_id SERIAL PRIMARY KEY, \
   \ title TEXT, \
   \ creation_date DATE, \
@@ -76,4 +88,4 @@ createTableNews =
 
 createTablePhoto :: Query
 createTablePhoto = 
-  "CREATE TABLE photo(photo_id SERIAL PRIMARY KEY, image TEXT);"
+  "CREATE TABLE IF NOT EXISTS photo(photo_id SERIAL PRIMARY KEY, image TEXT);"
