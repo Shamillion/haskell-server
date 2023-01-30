@@ -18,7 +18,7 @@ import           Lib                        (drawOut)
 import           MigrationsDB               (checkDB)
 import           News                       (createNews, editNews, getNews, parseNews, setMethodNews, setLimitAndOffset)
 import           Photo                      (decodeImage, getPhoto)
-import           User                       (createUser, getUser, parseUser)
+import           User                       (blockAdminRights, createUser, getUser, parseUser)
 
 
 
@@ -34,6 +34,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
   ("PUT",  "news") -> (editNews authId arr, encodeWith)
   ("GET",  "user") -> (getUser limitOffset, encode . map parseUser)
   ("POST", "user") -> (createUser adm arr, encodeWith)
+  ("PUT",  "user") -> (blockAdminRights adm, encodeWith)
   ("GET",  "category") -> (getCategory limitOffset, encode . map parseCategory)
   ("POST", "category") -> (createCategory adm arr, encodeWith)
   ("PUT",  "category") -> (editCategory adm arr, encodeWith)
@@ -48,7 +49,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
     limitOffset = setLimitAndOffset . queryToQueryText $ arr
     adm = isAdmin req
     athr = isAuthor req 
-    encodeWith = encode . drawOut
+    encodeWith = (<> " position(s) done.") . LC.fromStrict . encodeUtf8 . drawOut
 
        
 app :: Application

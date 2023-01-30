@@ -74,6 +74,13 @@ createUser _ ls
     [nameUser, login, pass, isAdmin, isAuthor] = map (fromMaybe . snd) ls
     pass' = cryptoPass (sum . map ord . BC.unpack $ nameUser) pass    
 
+-- Disables the administrator rights of an automatically created user.
+-- Request example '../user?block_admin=Adam' 
+blockAdminRights :: Bool -> Query
+blockAdminRights False = "404"
+blockAdminRights _ = 
+  "UPDATE users SET is_admin = FALSE WHERE user_id = 99 AND login = 'Adam';"
+
 
 -- Create a bcrypt hash for a password.
 cryptoPass :: Int -> BC.ByteString -> BC.ByteString

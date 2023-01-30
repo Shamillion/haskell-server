@@ -27,17 +27,28 @@ To deploy the project, you need to perform the following steps:
    You also may change other parameters. The values of the parameters will be given below.
 5. Run the server with the 
    ```haskell
-   stack build
+   stack run
    ```
    command from the root folder of the project.
    After running the server will check database and create necessery tables.
 6. Open one more terminal to send requests to the server.
 7. Create a user by sending the following request to the server
    ```  
-   curl -X POST 'http://Adam:sixthDay@localhost:8080/user?name_user=NAME&login=LOGIN&pass=PASSWORD&is_admin=true&is_author=true'
+   curl -X POST 'http://Adam:sixthDay@localhost:SERVER_PORT/user?name_user=NAME&login=LOGIN&pass=PASSWORD&is_admin=true&is_author=true'
    ```
    where
-    - NAME - name for your user,
-    - LOGIN - login for your user,
+    - SERVER_PORT - TCP port number, specified in the "config.json" file as "ServerPort";    
+    - NAME - name for your user;
+    - LOGIN - login for your user;
     - PASSWORD - password for your user.
-8. Drink some coffee.    
+8. For security reasons, it is necessary to block the administrator rights of the user automatically created by the system. 
+   You should to execute following request to do it
+   ```
+   curl -X PUT 'http://LOGIN:PASSWORD@localhost:SERVER_PORT/user?block_admin=Adam'
+   ```  
+   where
+    - SERVER_PORT - TCP port number, specified in the "config.json" file as "ServerPort";    
+    - LOGIN - login of the user created by the last request;
+    - PASSWORD - password of the user created by the last request.
+    
+That is all. Your server is ready to work!  

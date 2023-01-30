@@ -55,11 +55,12 @@ createTableUsers =
   \ is_admin  BOOLEAN, \
   \ is_author BOOLEAN );" 
 
+-- Creating the first administrator. Required to create other users.
 addAdmin :: Query
 addAdmin =  Query $
   "INSERT INTO users \
   \ (user_id, name_user, login, pass, creation_date, is_admin, is_author) \
-  \ VALUES (1, 'Adam', 'Adam', '" <>  pass' <> "', NOW(), TRUE, FALSE) \
+  \ VALUES (99, 'Adam', 'Adam', '" <>  pass' <> "', NOW(), TRUE, FALSE) \
   \ ON CONFLICT DO NOTHING;"
   where
     pass' = cryptoPass (sum . map ord . BC.unpack $ "Adam") "sixthDay"
