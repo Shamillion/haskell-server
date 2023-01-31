@@ -17,7 +17,7 @@ To deploy the project, you need to perform the following steps:
    stack build
    ```
    command.
-4. Open file "config.json" in root folder of the project and change database parameters on parameters your database 
+4. Open file **config.json** in root folder of the project and change database parameters on parameters your database 
     - "dbHost" : "localhost"              - change it if your database in another place,        
     - "dbPort"      : 5432                - replace "5432" with the port number of your database,
     - "dbname"      : "haskellserverlite" - replace "haskellserverlite" with the name of your database,
@@ -37,7 +37,7 @@ To deploy the project, you need to perform the following steps:
    curl -X POST 'http://Adam:sixthDay@localhost:SERVER_PORT/user?name_user=NAME&login=LOGIN&pass=PASSWORD&is_admin=true&is_author=true'
    ```
    where
-    - SERVER_PORT - TCP port number, specified in the "config.json" file as "ServerPort";    
+    - SERVER_PORT - TCP port number, specified in the **config.json** file as **ServerPort**;    
     - NAME - name for your user;
     - LOGIN - login for your user;
     - PASSWORD - password for your user.
@@ -47,8 +47,29 @@ To deploy the project, you need to perform the following steps:
    curl -X PUT 'http://LOGIN:PASSWORD@localhost:SERVER_PORT/user?block_admin=Adam'
    ```  
    where
-    - SERVER_PORT - TCP port number, specified in the "config.json" file as "ServerPort";    
+    - SERVER_PORT - TCP port number, specified in the **config.json** file as **ServerPort**;    
     - LOGIN - login of the user created by the last request;
     - PASSWORD - password of the user created by the last request.
     
 That is all. Your server is ready to work!  
+
+## Settings in config.json
+
+```json
+{
+  "serverPort"  : 8080,                 - TCP port on which the server will run.       
+  "comment_serverPort" : "TCP port number",
+  "dbHost"      : "localhost",          - database host.       
+  "comment_db"  : "db is Data Base",             
+  "dbPort"      : 5432,                 - database port.
+  "dbname"      : "haskellserverlite",  - name of the database.
+  "dbUser"      : "haskell",            - user name to log in to the database.
+  "dbPassword"  : "haskell",            - password to log in to the database
+  "maxElem"     : 20,                   - limiting the maximum number of rows in the server response.
+  "comment_maxElem" : "The maximum number of elements in the server response", 
+  "priorityLevel"   : "DEBUG",          - logging level.
+  "comment_priorityLevel" : "DEBUG || INFO || WARNING || ERROR", - possible logging levels.
+  "logOutput"       : "cons",           - the place where the logs will be output.
+  "comment_logOutput" : "file || cons"  - possible log output locations (file or console).
+}
+```  
