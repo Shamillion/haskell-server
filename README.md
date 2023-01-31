@@ -55,21 +55,21 @@ That is all. Your server is ready to work!
 
 ## Settings in config.json
 
-```json
+```haskell
 {
-  "serverPort"  : 8080,                 - TCP port on which the server will run.       
+  "serverPort"  : 8080,                 -- TCP port on which the server will run.       
   "comment_serverPort" : "TCP port number",
-  "dbHost"      : "localhost",          - database host.       
+  "dbHost"      : "localhost",          -- database host.       
   "comment_db"  : "db is Data Base",             
-  "dbPort"      : 5432,                 - database port.
-  "dbname"      : "haskellserverlite",  - name of the database.
-  "dbUser"      : "haskell",            - user name to log in to the database.
-  "dbPassword"  : "haskell",            - password to log in to the database
-  "maxElem"     : 20,                   - limiting the maximum number of rows in the server response.
+  "dbPort"      : 5432,                 -- database port.
+  "dbname"      : "haskellserverlite",  -- name of the database.
+  "dbUser"      : "haskell",            -- user name to log in to the database.
+  "dbPassword"  : "haskell",            -- password to log in to the database
+  "maxElem"     : 20,                   -- limiting the maximum number of rows in the server response.
   "comment_maxElem" : "The maximum number of elements in the server response", 
-  "priorityLevel"   : "DEBUG",          - logging level.
-  "comment_priorityLevel" : "DEBUG || INFO || WARNING || ERROR", - possible logging levels.
-  "logOutput"       : "cons",           - the place where the logs will be output.
-  "comment_logOutput" : "file || cons"  - possible log output locations (file or console).
+  "priorityLevel"   : "DEBUG",          -- logging level.
+  "comment_priorityLevel" : "DEBUG || INFO || WARNING || ERROR",    -- possible logging levels.
+  "logOutput"       : "cons",           -- the place where the logs will be output.
+  "comment_logOutput" : "file || cons"  -- possible log output locations (file or console).
 }
-```  
+``` 
