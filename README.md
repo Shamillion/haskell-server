@@ -1,10 +1,12 @@
-﻿# haskell-server
+# haskell-server
+------
 
 This is a news web server with a REST API that accepts HTTP requests and gives responses in JSON format.
 
 The project is a task from Metalamp's internship (link: https://coda.io/@metalamp/education/4-15). 
 
 ## Project deployment
+------
 
 You should have installed PostgreSQL and created the database before following the steps.
 Also you will need the Stack.
@@ -53,8 +55,18 @@ To deploy the project, you need to perform the following steps:
     
 That is all. Your server is ready to work!  
 
-## Settings in config.json
+You can stop the server by pressing **Ctrl + C** in the first terminal
 
+## Starting and stopping the server
+
+To start the server, open the terminal, go to the root of the project and run the following command 
+```haskell
+stack run
+```
+To stop the server operation, press **Ctrl + C** in the terminal where the server was started.
+
+## Settings in config.json
+------
 ```haskell
 {
   "serverPort"  : 8080,                 -- TCP port on which the server will run.       
@@ -72,4 +84,27 @@ That is all. Your server is ready to work!
   "logOutput"       : "cons",           -- the place where the logs will be output.
   "comment_logOutput" : "file || cons"  -- possible log output locations (file or console).
 }
-``` 
+```  
+
+## Basic project structure
+------
+```haskell
+haskell-server                       -- the root folder of the project.
+  ├── app                            
+  │   └── Main.hs
+  ├── config.json                    -- server settings file.
+  ├── log.log                        -- file for server logs.
+  ├── _scripts                       -- folder with request file folders for endpoints.
+  ├── sql
+  │   └── db.sql                     -- sql queries for creating a database.
+  ├── src
+  │   ├── Auth.hs                    -- lib for user authorization.
+  │   ├── Category.hs                -- lib for working with categories.
+  │   ├── Config.hs                  -- lib for working with Config.json, database and logger.
+  │   ├── Lib.hs                     -- common functions used in the project.
+  │   ├── MigrationsDB.hs            -- lib for creating and verifying a database.
+  │   ├── News.hs                    -- lib for working with news.
+  │   ├── Photo.hs                   -- lib for working with images.
+  │   └── User.hs                    -- lib for working with users.
+  └── test                           -- folder with tests for server.
+```
