@@ -6,7 +6,6 @@ This is a news web server with a REST API that accepts HTTP requests and gives r
 The project is a task from Metalamp's internship (link: https://coda.io/@metalamp/education/4-15). 
 
 ## Project deployment
-------
 
 You should have installed PostgreSQL and created the database before following the steps.
 Also you will need the Stack.
@@ -66,7 +65,7 @@ stack run
 To stop the server operation, press **Ctrl + C** in the terminal where the server was started.
 
 ## Settings in config.json
-------
+
 ```haskell
 {
   "serverPort"  : 8080,                 -- TCP port on which the server will run.       
@@ -87,7 +86,7 @@ To stop the server operation, press **Ctrl + C** in the terminal where the serve
 ```  
 
 ## Basic project structure
-------
+
 ```haskell
 haskell-server                       -- the root folder of the project.
   ├── app                            
@@ -108,3 +107,36 @@ haskell-server                       -- the root folder of the project.
   │   └── User.hs                    -- lib for working with users.
   └── test                           -- folder with tests for server.
 ```
+
+## Request
+
+If necessary, the following requests will be created by a user with the 
+login **Sam** and password **pass123**, who has administrator and author rights. 
+
+The server port **8080** will be used.
+
+It is not an error to specify a username and password in the request when authorization is not required.
+
+### Requests for working with news.
+
+#### Getting news
+Without authorization, unpublished news created by the author of the request will not be included in the output.
+
+Unpublished news from other users cannot be obtained.
+
+The maximum number of news output is limited by the **maxElem** parameter in the **config.json file**
+
+Getting all the published news.
+Authorization is not required.    
+```
+curl -X GET 'http://localhost:8080/news'
+```
+
+Getting all published news and unpublished ones created by the author of the request.
+Authorization is required.
+```
+curl -X GET 'http://Sam:pass123@localhost:8080/news'
+```
+
+
+
