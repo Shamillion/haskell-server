@@ -138,5 +138,34 @@ Authorization is required.
 curl -X GET 'http://Sam:pass123@localhost:8080/news'
 ```
 
+Getting sorted news.
+To get sorted news, you need to add **sort_by=** with parameter  to the previous request. 
+News can be sorted by the following parameters
+    - **date**     - date of creation;
+    - **author**   - author (alphabetical name);
+    - **category** - category (alphabetically named);
+    - **photos**   - number of photos.
 
+The parameter can be only one.
+Example of a request to receive news sorted by creation date
+```
+curl -X GET 'http://Sam:pass123@localhost:8080/news?sort_by=date'
+```
 
+Filtering news.
+To filter the news, you can use the following parameters:
+    - **created_until** - created before the date, 
+    - **created_since** - created from the date, 
+    - **created_at**    - created on the specified day;
+    - **author**   - author user name;
+    - **category** - ID category;
+    - **title**    - title (occurrence of substring);
+    - **content**  - content (occurrence of substring).
+
+The request may include several parameters for filtering and a parameter for sorting.
+
+Example of a request to receive news created by the user Ann before 02.24.2022, 
+with the word "exhibition" in the title and sorted by the number of photos:
+```
+curl -X GET 'http://localhost:8080/news?author=Ann&created_until=2022-02-24&title=exhibition&sort_by=photos'
+```
