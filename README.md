@@ -117,7 +117,17 @@ The server port **8080** will be used.
 
 It is not an error to specify a username and password in the request when authorization is not required.
 
-### Requests for working with news.
+Limit and offset.
+Using the **limit** and **offset** parameters, you can limit the number of elements output, 
+as well as specify how many elements should be skipped in the output.
+If **limit** is greater than **maxElem** in **config.json**, it will be ignored.
+ 
+Limit and offset can be used together and separately.
+
+Limit and offset can be used in all getting requests.
+
+
+### Requests for working with news
 
 #### Getting news
 Without authorization, unpublished news created by the author of the request will not be included in the output.
@@ -141,10 +151,10 @@ curl -X GET 'http://Sam:pass123@localhost:8080/news'
 Getting sorted news.
 To get sorted news, you need to add **sort_by=** with parameter  to the previous request. 
 News can be sorted by the following parameters
-    - **date**     - date of creation;
-    - **author**   - author (alphabetical name);
-    - **category** - category (alphabetically named);
-    - **photos**   - number of photos.
+- **date**     - date of creation;
+- **author**   - author (alphabetical name);
+- **category** - category (alphabetically named);
+- **photos**   - number of photos.
 
 The parameter can be only one.
 Example of a request to receive news sorted by creation date
@@ -154,13 +164,13 @@ curl -X GET 'http://Sam:pass123@localhost:8080/news?sort_by=date'
 
 Filtering news.
 To filter the news, you can use the following parameters:
-    - **created_until** - created before the date, 
-    - **created_since** - created from the date, 
-    - **created_at**    - created on the specified day;
-    - **author**   - author user name;
-    - **category** - ID category;
-    - **title**    - title (occurrence of substring);
-    - **content**  - content (occurrence of substring).
+- **created_until** - created before the date, 
+- **created_since** - created from the date, 
+- **created_at**    - created on the specified day;
+- **author**   - author user name;
+- **category** - ID category;
+- **title**    - title (occurrence of substring);
+- **content**  - content (occurrence of substring).
 
 The request may include several parameters for filtering and a parameter for sorting.
 
@@ -169,3 +179,27 @@ with the word "exhibition" in the title and sorted by the number of photos:
 ```
 curl -X GET 'http://localhost:8080/news?author=Ann&created_until=2022-02-24&title=exhibition&sort_by=photos'
 ```
+
+Limit and offset.
+Example of the last request with limit and offset:
+```
+curl -X GET 'http://localhost:8080/news?author=Ann&created_until=2022-02-24&title=exhibition&sort_by=photos&limit=10&offset=3'
+```
+
+#### Creating news
+To create news, the user must have the author's right.
+A request to create a news item must have the following parameters
+- **title**        - title of the news;
+- **category_id**  - ID of the category to which the news belongs;
+- **content**      - news text; 
+- **photo**        - images for news encoded in base64, there may be several images;
+- **is_published** - submit the news to public access, possible values are **true** or **false**.
+
+Example of creating news with title "Hi Everyone!", category id 3, content "The First News That I Created.",
+two images (not real, just for example),  not  publish (only  the author be able to see this news):
+```
+curl -X POST 'http://Sam:pass123@localhost:8080/news?title=Hi%20Everyone%21&category_id=3&content=The%20First%20News%20That%20I%20Created%2E&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaHGkjHGKHJgghK&photo=data%3Aimage%2Fpng%3Bbase64%2CbbbHGkjHGKHJgghK&is_published=false'
+```
+
+#### News Editing
+
