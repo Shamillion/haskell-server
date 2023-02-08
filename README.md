@@ -136,19 +136,19 @@ Unpublished news from other users cannot be obtained.
 
 The maximum number of news output is limited by the **maxElem** parameter in the **config.json file**
 
-Getting all the published news.
+##### Getting all the published news.
 Authorization is not required.    
 ```
 curl -X GET 'http://localhost:8080/news'
 ```
 
-Getting all published news and unpublished ones created by the author of the request.
+##### Getting all published news and unpublished ones created by the author of the request.
 Authorization is required.
 ```
 curl -X GET 'http://Sam:pass123@localhost:8080/news'
 ```
 
-Getting sorted news.
+##### Getting sorted news.
 To get sorted news, you need to add **sort_by=** with parameter  to the previous request. 
 News can be sorted by the following parameters
 - **date**     - date of creation;
@@ -162,7 +162,7 @@ Example of a request to receive news sorted by creation date
 curl -X GET 'http://Sam:pass123@localhost:8080/news?sort_by=date'
 ```
 
-Filtering news.
+##### Filtering news.
 To filter the news, you can use the following parameters:
 - **created_until** - created before the date, 
 - **created_since** - created from the date, 
@@ -180,7 +180,7 @@ with the word "exhibition" in the title and sorted by the number of photos:
 curl -X GET 'http://localhost:8080/news?author=Ann&created_until=2022-02-24&title=exhibition&sort_by=photos'
 ```
 
-Limit and offset.
+##### Limit and offset.
 Example of the last request with limit and offset:
 ```
 curl -X GET 'http://localhost:8080/news?author=Ann&created_until=2022-02-24&title=exhibition&sort_by=photos&limit=10&offset=3'
@@ -188,6 +188,7 @@ curl -X GET 'http://localhost:8080/news?author=Ann&created_until=2022-02-24&titl
 
 #### Creating news
 To create news, the user must have the author's right.
+
 A request to create a news item must have the following parameters
 - **title**        - title of the news;
 - **category_id**  - ID of the category to which the news belongs;
@@ -202,4 +203,21 @@ curl -X POST 'http://Sam:pass123@localhost:8080/news?title=Hi%20Everyone%21&cate
 ```
 
 #### News Editing
+The user can edit only the news that he created.
 
+A request to edit a news item must have the following parameters
+- **news_id** - ID of the news to edit;
+- news fields that need to be edited. 
+
+Example of editing news.
+
+Let's edit the news created by the previous request, 
+let's assume that the **news_id** 8 was assigned to it when it was created. 
+And change the **title** to "Breaking news!", the **content** to 
+"The first news has been edited." and we will publish it.
+```
+curl -X PUT 'http://Sam:pass123@localhost:8080/news?news_id=8&title=Breaking%20news%21&category_id=3&content=The%20First%20News%20has%20been%20edited%2E&is_published=true'
+```
+
+
+### Requests for working with users
