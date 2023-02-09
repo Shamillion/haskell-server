@@ -221,3 +221,29 @@ curl -X PUT 'http://Sam:pass123@localhost:8080/news?news_id=8&title=Breaking%20n
 
 
 ### Requests for working with users
+
+#### Getting users
+Authorization is not required, the request may include **limit** and **offset**.    
+```
+curl -X GET 'http://localhost:8080/user'
+```
+
+#### Creating users
+To create users, the user must have administrator rights.
+
+A request to create a user must have the following parameters
+- **name_user** - user name;
+- **login**     - user login;
+- **pass**      - user password; 
+- **is_admin**  - administrator rights, possible values are **true** or **false**;
+- **is_author** - right to create news, possible values are **true** or **false**.
+
+Example of creating user with name "Ralf", login "Ralfio", password "zxc999", 
+without administrator rights, with right to create news:
+```
+curl -X POST 'http://Sam:pass123@localhost:8080/user?name_user=Ralf&login=Ralfio&pass=zxc999&is_admin=false&is_author=true'
+```
+
+
+### Requests for working with categories
+ 
