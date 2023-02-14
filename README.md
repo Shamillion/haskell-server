@@ -246,4 +246,44 @@ curl -X POST 'http://Sam:pass123@localhost:8080/user?name_user=Ralf&login=Ralfio
 
 
 ### Requests for working with categories
- 
+
+#### Getting categories
+Authorization is not required, the request may include **limit** and **offset**.    
+```
+curl -X GET 'http://localhost:8080/category'
+``` 
+
+#### Creating category
+To create category, the user must have administrator rights.
+
+Example of creating a category named "Trees" and a parent category named "Nature":
+```
+curl -X POST 'http://Sam:pass123@localhost:8080/category?Nature>Trees'
+```
+
+If you want to create a category without a parent category, then just specify the category name:
+```
+curl -X POST 'http://Sam:pass123@localhost:8080/category?Trees'
+```
+
+#### Category Editing
+To edit category, the user must have administrator rights.
+
+You can use the request to change the category name or change the parent category.
+
+A request to edit a category must have one of the following parameters
+- **change_name**   - to change the category name;
+- **change_parent** - to change the parent category.
+
+##### Changing the category name
+Let's change the name of the "Plants" category to "Flowers":
+```
+curl -X PUT 'http://Sam:pass123@localhost:8080/category?change_name=Plants>Flowers'
+```
+
+##### Changing the parent category
+Let's change the parent category to "Forest" for the previously created category "Trees":
+```
+curl -X PUT 'http://Sam:pass123@localhost:8080/category?change_parent=Trees>Forest'
+```
+
