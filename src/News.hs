@@ -27,13 +27,33 @@ getNews :: Query -> Maybe (Query, Query) -> Query
 getNews auth str = if isNothing str
   then "404"
   else
+  "SELECT (news_id :: TEXT), title, (news.creation_date :: TEXT), \
+   \ (author :: TEXT), name_category, content, (photo :: TEXT), \
+   \ (is_published :: TEXT) \
+   \ FROM news \
+   \ INNER JOIN category ON news.category_id = category.category_id \
+   \ INNER JOIN ( SELECT user_id, name_user, users.creation_date, is_admin, \
+   \ is_author, login \
+   \ FROM users ) author ON news.user_id = author.user_id \
+   \ WHERE (is_published = TRUE OR is_published = FALSE AND \
+   \ author.user_id = " <> auth <> ") AND " <> fltr <>  -- WHERE title LIKE '%'
+   " GROUP BY news_id, title, news.creation_date, author, author.name_user, \
+   \ name_category, photo, content, is_published "  <> srt <> ";"
+   where 
+     Just (fltr,srt) = str
+
+-- Creating a database query to get a list of news with abbreviations of the text.
+getNews' :: Query -> Maybe (Query, Query) -> Query
+getNews' auth str = if isNothing str
+  then "404"
+  else
   "SELECT (news_id :: TEXT), substring(title from 1 for 12), \
    \ (news.creation_date :: TEXT), (author :: TEXT), \
    \ name_category, substring(content from 1 for 12), \
    \ (photo :: TEXT), (is_published :: TEXT) \
    \ FROM news \
    \ INNER JOIN category ON news.category_id = category.category_id \
-   \ INNER JOIN ( SELECT  user_id, name_user, users.creation_date, is_admin, \
+   \ INNER JOIN ( SELECT user_id, name_user, users.creation_date, is_admin, \
    \ is_author, login \
    \ FROM users ) author ON news.user_id = author.user_id \
    \ WHERE (is_published = TRUE OR is_published = FALSE AND \

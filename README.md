@@ -287,3 +287,12 @@ Let's change the parent category to "Forest" for the previously created category
 curl -X PUT 'http://Sam:pass123@localhost:8080/category?change_parent=Trees>Forest'
 ```
 
+
+### Requests for getting image
+
+Authorization is not required, you can get only one image by specifying its ID.
+
+Example of getting an image with ID 17:    
+```
+curl -X GET 'http://localhost:8080/photo?get_photo=17'
+``` 
