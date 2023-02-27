@@ -11,7 +11,7 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Lib (fromMaybe, readNum)
-import System.IO.Unsafe (unsafePerformIO)
+
 
 -- Creating a database query to get a list of users
 getUser :: Query -> Query
@@ -57,33 +57,36 @@ parseUser ls
 
 -- Request example (strict order):
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
-createUser :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
-createUser False _ = "404"
+createUser :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+createUser False _ = pure "404"
 createUser _ ls
-  | null ls || map fst ls /= checkList = "404"
-  | searchNothing = "404"
-  | not (checkUniqLogin login) = "406uu"
-  | otherwise =
-    Query $
-      "INSERT INTO users (name_user, login, pass, \
-      \       creation_date, is_admin, is_author) \
-      \ VALUES ('"
-        <> nameUser
-        <> "', '"
-        <> login
-        <> "', '"
-        <> pass'
-        <> "', NOW(), '"
-        <> isAdmin
-        <> "', '"
-        <> isAuthor
-        <> "');"
+  | null ls || map fst ls /= checkList = pure "404"
+  | searchNothing = pure "404"
+  | otherwise = do
+      uniq <- checkUniqLogin login
+      if uniq 
+        then do
+          pass' <- cryptoPass (sum . map ord . BC.unpack $ nameUser) pass
+          pure . Query $
+            "INSERT INTO users (name_user, login, pass, \
+            \       creation_date, is_admin, is_author) \
+            \ VALUES ('"
+              <> nameUser
+              <> "', '"
+              <> login
+              <> "', '"
+              <> pass'
+              <> "', NOW(), '"
+              <> isAdmin
+              <> "', '"
+              <> isAuthor
+              <> "');"
+        else pure "406uu"          
   where
     checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
     sndList = map (fromMaybe . snd) ls
     searchNothing = "???" `elem` sndList
-    [nameUser, login, pass, isAdmin, isAuthor] = map (fromMaybe . snd) ls
-    pass' = cryptoPass (sum . map ord . BC.unpack $ nameUser) pass
+    [nameUser, login, pass, isAdmin, isAuthor] = map (fromMaybe . snd) ls    
 
 -- Disables the administrator rights of an automatically created user.
 -- Request example '../user?block_admin=Adam'
@@ -93,13 +96,12 @@ blockAdminRights _ =
   "UPDATE users SET is_admin = FALSE WHERE user_id = 99 AND login = 'Adam';"
 
 -- Create a bcrypt hash for a password.
-cryptoPass :: Int -> BC.ByteString -> BC.ByteString
-cryptoPass n str =
-  unsafePerformIO $ hashPassword (mod n 7 + 4) str
+cryptoPass :: Int -> BC.ByteString -> IO BC.ByteString
+cryptoPass n str = hashPassword (mod n 7 + 4) str
 
 -- Checking the uniqueness of the login in the database.
-checkUniqLogin :: BC.ByteString -> Bool
-checkUniqLogin str = unsafePerformIO $ do
+checkUniqLogin :: BC.ByteString -> IO Bool
+checkUniqLogin str = do
   conn <- connectDB
   ls <-
     query_ conn $

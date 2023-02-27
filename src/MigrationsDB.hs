@@ -10,6 +10,8 @@ import Database.PostgreSQL.Simple (close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import User (cryptoPass)
 
+import System.IO.Unsafe (unsafePerformIO) -- Delete
+
 -- Checking the availability of the necessary tables in the database.
 checkDB :: Int -> IO Int
 checkDB num
@@ -68,7 +70,7 @@ addAdmin =
       <> "', NOW(), TRUE, FALSE) \
          \ ON CONFLICT DO NOTHING;"
   where
-    pass' = cryptoPass (sum . map ord . BC.unpack $ "Adam") "sixthDay"
+    pass' = unsafePerformIO $ cryptoPass (sum . map ord . BC.unpack $ "Adam") "sixthDay"
 
 createTableCategory :: Query
 createTableCategory =

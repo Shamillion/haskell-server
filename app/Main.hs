@@ -21,6 +21,9 @@ import News (createNews, editNews, getNews, parseNews, setLimitAndOffset, setMet
 import Photo (decodeImage, getPhoto)
 import User (blockAdminRights, createUser, getUser, parseUser)
 
+import System.IO.Unsafe (unsafePerformIO) -- Delete
+
+
 -- Defining the type of request and creating a response.
 setQueryAndRespond :: W.Request -> (DB.Query, [[T.Text]] -> LC.ByteString)
 setQueryAndRespond req = case (reqMtd, entity) of
@@ -28,7 +31,7 @@ setQueryAndRespond req = case (reqMtd, entity) of
   ("POST", "news") -> (createNews athr authId arr, encodeWith)
   ("PUT", "news") -> (editNews authId arr, encodeWith)
   ("GET", "user") -> (getUser limitOffset, encode . map parseUser)
-  ("POST", "user") -> (createUser adm arr, encodeWith)
+  ("POST", "user") -> (unsafePerformIO $ createUser adm arr, encodeWith)
   ("PUT", "user") -> (blockAdminRights adm, encodeWith)
   ("GET", "category") -> (getCategory limitOffset, encode . map parseCategory)
   ("POST", "category") -> (createCategory adm arr, encodeWith)
