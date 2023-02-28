@@ -52,7 +52,7 @@ authorID :: W.Request -> Query
 authorID req =
   case checkAuth (W.requestHeaders req) of
     Right [u] -> fromString $ show $ user_id u
-    _ -> Query "Null"
+    _ -> "Null"
 
 -- Checks the administrator rights of the user.
 isAdmin :: W.Request -> Bool

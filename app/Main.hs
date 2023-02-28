@@ -28,8 +28,8 @@ import System.IO.Unsafe (unsafePerformIO) -- Delete
 setQueryAndRespond :: W.Request -> (DB.Query, [[T.Text]] -> LC.ByteString)
 setQueryAndRespond req = case (reqMtd, entity) of
   ("GET", "news") -> (getNews authId method, encode . map parseNews)
-  ("POST", "news") -> (createNews athr authId arr, encodeWith)
-  ("PUT", "news") -> (editNews authId arr, encodeWith)
+  ("POST", "news") -> (unsafePerformIO $ createNews athr authId arr, encodeWith)
+  ("PUT", "news") -> (unsafePerformIO $ editNews authId arr, encodeWith)
   ("GET", "user") -> (getUser limitOffset, encode . map parseUser)
   ("POST", "user") -> (unsafePerformIO $ createUser adm arr, encodeWith)
   ("PUT", "user") -> (blockAdminRights adm, encodeWith)

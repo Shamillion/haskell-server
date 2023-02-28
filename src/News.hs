@@ -18,7 +18,6 @@ import Database.PostgreSQL.Simple.Types (Query (..))
 import GHC.Generics (Generic)
 import Lib (fromMaybe, initTxt, readNum, splitOnTxt, tailTxt)
 import Photo (sendPhotoToDB)
-import System.IO.Unsafe (unsafePerformIO)
 import Text.Read (readMaybe)
 import User (User, errorUser, parseUser)
 
@@ -180,23 +179,22 @@ setLimitAndOffset = setLimitAndOffsetWith limitElem
 -- '.../news?title=Text&category_id=3&content=Text&
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-createNews :: Bool -> Query -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
-createNews False _ _ = "404"
-createNews _ _ [] = "404"
-createNews True auth ls
-  | nothingInLs = "404"
-  | otherwise =
-    Query $
+createNews :: Bool -> Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+createNews auth authID ls
+  | not auth || null ls || nothingInLs = pure "404"
+  | otherwise = do
+    photoIdList <- photoIDLs ls'
+    pure . Query $
       "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
       \ content, is_published) \
       \ VALUES ('"
         <> titleNws
         <> "', NOW(), "
-        <> fromQuery auth
+        <> fromQuery authID
         <> ", "
         <> categoryId
         <> ", "
-        <> photoIDLs ls'
+        <> photoIdList
         <> ", '"
         <> contentNws
         <> "', "
@@ -211,15 +209,17 @@ createNews True auth ls
     isPublished = getValue "is_published"
     getValue str = sndMaybe . LT.find (\(x, _) -> x == str) $ ls'
     sndMaybe Nothing = "Null"
-    sndMaybe (Just e) = snd e
+    sndMaybe (Just e) = snd e    
 
 -- Puts the photos from the query into the database and
 --  returns a list from the ID.
-photoIDLs :: [(BC.ByteString, BC.ByteString)] -> BC.ByteString
-photoIDLs =
-  (\x -> "'{" <> x <> "}'") . buildPhotoIdString
-    . map (sendPhotoToDB . snd)
-    . filter ((== "photo") . fst)
+photoIDLs :: [(BC.ByteString, BC.ByteString)] -> IO BC.ByteString
+photoIDLs ls = ls' >>= pure . (\x -> "'{" <> buildPhotoIdString x <> "}'")
+  --((\x -> "'{" <> x <> "}'") <$>) . (buildPhotoIdString <$>)
+    -- .  mapM (sendPhotoToDB . snd)
+    -- . filter ((== "photo") . fst)
+  where
+    ls' = mapM (sendPhotoToDB . snd) . filter ((== "photo") . fst) $ ls    
 
 buildPhotoIdString :: [BC.ByteString] -> BC.ByteString
 buildPhotoIdString [] = ""
@@ -230,18 +230,19 @@ buildPhotoIdString (x : xs) = x <> ", " <> buildPhotoIdString xs
 --    news?news_id=(id news needed to edit)&title=Text&category_id=3&
 --       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-editNews :: Query -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
-editNews _ [] = "404"
-editNews auth ls
-  | not author' = "404"
-  | otherwise =
-    Query $
-      "UPDATE news SET " <> photo' <> buildChanges ls'
-        <> " WHERE news_id = "
-        <> newsId
-        <> ";"
+editNews :: Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+editNews auth ls = do
+  author' <- authorNews (fromQuery auth) newsId
+  if null ls || not author'
+    then pure "404"
+    else do
+      photo' <- photoIdList
+      pure . Query $
+        "UPDATE news SET " <> photo' <> buildChanges ls'
+          <> " WHERE news_id = "
+          <> newsId
+          <> ";"   
   where
-    author' = authorNews (fromQuery auth) newsId
     newsId = case LT.find (\(x, _) -> x == "news_id") ls of
       Just (_, Just n) -> n
       _ -> "0"
@@ -249,15 +250,17 @@ editNews auth ls
       map (fromMaybe <$>) $
         LT.filter (\(x, y) -> elem x fields && isJust y) ls
     fields = ["title", "category_id", "content", "is_published"]
-    photo' =
+    photoIdList =
       if "photo" `elem` map fst ls
-        then "photo = " <> photoIDLs (map (fromMaybe <$>) ls) <> ", "
-        else ""
-
+        then do
+          x <- photoIDLs $ map (fromMaybe <$>) ls
+          pure $ "photo = " <> x <> ", "
+        else pure ""
+     
 -- Checks whether this user is the author of this news.
-authorNews :: BC.ByteString -> BC.ByteString -> Bool
-authorNews authId newsId =
-  unsafePerformIO $ do
+authorNews :: BC.ByteString -> BC.ByteString -> IO Bool
+authorNews "Null" _ = pure False
+authorNews authId newsId = do
     conn <- connectDB
     ls <-
       query

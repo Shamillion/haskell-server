@@ -11,7 +11,6 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Database.PostgreSQL.Simple (close, execute, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import System.IO.Unsafe (unsafePerformIO)
 
 -- Creating a query to the database to get one photo.
 getPhoto :: [(BC.ByteString, Maybe BC.ByteString)] -> Query
@@ -34,8 +33,8 @@ decodeImage ([img] : _) = decodeLenient . LC.fromStrict . encodeUtf8 $ img'
 decodeImage (_ : _) = "404"
 
 -- The function sends the photo to the database and returns its ID in the table.
-sendPhotoToDB :: BC.ByteString -> BC.ByteString
-sendPhotoToDB str = unsafePerformIO $ do
+sendPhotoToDB :: BC.ByteString -> IO BC.ByteString
+sendPhotoToDB str = do
   conn <- connectDB
   _ <- execute conn "INSERT INTO photo (image) VALUES (?);" [str]
   num <- query_ conn "SELECT max(photo_id) FROM photo;" :: IO [[Int]]
