@@ -34,8 +34,8 @@ setQueryAndRespond req = case (reqMtd, entity) of
   ("POST", "user") -> (unsafePerformIO $ createUser adm arr, encodeWith)
   ("PUT", "user") -> (blockAdminRights adm, encodeWith)
   ("GET", "category") -> (getCategory limitOffset, encode . map parseCategory)
-  ("POST", "category") -> (createCategory adm arr, encodeWith)
-  ("PUT", "category") -> (editCategory adm arr, encodeWith)
+  ("POST", "category") -> (unsafePerformIO $ createCategory adm arr, encodeWith)
+  ("PUT", "category") -> (unsafePerformIO $ editCategory adm arr, encodeWith)
   ("GET", "photo") -> (getPhoto arr, decodeImage)
   _ -> ("404", const "404")
   where

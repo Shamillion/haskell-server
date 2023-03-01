@@ -10,7 +10,6 @@ import Database.PostgreSQL.Simple (close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import User (cryptoPass)
 
-import System.IO.Unsafe (unsafePerformIO) -- Delete
 
 -- Checking the availability of the necessary tables in the database.
 checkDB :: Int -> IO Int
@@ -30,7 +29,14 @@ checkDB num
           writingLine INFO "Database is OK."
           pure num
         else do
-          mapM_ (execute_ conn) lq
+          addAdmin' <- addAdmin
+          mapM_ (execute_ conn) 
+            [ createTableUsers,
+              addAdmin',
+              createTableCategory,
+              createTableNews,
+              createTablePhoto
+            ]
           writingLine INFO "Database has been created."
           close conn
           checkDB (num + 1)
@@ -40,13 +46,7 @@ checkDB num
     qry =
       "SELECT table_name FROM information_schema.tables \
       \ WHERE table_schema NOT IN ('information_schema','pg_catalog');"
-    lq =
-      [ createTableUsers,
-        addAdmin,
-        createTableCategory,
-        createTableNews,
-        createTablePhoto
-      ]
+
 
 createTableUsers :: Query
 createTableUsers =
@@ -60,17 +60,16 @@ createTableUsers =
   \ is_author BOOLEAN );"
 
 -- Creating the first administrator. Required to create other users.
-addAdmin :: Query
-addAdmin =
-  Query $
+addAdmin :: IO Query
+addAdmin = do
+  pass' <- cryptoPass (sum . map ord . BC.unpack $ "Adam") "sixthDay"
+  pure . Query $
     "INSERT INTO users \
     \ (user_id, name_user, login, pass, creation_date, is_admin, is_author) \
     \ VALUES (99, 'Adam', 'Adam', '"
       <> pass'
       <> "', NOW(), TRUE, FALSE) \
          \ ON CONFLICT DO NOTHING;"
-  where
-    pass' = unsafePerformIO $ cryptoPass (sum . map ord . BC.unpack $ "Adam") "sixthDay"
 
 createTableCategory :: Query
 createTableCategory =
