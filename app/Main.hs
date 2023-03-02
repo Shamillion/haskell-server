@@ -27,7 +27,7 @@ import System.IO.Unsafe (unsafePerformIO) -- Delete
 -- Defining the type of request and creating a response.
 setQueryAndRespond :: W.Request -> (DB.Query, [[T.Text]] -> LC.ByteString)
 setQueryAndRespond req = case (reqMtd, entity) of
-  ("GET", "news") -> (getNews authId method, encode . map parseNews)
+  ("GET", "news") -> (getNews authId method, encode . unsafePerformIO . mapM parseNews)
   ("POST", "news") -> (unsafePerformIO $ createNews athr authId arr, encodeWith)
   ("PUT", "news") -> (unsafePerformIO $ editNews authId arr, encodeWith)
   ("GET", "user") -> (getUser limitOffset, encode . map parseUser)
@@ -43,8 +43,8 @@ setQueryAndRespond req = case (reqMtd, entity) of
     [entity] = W.pathInfo req
     authId = authorID req
     arr = W.queryString req
-    method = setMethodNews limitElem . queryToQueryText $ arr
-    limitOffset = setLimitAndOffset . queryToQueryText $ arr
+    method = (setMethodNews (unsafePerformIO limitElem)) . queryToQueryText $ arr
+    limitOffset = unsafePerformIO . setLimitAndOffset . queryToQueryText $ arr
     adm = isAdmin req
     athr = isAuthor req
     encodeWith = (<> " position(s) done.") . LC.fromStrict . encodeUtf8 . drawOut
@@ -101,5 +101,6 @@ main = do
   if x > 2
     then print ("Error Database! Server can not be started!" :: String)
     else do
+      port' <- port
       writingLine INFO "Server is started."
-      run port app
+      run port' app

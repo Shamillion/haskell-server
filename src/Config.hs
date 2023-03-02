@@ -11,7 +11,7 @@ import Data.Word (Word16)
 import qualified Database.PostgreSQL.Simple as PS
 import GHC.Generics (Generic)
 import qualified System.IO as I
-import System.IO.Unsafe (unsafePerformIO)
+
 
 -- Data type for the configuration file.
 data Configuration = Configuration
@@ -28,9 +28,8 @@ data Configuration = Configuration
   deriving (Show, Generic, FromJSON)
 
 -- Function reads configuration information from file.
-getConfiguration :: String -> Either String Configuration
-getConfiguration fileName =
-  unsafePerformIO $ do
+getConfiguration :: String -> IO Either String Configuration
+getConfiguration fileName = do
     t <- time
     content <- L.readFile fileName
     let obj = eitherDecode content
@@ -39,8 +38,9 @@ getConfiguration fileName =
       Left e -> do
         let str = t ++ " UTC   " ++ "ERROR  " ++ " - " ++ e
         print str
-        I.hPutStrLn file str
-        I.hFlush file
+        file' <- file
+        I.hPutStrLn file' str
+        I.hFlush file'
         pure obj
 
 -- The object is used when the configuration
@@ -60,9 +60,10 @@ errorConfig =
     }
 
 -- Try to read configuration file.
-configuration :: Configuration
-configuration =
-  case getConfiguration "config.json" of
+configuration :: IO Configuration
+configuration = do
+  getConf <- getConfiguration
+  pure $ case getConf "config.json" of
     Right v -> v
     Left _ -> errorConfig
 
@@ -71,51 +72,54 @@ time :: IO String
 time = take 19 . show <$> getCurrentTime
 
 -- Parameters for connecting to the database.
-connectInfo :: PS.ConnectInfo
-connectInfo =
+connectInfo :: IO PS.ConnectInfo
+connectInfo = do
+  conf <- configuration 
   PS.ConnectInfo
-    { PS.connectHost = dbHost configuration,
-      PS.connectPort = dbPort configuration,
-      PS.connectDatabase = dbname configuration,
-      PS.connectUser = dbUser configuration,
-      PS.connectPassword = dbPassword configuration
+    { PS.connectHost = dbHost conf,
+      PS.connectPort = dbPort conf,
+      PS.connectDatabase = dbname conf,
+      PS.connectUser = dbUser conf,
+      PS.connectPassword = dbPassword conf
     }
 
 -- Maximum number of items returned by the database in response to a request.
-limitElem :: Int
-limitElem = maxElem configuration
+limitElem :: IO Int
+limitElem = maxElem <$> configuration 
 
 -- Establishing a connection to the database.
 connectDB :: IO PS.Connection
 connectDB = do
   writingLine INFO "Sent a request to the database."
-  writingLineDebug connectInfo
-  PS.connect connectInfo
+  connectInfo >>= writingLineDebug 
+  connectInfo >>= PS.connect 
 
 -- Data type for the logger.
 data Priority = DEBUG | INFO | WARNING | ERROR
   deriving (Show, Eq, Ord, Generic, FromJSON)
 
 -- Get Handle for the logfile.
-file :: I.Handle
+file :: IO I.Handle
 {-# NOINLINE file #-}
-file = unsafePerformIO $ I.openFile "../log.log" I.AppendMode
+file = I.openFile "../log.log" I.AppendMode
 
 -- Function writes log information down.
 writingLine :: Priority -> String -> IO ()
-writingLine lvl str =
-  if lvl >= logLevel
+writingLine lvl str = do
+  logLevel' <- logLevel
+  if lvl >= logLevel'
     then do
       t <- time
       let string = t ++ " UTC   " ++ fun lvl ++ " - " ++ str
+      out <- logOutput <$> configuration
       case out of
         "file" -> do
-          I.hPutStrLn file string
-          I.hFlush file
+          file' <- file
+          I.hPutStrLn file' string
+          I.hFlush file'
         _ -> putStrLn string
     else pure ()
-  where
-    out = logOutput configuration
+  where    
     fun val = case val of
       DEBUG -> "DEBUG  "
       INFO -> "INFO   "
@@ -126,9 +130,9 @@ writingLineDebug :: (Show a) => a -> IO ()
 writingLineDebug s = writingLine DEBUG $ show s
 
 -- Logging level.
-logLevel :: Priority
-logLevel = priorityLevel configuration
+logLevel :: IO Priority
+logLevel = priorityLevel <$> configuration 
 
 -- TCP port number.
-port :: Int
-port = serverPort configuration
+port :: IO Int
+port = serverPort <$> configuration  

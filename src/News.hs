@@ -86,20 +86,21 @@ data News = News
   }
   deriving (Show, Generic, ToJSON)
 
-errorNews :: News
-errorNews = News 0 "error" "error" errorUser ["error"] "error" ["error"] False
+errorNews :: IO News
+errorNews = pure $ News 0 "error" "error" errorUser ["error"] "error" ["error"] False
 
-parseNews :: [T.Text] -> News
+parseNews :: [T.Text] -> IO News
 parseNews ls
   | length ls /= 8 = errorNews
   | idNws == 0 = errorNews
-  | otherwise = News idNws n1 n2 athr cats n5 pht isPbl
+  | otherwise = do
+    cats <- getParentCategories n4
+    pure $ News idNws n1 n2 athr cats n5 pht isPbl
   where
     [n0, n1, n2, n3, n4, n5, n6, n7] = ls
     idNws = readNum n0
     splitText = splitOnTxt "," . tailTxt . initTxt
-    athr = parseUser $ splitText n3
-    cats = getParentCategories n4
+    athr = parseUser $ splitText n3    
     pht = map ("/photo?get_photo=" <>) $ splitText n6
     isPbl = n7 == "true" || n7 == "t"
 
@@ -116,7 +117,7 @@ setMethodNews num ls = do
         [("sort_by", Just x)] -> sortBy x
         _ -> pure ""
     findSort = LT.filter ((== "sort_by") . fst) ls
-    sortNewsLimitOffset = fmap (<> setLimitAndOffsetWith num ls) sortNews
+    sortNewsLimitOffset = fmap (<> setLimitAndOffsetWith num ls) sortNews -----------------
 
 -- Processing of the "sort_by=..." part of the request.
 sortBy :: T.Text -> Maybe Query
@@ -158,22 +159,24 @@ setFiltersNews ((mthd, param) : xs)
         <> fromMaybe' param
         <> "'"
 
-setLimitAndOffsetWith :: Int -> [(T.Text, Maybe T.Text)] -> Query
-setLimitAndOffsetWith val ls = Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst
+setLimitAndOffsetWith :: IO Int -> [(T.Text, Maybe T.Text)] -> IO Query
+setLimitAndOffsetWith val ls = do 
+  val' <- val
+  let lmt = listToValue "limit" lessVal val'
+      lessVal x = if x > 0 && x < val then x else val'
+  pure . Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst
   where
-    ofst = listToValue "offset" (max 0) 0
-    lmt = listToValue "limit" lessVal val
+    ofst = listToValue "offset" (max 0) 0    
     getMaybe wrd f =
       (LT.find ((== wrd) . fst) ls >>= snd >>= readMaybe . T.unpack) <&> f
     listToValue wrd f x = toByteString $
       case getMaybe wrd f of
         Just n -> n
-        _ -> x
-    lessVal x = if x > 0 && x < val then x else val
+        _ -> x    
     toByteString = BC.pack . show
 
-setLimitAndOffset :: [(T.Text, Maybe T.Text)] -> Query
-setLimitAndOffset = setLimitAndOffsetWith limitElem
+setLimitAndOffset :: [(T.Text, Maybe T.Text)] -> IO Query
+setLimitAndOffset = setLimitAndOffsetWith limitElem    
 
 -- Request example:
 -- '.../news?title=Text&category_id=3&content=Text&

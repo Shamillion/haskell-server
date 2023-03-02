@@ -13,7 +13,6 @@ import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import GHC.Generics (Generic)
 import Lib (fromMaybe, head', readNum)
-import System.IO.Unsafe (unsafePerformIO)
 
 -- Creating a database query to get a list of catygories.
 getCategory :: Query -> Query
@@ -46,8 +45,8 @@ parseCategory ls
     idCat = readNum ic
     (ic : pc : nc : _) = ls
 
-getParentCategories :: T.Text -> [T.Text]
-getParentCategories cat = unsafePerformIO $ do
+getParentCategories :: T.Text -> IO [T.Text]
+getParentCategories cat = do
   conn <- connectDB
   ls <- query_ conn getCategory' :: IO [[T.Text]]
   close conn
@@ -106,21 +105,19 @@ editCategoryWith checkUniq isAdm ls
  -- | "" `elem` [name, new_name] = "404"
   | method == "change_parent" && name == new_name = pure "406ce"  
  -- | checkUniq name = "406cn"
-  | method == "change_name" && not (checkUniq new_name) = "406cu"
-  | method == "change_parent"
-      && checkUniq new_name
-      && new_name /= "Null" =
-    "406cp"
-  
+--  | method == "change_name" && not (checkUniq new_name) = "406cu"
+--  | method == "change_parent"
+     -- && checkUniq new_name
+     -- && new_name /= "Null" =
+    --"406cp"  
   | otherwise = do
     uniqName <- checkUniq name
     if uniqName
       then pure "406cn"
       else do
         uniqNew_name <- checkUniq new_name
-        .........
-  
-    Query $ checkQuery $ map buildQuery fls''
+        pure $ checkAndResponse uniqNew_name  
+  --  Query $ checkQuery $ map buildQuery fls''
   where
     fls = filter ((/= "???") . snd) $ map (fmap fromMaybe) $ take 1 ls
     fls' = map (fmap (BC.split '>')) fls
@@ -132,7 +129,11 @@ editCategoryWith checkUniq isAdm ls
               then ("404", ["", ""])
               else x
         )
-        categorys
+        categorys    
+    checkAndResponse w
+      | method == "change_name" && not w = "406cu"
+      | method == "change_parent" && w && new_name /= "Null" = "406cp" 
+      | otherwise = Query $ checkQuery $ map buildQuery fls''       
     checkQuery lq = if "404" `elem` lq then "404" else mconcat lq
     buildQuery (meth, [nm, new_nm]) =
       case meth of

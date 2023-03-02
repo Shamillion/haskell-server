@@ -12,11 +12,13 @@ import Data.String (IsString)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Test.Hspec (SpecWith, it, shouldBe)
 
-testUniqCategory :: (Eq a, Data.String.IsString a) => a -> Bool
-testUniqCategory e = e `notElem` ["parentCategory", "Null", "existCategory"]
+import System.IO.Unsafe (unsafePerformIO)
+
+testUniqCategory :: (Eq a, Data.String.IsString a) => a -> IO Bool
+testUniqCategory e = pure $ e `notElem` ["parentCategory", "Null", "existCategory"]
 
 createCategory' :: Bool -> [(ByteString, Maybe ByteString)] -> Query
-createCategory' = createCategoryWith testUniqCategory
+createCategory' b ls = unsafePerformIO $ createCategoryWith testUniqCategory  b ls
 
 testsFunctionCreateCategoryWith :: SpecWith ()
 testsFunctionCreateCategoryWith = do
@@ -98,7 +100,7 @@ testsFunctionCreateCategoryWith = do
       `shouldBe` Query "404"
 
 editCategory' :: Bool -> [(ByteString, Maybe ByteString)] -> Query
-editCategory' = editCategoryWith testUniqCategory
+editCategory' b ls = unsafePerformIO $ editCategoryWith testUniqCategory b ls
 
 testsFunctionEditCategoryWith :: SpecWith ()
 testsFunctionEditCategoryWith = do
