@@ -10,50 +10,60 @@ import Database.PostgreSQL.Simple.Types (Query (..))
 import News (setLimitAndOffsetWith, setMethodNews)
 import Test.Hspec (SpecWith, it, shouldBe)
 
+import System.IO.Unsafe (unsafePerformIO) -- Delete
+import qualified Data.Text as T
+
+
+setLimitAndOffsetWith' :: Int -> [(T.Text, Maybe T.Text)] -> Query
+setLimitAndOffsetWith' n ls = unsafePerformIO $ setLimitAndOffsetWith (pure n) ls
+
 testsFunctionSetLimitAndOffsetWith :: SpecWith ()
 testsFunctionSetLimitAndOffsetWith = do
   it "limit and offset have not set in request" $
-    setLimitAndOffsetWith 20 [] `shouldBe` Query " LIMIT 20 OFFSET 0"
+    setLimitAndOffsetWith' 20 [] `shouldBe` Query " LIMIT 20 OFFSET 0"
   it "limit is less than 0, offset have not set in request" $
-    setLimitAndOffsetWith 20 [("limit", Just "-5")]
+    setLimitAndOffsetWith' 20 [("limit", Just "-5")]
       `shouldBe` Query " LIMIT 20 OFFSET 0"
   it "limit is less than 20, offset have not set in request" $
-    setLimitAndOffsetWith 20 [("limit", Just "5")]
+    setLimitAndOffsetWith' 20 [("limit", Just "5")]
       `shouldBe` Query " LIMIT 5 OFFSET 0"
   it "limit is 20, offset have not set in request" $
-    setLimitAndOffsetWith 20 [("limit", Just "25")]
+    setLimitAndOffsetWith' 20 [("limit", Just "25")]
       `shouldBe` Query " LIMIT 20 OFFSET 0"
   it "limit is more than 20, offset have not set in request" $
-    setLimitAndOffsetWith 20 [("limit", Just "25")]
+    setLimitAndOffsetWith' 20 [("limit", Just "25")]
       `shouldBe` Query " LIMIT 20 OFFSET 0"
   it "limit is not a number, offset have not set in request" $
-    setLimitAndOffsetWith 20 [("limit", Just "ABC")]
+    setLimitAndOffsetWith' 20 [("limit", Just "ABC")]
       `shouldBe` Query " LIMIT 20 OFFSET 0"
   it "limit and offset are not a number" $
-    setLimitAndOffsetWith 20 [("limit", Just "ABC"), ("offset", Just "-DF$")]
+    setLimitAndOffsetWith' 20 [("limit", Just "ABC"), ("offset", Just "-DF$")]
       `shouldBe` Query " LIMIT 20 OFFSET 0"
   it "limit and offset are less than 0" $
-    setLimitAndOffsetWith 20 [("limit", Just "-5"), ("offset", Just "-3")]
+    setLimitAndOffsetWith' 20 [("limit", Just "-5"), ("offset", Just "-3")]
       `shouldBe` Query " LIMIT 20 OFFSET 0"
   it "limit is more than 20, offset is 3" $
-    setLimitAndOffsetWith 20 [("limit", Just "50"), ("offset", Just "3")]
+    setLimitAndOffsetWith' 20 [("limit", Just "50"), ("offset", Just "3")]
       `shouldBe` Query " LIMIT 20 OFFSET 3"
   it "offset is 5, limit have not set in request" $
-    setLimitAndOffsetWith 20 [("offset", Just "5")]
+    setLimitAndOffsetWith' 20 [("offset", Just "5")]
       `shouldBe` Query " LIMIT 20 OFFSET 5"
   it "offset is less than 0, limit have not set in request" $
-    setLimitAndOffsetWith 20 [("offset", Just "-5")]
+    setLimitAndOffsetWith' 20 [("offset", Just "-5")]
       `shouldBe` Query " LIMIT 20 OFFSET 0"
   it "offset is not a number, limit have not set in request" $
-    setLimitAndOffsetWith 20 [("offset", Just "S")]
+    setLimitAndOffsetWith' 20 [("offset", Just "S")]
       `shouldBe` Query " LIMIT 20 OFFSET 0"
+
+setMethodNews' :: Int -> [(T.Text, Maybe T.Text)] -> Maybe (Query, Query)
+setMethodNews' n ls = unsafePerformIO $ setMethodNews (pure n) ls
 
 testsFunctionSetMethodNews :: SpecWith ()
 testsFunctionSetMethodNews = do
   it "list is empty" $
-    setMethodNews 20 [] `shouldBe` Just ("title LIKE '%'", " LIMIT 20 OFFSET 0")
+    setMethodNews' 20 [] `shouldBe` Just ("title LIKE '%'", " LIMIT 20 OFFSET 0")
   it "test 1" $
-    setMethodNews
+    setMethodNews'
       20
       [ ("created_since", Just "2022-03-22"),
         ("author", Just "Ann"),
@@ -66,7 +76,7 @@ testsFunctionSetMethodNews = do
           "ORDER BY author.name_user LIMIT 10 OFFSET 1"
         )
   it "test 2" $
-    setMethodNews
+    setMethodNews'
       20
       [ ("created_since", Just "2022-03-22"),
         ("author", Just "Ann"),
@@ -76,7 +86,7 @@ testsFunctionSetMethodNews = do
       ]
       `shouldBe` Nothing
   it "test 3" $
-    setMethodNews
+    setMethodNews'
       20
       [ ("created_at", Just "2022-03-22"),
         ("author", Just "Sam"),
@@ -91,7 +101,7 @@ testsFunctionSetMethodNews = do
           "ORDER BY CARDINALITY(photo) LIMIT 20 OFFSET 1"
         )
   it "test 4" $
-    setMethodNews
+    setMethodNews'
       20
       [ ("created_until", Just "2022-03-22"),
         ("author", Just "Violette"),
@@ -108,7 +118,7 @@ testsFunctionSetMethodNews = do
           "ORDER BY creation_date LIMIT 20 OFFSET 0"
         )
   it "test 5" $
-    setMethodNews
+    setMethodNews'
       20
       [ ("created_at", Just "2022-03-22"),
         ("avthor", Just "Sam"),
@@ -119,7 +129,7 @@ testsFunctionSetMethodNews = do
       ]
       `shouldBe` Nothing
   it "test 6" $
-    setMethodNews
+    setMethodNews'
       20
       [ ("created_until", Just "2022-03-22"),
         ("author", Nothing),

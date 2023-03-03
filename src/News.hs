@@ -21,6 +21,7 @@ import Photo (sendPhotoToDB)
 import Text.Read (readMaybe)
 import User (User, errorUser, parseUser)
 
+
 -- Creating a database query to get a list of news.
 getNews :: Query -> Maybe (Query, Query) -> Query
 getNews auth str =
@@ -104,11 +105,14 @@ parseNews ls
     pht = map ("/photo?get_photo=" <>) $ splitText n6
     isPbl = n7 == "true" || n7 == "t"
 
-setMethodNews :: Int -> [(T.Text, Maybe T.Text)] -> Maybe (Query, Query)
+setMethodNews :: IO Int -> [(T.Text, Maybe T.Text)] -> IO (Maybe (Query, Query))
 setMethodNews num ls = do
-  a <- filterNews
-  b <- sortNewsLimitOffset
-  pure (a, b)
+  setLimOffs <- setLimitAndOffsetWith num ls 
+  let sortNewsLimitOffset = fmap (<> setLimOffs) sortNews
+  pure $ do
+    a <- filterNews
+    b <- sortNewsLimitOffset
+    pure (a, b)
   where
     filterNews = setFiltersNews $ LT.filter ((`notElem` fields) . fst) ls
     fields = ["sort_by", "limit", "offset"]
@@ -117,7 +121,6 @@ setMethodNews num ls = do
         [("sort_by", Just x)] -> sortBy x
         _ -> pure ""
     findSort = LT.filter ((== "sort_by") . fst) ls
-    sortNewsLimitOffset = fmap (<> setLimitAndOffsetWith num ls) sortNews -----------------
 
 -- Processing of the "sort_by=..." part of the request.
 sortBy :: T.Text -> Maybe Query
@@ -163,7 +166,7 @@ setLimitAndOffsetWith :: IO Int -> [(T.Text, Maybe T.Text)] -> IO Query
 setLimitAndOffsetWith val ls = do 
   val' <- val
   let lmt = listToValue "limit" lessVal val'
-      lessVal x = if x > 0 && x < val then x else val'
+      lessVal x = if x > 0 && x < val' then x else val'
   pure . Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst
   where
     ofst = listToValue "offset" (max 0) 0    

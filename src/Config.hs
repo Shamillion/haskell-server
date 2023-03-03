@@ -28,7 +28,7 @@ data Configuration = Configuration
   deriving (Show, Generic, FromJSON)
 
 -- Function reads configuration information from file.
-getConfiguration :: String -> IO Either String Configuration
+getConfiguration :: String -> IO (Either String Configuration)
 getConfiguration fileName = do
     t <- time
     content <- L.readFile fileName
@@ -62,8 +62,8 @@ errorConfig =
 -- Try to read configuration file.
 configuration :: IO Configuration
 configuration = do
-  getConf <- getConfiguration
-  pure $ case getConf "config.json" of
+  getConf <- getConfiguration "config.json"
+  pure $ case getConf of
     Right v -> v
     Left _ -> errorConfig
 
@@ -75,7 +75,7 @@ time = take 19 . show <$> getCurrentTime
 connectInfo :: IO PS.ConnectInfo
 connectInfo = do
   conf <- configuration 
-  PS.ConnectInfo
+  pure $ PS.ConnectInfo
     { PS.connectHost = dbHost conf,
       PS.connectPort = dbPort conf,
       PS.connectDatabase = dbname conf,
