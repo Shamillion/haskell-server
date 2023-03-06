@@ -185,27 +185,30 @@ setLimitAndOffset = setLimitAndOffsetWith limitElem
 -- '.../news?title=Text&category_id=3&content=Text&
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-createNews :: Bool -> Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
-createNews auth authID ls
-  | not auth || null ls || nothingInLs = pure "404"
-  | otherwise = do
-    photoIdList <- photoIDLs ls'
-    pure . Query $
-      "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
-      \ content, is_published) \
-      \ VALUES ('"
-        <> titleNws
-        <> "', NOW(), "
-        <> fromQuery authID
-        <> ", "
-        <> categoryId
-        <> ", "
-        <> photoIdList
-        <> ", '"
-        <> contentNws
-        <> "', "
-        <> isPublished
-        <> ");"
+createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+createNews auth authID ls = do
+  auth' <- auth
+  if not auth' || null ls || nothingInLs 
+    then pure "404"
+    else do
+      authID' <- authID  
+      photoIdList <- photoIDLs ls'
+      pure . Query $
+        "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
+        \ content, is_published) \
+        \ VALUES ('"
+          <> titleNws
+          <> "', NOW(), "
+          <> fromQuery authID'
+          <> ", "
+          <> categoryId
+          <> ", "
+          <> photoIdList
+          <> ", '"
+          <> contentNws
+          <> "', "
+          <> isPublished
+          <> ");"
   where
     nothingInLs = any (\(_, y) -> isNothing y) ls
     ls' = map (fromMaybe <$>) ls
@@ -236,9 +239,10 @@ buildPhotoIdString (x : xs) = x <> ", " <> buildPhotoIdString xs
 --    news?news_id=(id news needed to edit)&title=Text&category_id=3&
 --       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-editNews :: Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+editNews :: IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
 editNews auth ls = do
-  author' <- authorNews (fromQuery auth) newsId
+  auth' <- auth
+  author' <- authorNews (fromQuery auth') newsId
   if null ls || not author'
     then pure "404"
     else do
