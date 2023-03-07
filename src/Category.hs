@@ -62,34 +62,34 @@ getParentCategories cat = do
 --  '.../category?aaa>bbb'
 --      aaa - parent category's name,
 --      bbb - category's name.
-createCategoryWith :: (BC.ByteString -> IO Bool) -> Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
-createCategoryWith checkUniq isAdm ls
-  | not isAdm || null ls || null categorys = pure "404"
---  | not (checkUniq nameCategory) = "406cu"
---  | checkUniq parentCategory && parentCategory /= "Null" = "406cp"
-  | otherwise = do
-    uniqName <- checkUniq nameCategory
-    if not uniqName
-      then pure "406cu"
-      else do
-        uniqParent <- checkUniq parentCategory
-        if uniqParent && parentCategory /= "Null" 
-          then pure "406cp"
-          else pure .        
-            Query $
-              "INSERT INTO category (name_category, parent_category) \
-              \ VALUES ('"
-                <> nameCategory
-                <> "', '"
-                <> parentCategory
-                <> "');"
+createCategoryWith :: (BC.ByteString -> IO Bool) -> IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+createCategoryWith checkUniq isAdm ls = do
+  isAdm' <- isAdm
+  if not isAdm' || null ls || null categorys 
+    then pure "404"
+    else do
+      uniqName <- checkUniq nameCategory
+      if not uniqName
+        then pure "406cu"
+        else do
+          uniqParent <- checkUniq parentCategory
+          if uniqParent && parentCategory /= "Null" 
+            then pure "406cp"
+            else pure .        
+              Query $
+                "INSERT INTO category (name_category, parent_category) \
+                \ VALUES ('"
+                  <> nameCategory
+                  <> "', '"
+                  <> parentCategory
+                  <> "');"
   where
     (x : _) = map (BC.split '>' . fst) ls
     categorys = filter (/= "") x
     (parentCategory : nameCategory : _) =
       if length categorys == 1 then "Null" : categorys else categorys
 
-createCategory :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+createCategory :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
 createCategory = createCategoryWith checkUniqCategory
 
 -- Request examples:
@@ -99,7 +99,7 @@ createCategory = createCategoryWith checkUniqCategory
 --   Changing the parent category: '.../category?change_parent=aaa>bbb'
 --      aaa - category's name,
 --      bbb - new parent category's name.
-editCategoryWith :: (BC.ByteString -> IO Bool) -> Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+editCategoryWith :: (BC.ByteString -> IO Bool) ->  Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
 editCategoryWith checkUniq isAdm ls
   | not isAdm || null ls || null fls || "" `elem` [name, new_name] = pure "404"
  -- | "" `elem` [name, new_name] = "404"
@@ -111,13 +111,17 @@ editCategoryWith checkUniq isAdm ls
      -- && new_name /= "Null" =
     --"406cp"  
   | otherwise = do
-    uniqName <- checkUniq name
-    if uniqName
-      then pure "406cn"
-      else do
-        uniqNew_name <- checkUniq new_name
-        pure $ checkAndResponse uniqNew_name  
-  --  Query $ checkQuery $ map buildQuery fls''
+    --isAdm' <- isAdm
+    --if not isAdm' || null ls || null fls || "" `elem` [name, new_name]
+      --then pure "404"
+      --else do      
+        uniqName <- checkUniq name
+        if uniqName
+          then pure "406cn"
+          else do
+            uniqNew_name <- checkUniq new_name
+            pure $ checkAndResponse uniqNew_name  
+      --  Query $ checkQuery $ map buildQuery fls''
   where
     fls = filter ((/= "???") . snd) $ map (fmap fromMaybe) $ take 1 ls
     fls' = map (fmap (BC.split '>')) fls

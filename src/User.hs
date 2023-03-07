@@ -57,31 +57,31 @@ parseUser ls
 
 -- Request example (strict order):
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
-createUser :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
-createUser False _ = pure "404"
-createUser _ ls
-  | null ls || map fst ls /= checkList = pure "404"
-  | searchNothing = pure "404"
-  | otherwise = do
-      uniq <- checkUniqLogin login
-      if uniq 
-        then do
-          pass' <- cryptoPass (sum . map ord . BC.unpack $ nameUser) pass
-          pure . Query $
-            "INSERT INTO users (name_user, login, pass, \
-            \       creation_date, is_admin, is_author) \
-            \ VALUES ('"
-              <> nameUser
-              <> "', '"
-              <> login
-              <> "', '"
-              <> pass'
-              <> "', NOW(), '"
-              <> isAdmin
-              <> "', '"
-              <> isAuthor
-              <> "');"
-        else pure "406uu"          
+createUser :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+createUser adm ls = do
+      adm' <- adm
+      if not adm' || null ls || map fst ls /= checkList || searchNothing 
+        then pure "404"
+        else do
+          uniq <- checkUniqLogin login
+          if uniq 
+            then do
+              pass' <- cryptoPass (sum . map ord . BC.unpack $ nameUser) pass
+              pure . Query $
+                "INSERT INTO users (name_user, login, pass, \
+                \       creation_date, is_admin, is_author) \
+                \ VALUES ('"
+                  <> nameUser
+                  <> "', '"
+                  <> login
+                  <> "', '"
+                  <> pass'
+                  <> "', NOW(), '"
+                  <> isAdmin
+                  <> "', '"
+                  <> isAuthor
+                  <> "');"
+            else pure "406uu"          
   where
     checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
     sndList = map (fromMaybe . snd) ls

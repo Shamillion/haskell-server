@@ -21,7 +21,7 @@ import News (createNews, editNews, getNews, parseNews, setLimitAndOffset, setMet
 import Photo (decodeImage, getPhoto)
 import User (blockAdminRights, createUser, getUser, parseUser)
 
---import System.IO.Unsafe (unsafePerformIO) -- Delete
+import System.IO.Unsafe (unsafePerformIO) -- Delete
 
 
 -- Defining the type of request and creating a response.
@@ -29,17 +29,17 @@ setQueryAndRespond :: W.Request -> IO (DB.Query, [[T.Text]] -> LC.ByteString)
 setQueryAndRespond req = do  
   case (reqMtd, entity) of
     ("GET", "news") -> do 
-      q <- getNews <$> authId <*> method
-      let r = encode <$> mapM parseNews
+      q <- getNews <$> authId <*> method       
+      let r = encode . unsafePerformIO . mapM parseNews          -------------
       pure (q,r)
     ("POST", "news") -> (,) <$> (createNews athr authId arr) <*> pure encodeWith
     ("PUT", "news") -> (,) <$> (editNews authId arr) <*> pure encodeWith
     ("GET", "user") -> (,) <$> (getUser <$> limitOffset) <*> (pure $ encode . map parseUser)
-    ("POST", "user") -> (,) <$> (createUser <*> adm <*> pure arr) <*> pure encodeWith             -------------------
+    ("POST", "user") -> (,) <$> (createUser adm arr) <*> pure encodeWith             -------------------
     ("PUT", "user") -> (,) <$> (blockAdminRights <$> adm) <*> pure encodeWith
     ("GET", "category") -> (,) <$> (getCategory <$> limitOffset) <*> (pure $ encode . map parseCategory)
-    ("POST", "category") -> (,) <$> (createCategory <*> adm <*> pure arr) <*> pure encodeWith       
-    ("PUT", "category") -> (,) <$> (editCategory <*> adm <*> pure arr) <*> pure encodeWith
+    ("POST", "category") -> (,) <$> (createCategory adm arr) <*> pure encodeWith       
+    ("PUT", "category") -> (,) <$> (adm >>= \x -> editCategory x arr) <*> pure encodeWith    -------
     ("GET", "photo") -> pure (getPhoto arr, decodeImage)
     _ -> pure ("404", const "404")
   where
