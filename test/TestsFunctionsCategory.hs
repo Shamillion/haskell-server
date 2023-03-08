@@ -100,7 +100,7 @@ testsFunctionCreateCategoryWith = do
       `shouldBe` Query "404"
 
 editCategory' :: Bool -> [(ByteString, Maybe ByteString)] -> Query
-editCategory' b ls = unsafePerformIO $ editCategoryWith testUniqCategory (b) ls
+editCategory' b ls = unsafePerformIO $ editCategoryWith testUniqCategory (pure b) ls
 
 testsFunctionEditCategoryWith :: SpecWith ()
 testsFunctionEditCategoryWith = do

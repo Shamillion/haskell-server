@@ -39,7 +39,7 @@ setQueryAndRespond req = do
     ("PUT", "user") -> (,) <$> (blockAdminRights <$> adm) <*> pure encodeWith
     ("GET", "category") -> (,) <$> (getCategory <$> limitOffset) <*> (pure $ encode . map parseCategory)
     ("POST", "category") -> (,) <$> (createCategory adm arr) <*> pure encodeWith       
-    ("PUT", "category") -> (,) <$> (adm >>= \x -> editCategory x arr) <*> pure encodeWith    -------
+    ("PUT", "category") -> (,) <$> (editCategory adm arr) <*> pure encodeWith    -------
     ("GET", "photo") -> pure (getPhoto arr, decodeImage)
     _ -> pure ("404", const "404")
   where
