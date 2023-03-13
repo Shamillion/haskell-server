@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Category where
 
@@ -45,6 +44,20 @@ parseCategory ls
     idCat = readNum ic
     (ic : pc : nc : _) = ls
 
+data CategoryHandle m = CategoryHandle
+  { checkUniqCategoryH :: BC.ByteString -> m Bool
+--  , 
+  
+  }
+    
+categoryHandler :: CategoryHandle IO  
+categoryHandler =
+  CategoryHandle
+    { checkUniqCategoryH = checkUniqCategory
+   -- , writingLineH = writingLine
+     
+    }    
+
 getParentCategories :: T.Text -> IO [T.Text]
 getParentCategories cat = do
   conn <- connectDB
@@ -62,17 +75,18 @@ getParentCategories cat = do
 --  '.../category?aaa>bbb'
 --      aaa - parent category's name,
 --      bbb - category's name.
-createCategoryWith :: (BC.ByteString -> IO Bool) -> IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
-createCategoryWith checkUniq isAdm ls = do
+createCategory :: Monad m =>
+  CategoryHandle m -> m Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> m Query
+createCategory CategoryHandle {..} isAdm ls = do
   isAdm' <- isAdm
   if not isAdm' || null ls || null categorys 
     then pure "404"
     else do
-      uniqName <- checkUniq nameCategory
+      uniqName <- checkUniqCategoryH nameCategory
       if not uniqName
         then pure "406cu"
         else do
-          uniqParent <- checkUniq parentCategory
+          uniqParent <- checkUniqCategoryH parentCategory
           if uniqParent && parentCategory /= "Null" 
             then pure "406cp"
             else pure .        
@@ -89,8 +103,6 @@ createCategoryWith checkUniq isAdm ls = do
     (parentCategory : nameCategory : _) =
       if length categorys == 1 then "Null" : categorys else categorys
 
-createCategory :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
-createCategory = createCategoryWith checkUniqCategory
 
 -- Request examples:
 --   Changing the category name: '.../category?change_name=aaa>bbb'
@@ -99,17 +111,18 @@ createCategory = createCategoryWith checkUniqCategory
 --   Changing the parent category: '.../category?change_parent=aaa>bbb'
 --      aaa - category's name,
 --      bbb - new parent category's name.
-editCategoryWith :: (BC.ByteString -> IO Bool) -> IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
-editCategoryWith checkUniq isAdm ls = do
+editCategory :: Monad m =>
+  CategoryHandle m -> m Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> m Query
+editCategory CategoryHandle {..} isAdm ls = do
   isAdm' <- isAdm
   if not isAdm' || null ls || null fls || "" `elem` [name, new_name]
     then pure "404"
     else do      
-      uniqName <- checkUniq name
+      uniqName <- checkUniqCategoryH name
       if uniqName
         then pure "406cn"
         else do
-          uniqNew_name <- checkUniq new_name
+          uniqNew_name <- checkUniqCategoryH new_name
           pure $ checkAndResponse uniqNew_name  
   where
     fls = filter ((/= "???") . snd) $ map (fmap fromMaybe) $ take 1 ls
@@ -156,9 +169,6 @@ editCategoryWith checkUniq isAdm ls = do
             <> "'; "
         _ -> "404"
     buildQuery (_, _) = "404"
-
-editCategory :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
-editCategory = editCategoryWith checkUniqCategory
 
 -- Checking the uniqueness of the category name in the database.
 checkUniqCategory :: BC.ByteString -> IO Bool

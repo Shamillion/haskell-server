@@ -1,12 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
-
---{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
-
 module Main where
 
 import Auth (authorID, checkAuth, isAdmin, isAuthor)
-import Category (createCategory, editCategory, getCategory, parseCategory)
-import Config (Priority (..), connectDB, limitElem, port, writingLine, writingLineDebug)
+import Category (categoryHandler, createCategory, editCategory, getCategory, parseCategory)
+import Config (Priority (..), connectDB, port, writingLine, writingLineDebug)
 import Data.Aeson (encode)
 import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.Text as T
@@ -34,8 +30,8 @@ setQueryAndRespond req = do
     ("POST", "user") -> (,) <$> (createUser adm arr) <*> pure encodeWith             
     ("PUT", "user") -> (,) <$> (blockAdminRights <$> adm) <*> pure encodeWith
     ("GET", "category") -> (,) <$> (getCategory <$> limitOffset) <*> (pure $ pure . encode . map parseCategory)
-    ("POST", "category") -> (,) <$> (createCategory adm arr) <*> pure encodeWith       
-    ("PUT", "category") -> (,) <$> (editCategory adm arr) <*> pure encodeWith    
+    ("POST", "category") -> (,) <$> (createCategory categoryHandler adm arr) <*> pure encodeWith       
+    ("PUT", "category") -> (,) <$> (editCategory categoryHandler adm arr) <*> pure encodeWith    
     ("GET", "photo") -> pure (getPhoto arr, pure . decodeImage)
     _ -> pure ("404", const (pure "404"))
   where
@@ -43,7 +39,7 @@ setQueryAndRespond req = do
     [entity] = W.pathInfo req
     authId = authorID req
     arr = W.queryString req
-    method = setMethodNews limitElem . queryToQueryText $ arr
+    method = setMethodNews . queryToQueryText $ arr
     limitOffset = setLimitAndOffset . queryToQueryText $ arr
     adm = isAdmin req
     athr = isAuthor req

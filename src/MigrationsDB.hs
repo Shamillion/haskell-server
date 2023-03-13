@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module MigrationsDB where
 
 import Config (Priority (..), connectDB, writingLine, writingLineDebug)

@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Config where
 
@@ -67,6 +66,28 @@ configuration = do
     Right v -> v
     Left _ -> errorConfig
 
+ -- Handle Pattern
+--data WorkHandle m a = WorkHandle
+--  { writingLineH :: Priority -> String -> m a
+ -- , writingLineDebugH :: (Show a) => a -> m a
+--  , connectDBH :: m PS.Connection
+ -- , queryH :: (PS.ToRow q, PS.FromRow a) => PS.Connection -> PS.Query -> q -> m [a] 
+--  , queryH_ :: PS.FromRow a => PS.Connection -> PS.Query -> m [a]
+ -- , closeH :: PS.Connection -> m ()
+ -- , checkUniqCategoryH :: BC.ByteString -> m Bool
+  --, 
+  --, sendComment' :: MessageDate -> String -> m (Response LC.ByteString)
+  --, sandRepeats' :: MessageDate -> Environment -> m a
+  --, wordIsRepeat' ::
+      --WorkHandle m a ->
+      --(Int -> Maybe WholeObject) ->
+      --MessageDate ->
+      --[MessageDate] ->
+      --StateT Environment m a
+  --, pureOne :: StateT Environment m a
+  --, pureTwo :: StateT Environment m a
+--  }
+ 
 -- Get current time for the logger.
 time :: IO String
 time = take 19 . show <$> getCurrentTime

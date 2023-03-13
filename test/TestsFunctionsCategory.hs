@@ -6,7 +6,8 @@ module TestsFunctionsCategory
   )
 where
 
-import Category (createCategoryWith, editCategoryWith)
+import Category (WorkHandle)
+import Config (connectDB, writingLineDebug)
 import Data.ByteString.Internal (ByteString)
 import Data.String (IsString)
 import Database.PostgreSQL.Simple.Types (Query (..))

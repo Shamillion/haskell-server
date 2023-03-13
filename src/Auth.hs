@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Auth where
 
 import Config (Priority (ERROR), connectDB, writingLine, writingLineDebug)

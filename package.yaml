@@ -34,6 +34,10 @@ dependencies:
 - warp
 - postgresql-simple
 
+default-extensions:
+- OverloadedStrings
+- RecordWildCards
+
 ghc-options:
 - -Wall
 - -Werror 

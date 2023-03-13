@@ -37,6 +37,9 @@ library
       Paths_haskell_server
   hs-source-dirs:
       src
+  default-extensions:
+      OverloadedStrings
+      RecordWildCards
   ghc-options: -Wall -Werror
   build-depends:
       aeson
@@ -60,6 +63,9 @@ executable haskell-server-exe
       Paths_haskell_server
   hs-source-dirs:
       app
+  default-extensions:
+      OverloadedStrings
+      RecordWildCards
   ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
@@ -87,6 +93,9 @@ test-suite haskell-server-test
       Paths_haskell_server
   hs-source-dirs:
       test
+  default-extensions:
+      OverloadedStrings
+      RecordWildCards
   ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       QuickCheck

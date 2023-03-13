@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
+
 
 module News where
 
@@ -105,9 +105,9 @@ parseNews ls
     pht = map ("/photo?get_photo=" <>) $ splitText n6
     isPbl = n7 == "true" || n7 == "t"
 
-setMethodNews :: IO Int -> [(T.Text, Maybe T.Text)] -> IO (Maybe (Query, Query))
-setMethodNews num ls = do
-  setLimOffs <- setLimitAndOffsetWith num ls 
+setMethodNews :: [(T.Text, Maybe T.Text)] -> IO (Maybe (Query, Query))
+setMethodNews ls = do
+  setLimOffs <- setLimitAndOffset ls 
   let sortNewsLimitOffset = fmap (<> setLimOffs) sortNews
   pure $ do
     a <- filterNews
@@ -162,11 +162,11 @@ setFiltersNews ((mthd, param) : xs)
         <> fromMaybe' param
         <> "'"
 
-setLimitAndOffsetWith :: IO Int -> [(T.Text, Maybe T.Text)] -> IO Query
-setLimitAndOffsetWith val ls = do 
-  val' <- val
-  let lmt = listToValue "limit" lessVal val'
-      lessVal x = if x > 0 && x < val' then x else val'
+setLimitAndOffset :: [(T.Text, Maybe T.Text)] -> IO Query
+setLimitAndOffset ls = do 
+  val <- limitElem
+  let lmt = listToValue "limit" lessVal val
+      lessVal x = if x > 0 && x < val then x else val
   pure . Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst
   where
     ofst = listToValue "offset" (max 0) 0    
@@ -177,9 +177,6 @@ setLimitAndOffsetWith val ls = do
         Just n -> n
         _ -> x    
     toByteString = BC.pack . show
-
-setLimitAndOffset :: [(T.Text, Maybe T.Text)] -> IO Query
-setLimitAndOffset = setLimitAndOffsetWith limitElem    
 
 -- Request example:
 -- '.../news?title=Text&category_id=3&content=Text&
