@@ -90,6 +90,20 @@ data News = News
 errorNews :: IO News
 errorNews = pure $ News 0 "error" "error" errorUser ["error"] "error" ["error"] False
 
+data NewsyHandle m = 
+  NewsyHandle 
+    { limitElemH :: m Int
+    , setLimitAndOffsetH :: [(T.Text, Maybe T.Text)] -> m Query
+    }
+    
+newsHandler :: NewsyHandle IO  
+newsHandler = 
+  NewsyHandle 
+    { limitElemH = limitElem
+    , setLimitAndOffsetH = setLimitAndOffset newsHandler
+    }  
+
+
 parseNews :: [T.Text] -> IO News
 parseNews ls
   | length ls /= 8 = errorNews
@@ -105,9 +119,10 @@ parseNews ls
     pht = map ("/photo?get_photo=" <>) $ splitText n6
     isPbl = n7 == "true" || n7 == "t"
 
-setMethodNews :: [(T.Text, Maybe T.Text)] -> IO (Maybe (Query, Query))
-setMethodNews ls = do
-  setLimOffs <- setLimitAndOffset ls 
+setMethodNews :: Monad m =>
+  NewsyHandle m -> [(T.Text, Maybe T.Text)] -> m (Maybe (Query, Query))
+setMethodNews NewsyHandle {..} ls = do
+  setLimOffs <- setLimitAndOffsetH ls 
   let sortNewsLimitOffset = fmap (<> setLimOffs) sortNews
   pure $ do
     a <- filterNews
@@ -162,9 +177,10 @@ setFiltersNews ((mthd, param) : xs)
         <> fromMaybe' param
         <> "'"
 
-setLimitAndOffset :: [(T.Text, Maybe T.Text)] -> IO Query
-setLimitAndOffset ls = do 
-  val <- limitElem
+setLimitAndOffset :: Monad m =>
+  NewsyHandle m -> [(T.Text, Maybe T.Text)] -> m Query
+setLimitAndOffset NewsyHandle {..} ls = do 
+  val <- limitElemH
   let lmt = listToValue "limit" lessVal val
       lessVal x = if x > 0 && x < val then x else val
   pure . Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst

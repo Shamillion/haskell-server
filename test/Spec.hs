@@ -18,7 +18,7 @@ testsFunctionReadNum = do
 main :: IO ()
 main = hspec $ do
   describe "Check function readNum" testsFunctionReadNum
-  describe "Check setLimitAndOffsetWith" testsFunctionSetLimitAndOffsetWith
+  describe "Check setLimitAndOffsetWith" testsFunctionSetLimitAndOffset
   describe "Check setMethodNews" testsFunctionSetMethodNews
-  describe "Check createCategoryWith" testsFunctionCreateCategoryWith
-  describe "Check editCategoryWith" testsFunctionEditCategoryWith
+  describe "Check createCategoryWith" testsFunctionCreateCategory
+  describe "Check editCategoryWith" testsFunctionEditCategory

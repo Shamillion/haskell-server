@@ -13,7 +13,7 @@ import MigrationsDB (checkDB)
 import Network.HTTP.Types (queryToQueryText, status200, status404, status406)
 import qualified Network.Wai as W
 import Network.Wai.Handler.Warp (run)
-import News (createNews, editNews, getNews, parseNews, setLimitAndOffset, setMethodNews)
+import News (createNews, editNews, getNews, newsHandler, parseNews, setLimitAndOffset, setMethodNews)
 import Photo (decodeImage, getPhoto)
 import User (blockAdminRights, createUser, getUser, parseUser)
 
@@ -39,8 +39,8 @@ setQueryAndRespond req = do
     [entity] = W.pathInfo req
     authId = authorID req
     arr = W.queryString req
-    method = setMethodNews . queryToQueryText $ arr
-    limitOffset = setLimitAndOffset . queryToQueryText $ arr
+    method = setMethodNews newsHandler . queryToQueryText $ arr
+    limitOffset = setLimitAndOffset newsHandler . queryToQueryText $ arr
     adm = isAdmin req
     athr = isAuthor req
     encodeWith = pure . (<> " position(s) done.") . LC.fromStrict . encodeUtf8 . drawOut

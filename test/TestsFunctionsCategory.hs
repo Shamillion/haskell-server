@@ -1,29 +1,30 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module TestsFunctionsCategory
-  ( testsFunctionCreateCategoryWith,
-    testsFunctionEditCategoryWith,
+  ( testsFunctionCreateCategory,
+    testsFunctionEditCategory,
   )
 where
 
-import Category (WorkHandle)
-import Config (connectDB, writingLineDebug)
-import Data.ByteString.Internal (ByteString)
+import Category (CategoryHandle (..), createCategory, editCategory)
+import qualified Data.ByteString.Char8 as BC
 import Data.String (IsString)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Data.Functor.Identity (Identity, runIdentity)
 import Test.Hspec (SpecWith, it, shouldBe)
 
-import System.IO.Unsafe (unsafePerformIO)
 
-testUniqCategory :: (Eq a, Data.String.IsString a) => a -> IO Bool
+categoryTestHandler :: CategoryHandle Identity  
+categoryTestHandler = CategoryHandle {checkUniqCategoryH = testUniqCategory}
+
+testUniqCategory :: (Eq a, Data.String.IsString a) => a -> Identity Bool
 testUniqCategory e = pure $ e `notElem` ["parentCategory", "Null", "existCategory"]
 
-createCategory' :: Bool -> [(ByteString, Maybe ByteString)] -> Query
-createCategory' b ls = unsafePerformIO $ createCategoryWith testUniqCategory  (pure b) ls
+createCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+createCategory' b ls = runIdentity $ createCategory categoryTestHandler (pure b) ls
 
-testsFunctionCreateCategoryWith :: SpecWith ()
-testsFunctionCreateCategoryWith = do
-  it "User is not admin" $
+
+testsFunctionCreateCategory :: SpecWith ()
+testsFunctionCreateCategory = do
+  it "User is not admin" $ 
     createCategory' False [("Cars>Wheels", Nothing)] `shouldBe` Query "404"
   it "User is not admin and list is empty" $
     createCategory' False [] `shouldBe` Query "404"
@@ -100,11 +101,11 @@ testsFunctionCreateCategoryWith = do
     createCategory' True [(">", Nothing)]
       `shouldBe` Query "404"
 
-editCategory' :: Bool -> [(ByteString, Maybe ByteString)] -> Query
-editCategory' b ls = unsafePerformIO $ editCategoryWith testUniqCategory (pure b) ls
+editCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+editCategory' b ls = runIdentity $ editCategory categoryTestHandler (pure b) ls
 
-testsFunctionEditCategoryWith :: SpecWith ()
-testsFunctionEditCategoryWith = do
+testsFunctionEditCategory :: SpecWith ()
+testsFunctionEditCategory = do
   -- [("change_name",Just "aaa>bbb")]
   it "User is not admin" $
     editCategory' False [("change_name", Just "existCategory>newCategory")]

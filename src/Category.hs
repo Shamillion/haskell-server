@@ -44,19 +44,11 @@ parseCategory ls
     idCat = readNum ic
     (ic : pc : nc : _) = ls
 
-data CategoryHandle m = CategoryHandle
-  { checkUniqCategoryH :: BC.ByteString -> m Bool
---  , 
-  
-  }
+data CategoryHandle m = CategoryHandle 
+  {checkUniqCategoryH :: BC.ByteString -> m Bool}
     
 categoryHandler :: CategoryHandle IO  
-categoryHandler =
-  CategoryHandle
-    { checkUniqCategoryH = checkUniqCategory
-   -- , writingLineH = writingLine
-     
-    }    
+categoryHandler = CategoryHandle {checkUniqCategoryH = checkUniqCategory}    
 
 getParentCategories :: T.Text -> IO [T.Text]
 getParentCategories cat = do
