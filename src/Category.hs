@@ -75,26 +75,23 @@ createCategory CategoryHandle {..} isAdm ls = do
     then pure "404"
     else do
       uniqName <- checkUniqCategoryH nameCategory
-      if not uniqName
-        then pure "406cu"
-        else do
-          uniqParent <- checkUniqCategoryH parentCategory
-          if uniqParent && parentCategory /= "Null" 
-            then pure "406cp"
-            else pure .        
-              Query $
+      uniqParent <- checkUniqCategoryH parentCategory
+      pure $ checkAndResponse uniqName uniqParent       
+  where
+    (x : _) = map (BC.split '>' . fst) ls
+    categorys = filter (/= "") x
+    (parentCategory : nameCategory : _) =
+      if length categorys == 1 then "Null" : categorys else categorys      
+    checkAndResponse uNm uPrnt
+      | not uNm = "406cu"     
+      | uPrnt && parentCategory /= "Null" = "406cp" 
+      | otherwise = Query $
                 "INSERT INTO category (name_category, parent_category) \
                 \ VALUES ('"
                   <> nameCategory
                   <> "', '"
                   <> parentCategory
                   <> "');"
-  where
-    (x : _) = map (BC.split '>' . fst) ls
-    categorys = filter (/= "") x
-    (parentCategory : nameCategory : _) =
-      if length categorys == 1 then "Null" : categorys else categorys
-
 
 -- Request examples:
 --   Changing the category name: '.../category?change_name=aaa>bbb'
