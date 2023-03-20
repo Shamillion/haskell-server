@@ -6,13 +6,12 @@ where
 
 import Category (CategoryHandle (..), createCategory, editCategory)
 import qualified Data.ByteString.Char8 as BC
+import Data.Functor.Identity (Identity, runIdentity)
 import Data.String (IsString)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Data.Functor.Identity (Identity, runIdentity)
 import Test.Hspec (SpecWith, it, shouldBe)
 
-
-categoryTestHandler :: CategoryHandle Identity  
+categoryTestHandler :: CategoryHandle Identity
 categoryTestHandler = CategoryHandle {checkUniqCategoryH = testUniqCategory}
 
 testUniqCategory :: (Eq a, Data.String.IsString a) => a -> Identity Bool
@@ -21,10 +20,9 @@ testUniqCategory e = pure $ e `notElem` ["parentCategory", "Null", "existCategor
 createCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
 createCategory' b ls = runIdentity $ createCategory categoryTestHandler (pure b) ls
 
-
 testsFunctionCreateCategory :: SpecWith ()
 testsFunctionCreateCategory = do
-  it "User is not admin" $ 
+  it "User is not admin" $
     createCategory' False [("Cars>Wheels", Nothing)] `shouldBe` Query "404"
   it "User is not admin and list is empty" $
     createCategory' False [] `shouldBe` Query "404"

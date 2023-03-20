@@ -17,21 +17,19 @@ import News (createNews, editNews, getNews, newsHandler, parseNews, setLimitAndO
 import Photo (decodeImage, getPhoto)
 import User (blockAdminRights, createUser, getUser, parseUser)
 
-
-
 -- Defining the type of request and creating a response.
 setQueryAndRespond :: W.Request -> IO (DB.Query, [[T.Text]] -> IO LC.ByteString)
-setQueryAndRespond req = do  
+setQueryAndRespond req = do
   case (reqMtd, entity) of
-    ("GET", "news") -> (,) <$> (getNews <$> authId <*> method) <*> pure ((encode <$>) . mapM parseNews)      
-    ("POST", "news") -> (,) <$> (createNews athr authId arr) <*> pure encodeWith
-    ("PUT", "news") -> (,) <$> (editNews authId arr) <*> pure encodeWith
-    ("GET", "user") -> (,) <$> (getUser <$> limitOffset) <*>  (pure $ pure . encode . map parseUser)
-    ("POST", "user") -> (,) <$> (createUser adm arr) <*> pure encodeWith             
+    ("GET", "news") -> (,) <$> (getNews <$> authId <*> method) <*> pure ((encode <$>) . mapM parseNews)
+    ("POST", "news") -> (,) <$> createNews athr authId arr <*> pure encodeWith
+    ("PUT", "news") -> (,) <$> editNews authId arr <*> pure encodeWith
+    ("GET", "user") -> (,) <$> (getUser <$> limitOffset) <*> pure (pure . encode . map parseUser)
+    ("POST", "user") -> (,) <$> createUser adm arr <*> pure encodeWith
     ("PUT", "user") -> (,) <$> (blockAdminRights <$> adm) <*> pure encodeWith
-    ("GET", "category") -> (,) <$> (getCategory <$> limitOffset) <*> (pure $ pure . encode . map parseCategory)
-    ("POST", "category") -> (,) <$> (createCategory categoryHandler adm arr) <*> pure encodeWith       
-    ("PUT", "category") -> (,) <$> (editCategory categoryHandler adm arr) <*> pure encodeWith    
+    ("GET", "category") -> (,) <$> (getCategory <$> limitOffset) <*> pure (pure . encode . map parseCategory)
+    ("POST", "category") -> (,) <$> createCategory categoryHandler adm arr <*> pure encodeWith
+    ("PUT", "category") -> (,) <$> editCategory categoryHandler adm arr <*> pure encodeWith
     ("GET", "photo") -> pure (getPhoto arr, pure . decodeImage)
     _ -> pure ("404", const (pure "404"))
   where
@@ -51,7 +49,7 @@ app req respond = do
   (qry, resp) <- setQueryAndRespond req
   writingLineDebug $ W.requestMethod req
   writingLineDebug $ W.requestHeaders req
-  writingLineDebug =<< (checkAuth $ W.requestHeaders req)
+  writingLineDebug =<< checkAuth (W.requestHeaders req)
   writingLineDebug $ W.pathInfo req
   writingLineDebug $ W.queryString req
   writingLineDebug qry
@@ -86,7 +84,7 @@ app req respond = do
           val' = drawOut val
       writingLine INFO "Sent a response to the request."
       ans <- resp val
-      responds status200 hdr ans 
+      responds status200 hdr ans
   where
     responds sts hdr = respond . W.responseLBS sts [("Content-Type", hdr)]
     getHdr = encodeUtf8 . T.drop 1 . T.takeWhile (/= ';') . T.dropWhile (/= ':')

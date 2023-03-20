@@ -11,7 +11,6 @@ import qualified Database.PostgreSQL.Simple as PS
 import GHC.Generics (Generic)
 import qualified System.IO as I
 
-
 -- Data type for the configuration file.
 data Configuration = Configuration
   { serverPort :: Int,
@@ -29,18 +28,18 @@ data Configuration = Configuration
 -- Function reads configuration information from file.
 getConfiguration :: String -> IO (Either String Configuration)
 getConfiguration fileName = do
-    t <- time
-    content <- L.readFile fileName
-    let obj = eitherDecode content
-    case obj of
-      Right _ -> pure obj
-      Left e -> do
-        let str = t ++ " UTC   " ++ "ERROR  " ++ " - " ++ e
-        print str
-        file' <- file
-        I.hPutStrLn file' str
-        I.hFlush file'
-        pure obj
+  t <- time
+  content <- L.readFile fileName
+  let obj = eitherDecode content
+  case obj of
+    Right _ -> pure obj
+    Left e -> do
+      let str = t ++ " UTC   " ++ "ERROR  " ++ " - " ++ e
+      print str
+      file' <- file
+      I.hPutStrLn file' str
+      I.hFlush file'
+      pure obj
 
 -- The object is used when the configuration
 --   file is read unsuccessfully.
@@ -65,7 +64,7 @@ configuration = do
   pure $ case getConf of
     Right v -> v
     Left _ -> errorConfig
- 
+
 -- Get current time for the logger.
 time :: IO String
 time = take 19 . show <$> getCurrentTime
@@ -73,25 +72,26 @@ time = take 19 . show <$> getCurrentTime
 -- Parameters for connecting to the database.
 connectInfo :: IO PS.ConnectInfo
 connectInfo = do
-  conf <- configuration 
-  pure $ PS.ConnectInfo
-    { PS.connectHost = dbHost conf,
-      PS.connectPort = dbPort conf,
-      PS.connectDatabase = dbname conf,
-      PS.connectUser = dbUser conf,
-      PS.connectPassword = dbPassword conf
-    }
+  conf <- configuration
+  pure $
+    PS.ConnectInfo
+      { PS.connectHost = dbHost conf,
+        PS.connectPort = dbPort conf,
+        PS.connectDatabase = dbname conf,
+        PS.connectUser = dbUser conf,
+        PS.connectPassword = dbPassword conf
+      }
 
 -- Maximum number of items returned by the database in response to a request.
 limitElem :: IO Int
-limitElem = maxElem <$> configuration 
+limitElem = maxElem <$> configuration
 
 -- Establishing a connection to the database.
 connectDB :: IO PS.Connection
 connectDB = do
   writingLine INFO "Sent a request to the database."
-  connectInfo >>= writingLineDebug 
-  connectInfo >>= PS.connect 
+  connectInfo >>= writingLineDebug
+  connectInfo >>= PS.connect
 
 -- Data type for the logger.
 data Priority = DEBUG | INFO | WARNING | ERROR
@@ -118,7 +118,7 @@ writingLine lvl str = do
           I.hFlush file'
         _ -> putStrLn string
     else pure ()
-  where    
+  where
     fun val = case val of
       DEBUG -> "DEBUG  "
       INFO -> "INFO   "
@@ -130,8 +130,8 @@ writingLineDebug s = writingLine DEBUG $ show s
 
 -- Logging level.
 logLevel :: IO Priority
-logLevel = priorityLevel <$> configuration 
+logLevel = priorityLevel <$> configuration
 
 -- TCP port number.
 port :: IO Int
-port = serverPort <$> configuration  
+port = serverPort <$> configuration

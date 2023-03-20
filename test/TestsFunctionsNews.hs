@@ -5,21 +5,20 @@ module TestsFunctionsNews
 where
 
 import Data.Functor.Identity (Identity, runIdentity)
+import qualified Data.Text as T
 import Database.PostgreSQL.Simple.Types (Query (..))
 import News (NewsyHandle (..), setLimitAndOffset, setMethodNews)
 import Test.Hspec (SpecWith, it, shouldBe)
 
-import qualified Data.Text as T
-
-newsHandler :: NewsyHandle Identity  
-newsHandler = 
-  NewsyHandle 
-    { limitElemH = pure 20
-    , setLimitAndOffsetH = pure . setLimitAndOffset'
-    } 
+newsHandler :: NewsyHandle Identity
+newsHandler =
+  NewsyHandle
+    { limitElemH = pure 20,
+      setLimitAndOffsetH = pure . setLimitAndOffset'
+    }
 
 setLimitAndOffset' :: [(T.Text, Maybe T.Text)] -> Query
-setLimitAndOffset' = runIdentity . setLimitAndOffset newsHandler 
+setLimitAndOffset' = runIdentity . setLimitAndOffset newsHandler
 
 testsFunctionSetLimitAndOffset :: SpecWith ()
 testsFunctionSetLimitAndOffset = do
@@ -67,7 +66,7 @@ testsFunctionSetMethodNews = do
   it "list is empty" $
     setMethodNews' [] `shouldBe` Just ("title LIKE '%'", " LIMIT 20 OFFSET 0")
   it "test 1" $
-    setMethodNews'        
+    setMethodNews'
       [ ("created_since", Just "2022-03-22"),
         ("author", Just "Ann"),
         ("sort_by", Just "author"),
@@ -79,7 +78,7 @@ testsFunctionSetMethodNews = do
           "ORDER BY author.name_user LIMIT 10 OFFSET 1"
         )
   it "test 2" $
-    setMethodNews'        
+    setMethodNews'
       [ ("created_since", Just "2022-03-22"),
         ("author", Just "Ann"),
         ("sort_by", Just "foto"),
@@ -88,7 +87,7 @@ testsFunctionSetMethodNews = do
       ]
       `shouldBe` Nothing
   it "test 3" $
-    setMethodNews'        
+    setMethodNews'
       [ ("created_at", Just "2022-03-22"),
         ("author", Just "Sam"),
         ("category", Just "11"),
@@ -102,7 +101,7 @@ testsFunctionSetMethodNews = do
           "ORDER BY CARDINALITY(photo) LIMIT 20 OFFSET 1"
         )
   it "test 4" $
-    setMethodNews'       
+    setMethodNews'
       [ ("created_until", Just "2022-03-22"),
         ("author", Just "Violette"),
         ("category", Just "4"),
@@ -118,7 +117,7 @@ testsFunctionSetMethodNews = do
           "ORDER BY creation_date LIMIT 20 OFFSET 0"
         )
   it "test 5" $
-    setMethodNews'       
+    setMethodNews'
       [ ("created_at", Just "2022-03-22"),
         ("avthor", Just "Sam"),
         ("category", Just "11"),
@@ -128,7 +127,7 @@ testsFunctionSetMethodNews = do
       ]
       `shouldBe` Nothing
   it "test 6" $
-    setMethodNews'  
+    setMethodNews'
       [ ("created_until", Just "2022-03-22"),
         ("author", Nothing),
         ("category", Just "4"),

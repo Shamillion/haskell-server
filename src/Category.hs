@@ -44,11 +44,11 @@ parseCategory ls
     idCat = readNum ic
     (ic : pc : nc : _) = ls
 
-data CategoryHandle m = CategoryHandle 
+newtype CategoryHandle m = CategoryHandle
   {checkUniqCategoryH :: BC.ByteString -> m Bool}
-    
-categoryHandler :: CategoryHandle IO  
-categoryHandler = CategoryHandle {checkUniqCategoryH = checkUniqCategory}    
+
+categoryHandler :: CategoryHandle IO
+categoryHandler = CategoryHandle {checkUniqCategoryH = checkUniqCategory}
 
 getParentCategories :: T.Text -> IO [T.Text]
 getParentCategories cat = do
@@ -67,31 +67,36 @@ getParentCategories cat = do
 --  '.../category?aaa>bbb'
 --      aaa - parent category's name,
 --      bbb - category's name.
-createCategory :: Monad m =>
-  CategoryHandle m -> m Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> m Query
+createCategory ::
+  Monad m =>
+  CategoryHandle m ->
+  m Bool ->
+  [(BC.ByteString, Maybe BC.ByteString)] ->
+  m Query
 createCategory CategoryHandle {..} isAdm ls = do
   isAdm' <- isAdm
-  if not isAdm' || null ls || null categorys 
+  if not isAdm' || null ls || null categorys
     then pure "404"
     else do
       uniqName <- checkUniqCategoryH nameCategory
       uniqParent <- checkUniqCategoryH parentCategory
-      pure $ checkAndResponse uniqName uniqParent       
+      pure $ checkAndResponse uniqName uniqParent
   where
     (x : _) = map (BC.split '>' . fst) ls
     categorys = filter (/= "") x
     (parentCategory : nameCategory : _) =
-      if length categorys == 1 then "Null" : categorys else categorys      
+      if length categorys == 1 then "Null" : categorys else categorys
     checkAndResponse uNm uPrnt
-      | not uNm = "406cu"     
-      | uPrnt && parentCategory /= "Null" = "406cp" 
-      | otherwise = Query $
-                "INSERT INTO category (name_category, parent_category) \
-                \ VALUES ('"
-                  <> nameCategory
-                  <> "', '"
-                  <> parentCategory
-                  <> "');"
+      | not uNm = "406cu"
+      | uPrnt && parentCategory /= "Null" = "406cp"
+      | otherwise =
+        Query $
+          "INSERT INTO category (name_category, parent_category) \
+          \ VALUES ('"
+            <> nameCategory
+            <> "', '"
+            <> parentCategory
+            <> "');"
 
 -- Request examples:
 --   Changing the category name: '.../category?change_name=aaa>bbb'
@@ -100,19 +105,23 @@ createCategory CategoryHandle {..} isAdm ls = do
 --   Changing the parent category: '.../category?change_parent=aaa>bbb'
 --      aaa - category's name,
 --      bbb - new parent category's name.
-editCategory :: Monad m =>
-  CategoryHandle m -> m Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> m Query
+editCategory ::
+  Monad m =>
+  CategoryHandle m ->
+  m Bool ->
+  [(BC.ByteString, Maybe BC.ByteString)] ->
+  m Query
 editCategory CategoryHandle {..} isAdm ls = do
   isAdm' <- isAdm
   if not isAdm' || null ls || null fls || "" `elem` [name, new_name]
     then pure "404"
-    else do      
+    else do
       uniqName <- checkUniqCategoryH name
       if uniqName
         then pure "406cn"
         else do
           uniqNew_name <- checkUniqCategoryH new_name
-          pure $ checkAndResponse uniqNew_name  
+          pure $ checkAndResponse uniqNew_name
   where
     fls = filter ((/= "???") . snd) $ map (fmap fromMaybe) $ take 1 ls
     fls' = map (fmap (BC.split '>')) fls
@@ -124,12 +133,12 @@ editCategory CategoryHandle {..} isAdm ls = do
               then ("404", ["", ""])
               else x
         )
-        categorys    
+        categorys
     checkAndResponse w
       | method == "change_parent" && name == new_name = "406ce"
       | method == "change_name" && not w = "406cu"
-      | method == "change_parent" && w && new_name /= "Null" = "406cp" 
-      | otherwise = Query $ checkQuery $ map buildQuery fls''       
+      | method == "change_parent" && w && new_name /= "Null" = "406cp"
+      | otherwise = Query $ checkQuery $ map buildQuery fls''
     checkQuery lq = if "404" `elem` lq then "404" else mconcat lq
     buildQuery (meth, [nm, new_nm]) =
       case meth of

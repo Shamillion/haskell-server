@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-
 module News where
 
 import Category (getParentCategories)
@@ -20,7 +19,6 @@ import Lib (fromMaybe, initTxt, readNum, splitOnTxt, tailTxt)
 import Photo (sendPhotoToDB)
 import Text.Read (readMaybe)
 import User (User, errorUser, parseUser)
-
 
 -- Creating a database query to get a list of news.
 getNews :: Query -> Maybe (Query, Query) -> Query
@@ -90,19 +88,17 @@ data News = News
 errorNews :: IO News
 errorNews = pure $ News 0 "error" "error" errorUser ["error"] "error" ["error"] False
 
-data NewsyHandle m = 
-  NewsyHandle 
-    { limitElemH :: m Int
-    , setLimitAndOffsetH :: [(T.Text, Maybe T.Text)] -> m Query
-    }
-    
-newsHandler :: NewsyHandle IO  
-newsHandler = 
-  NewsyHandle 
-    { limitElemH = limitElem
-    , setLimitAndOffsetH = setLimitAndOffset newsHandler
-    }  
+data NewsyHandle m = NewsyHandle
+  { limitElemH :: m Int,
+    setLimitAndOffsetH :: [(T.Text, Maybe T.Text)] -> m Query
+  }
 
+newsHandler :: NewsyHandle IO
+newsHandler =
+  NewsyHandle
+    { limitElemH = limitElem,
+      setLimitAndOffsetH = setLimitAndOffset newsHandler
+    }
 
 parseNews :: [T.Text] -> IO News
 parseNews ls
@@ -115,14 +111,17 @@ parseNews ls
     [n0, n1, n2, n3, n4, n5, n6, n7] = ls
     idNws = readNum n0
     splitText = splitOnTxt "," . tailTxt . initTxt
-    athr = parseUser $ splitText n3    
+    athr = parseUser $ splitText n3
     pht = map ("/photo?get_photo=" <>) $ splitText n6
     isPbl = n7 == "true" || n7 == "t"
 
-setMethodNews :: Monad m =>
-  NewsyHandle m -> [(T.Text, Maybe T.Text)] -> m (Maybe (Query, Query))
+setMethodNews ::
+  Monad m =>
+  NewsyHandle m ->
+  [(T.Text, Maybe T.Text)] ->
+  m (Maybe (Query, Query))
 setMethodNews NewsyHandle {..} ls = do
-  setLimOffs <- setLimitAndOffsetH ls 
+  setLimOffs <- setLimitAndOffsetH ls
   let sortNewsLimitOffset = fmap (<> setLimOffs) sortNews
   pure $ do
     a <- filterNews
@@ -177,21 +176,24 @@ setFiltersNews ((mthd, param) : xs)
         <> fromMaybe' param
         <> "'"
 
-setLimitAndOffset :: Monad m =>
-  NewsyHandle m -> [(T.Text, Maybe T.Text)] -> m Query
-setLimitAndOffset NewsyHandle {..} ls = do 
+setLimitAndOffset ::
+  Monad m =>
+  NewsyHandle m ->
+  [(T.Text, Maybe T.Text)] ->
+  m Query
+setLimitAndOffset NewsyHandle {..} ls = do
   val <- limitElemH
   let lmt = listToValue "limit" lessVal val
       lessVal x = if x > 0 && x < val then x else val
   pure . Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst
   where
-    ofst = listToValue "offset" (max 0) 0    
+    ofst = listToValue "offset" (max 0) 0
     getMaybe wrd f =
       (LT.find ((== wrd) . fst) ls >>= snd >>= readMaybe . T.unpack) <&> f
     listToValue wrd f x = toByteString $
       case getMaybe wrd f of
         Just n -> n
-        _ -> x    
+        _ -> x
     toByteString = BC.pack . show
 
 -- Request example:
@@ -201,10 +203,10 @@ setLimitAndOffset NewsyHandle {..} ls = do
 createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
 createNews auth authID ls = do
   auth' <- auth
-  if not auth' || null ls || nothingInLs 
+  if not auth' || null ls || nothingInLs
     then pure "404"
     else do
-      authID' <- authID  
+      authID' <- authID
       photoIdList <- photoIDLs ls'
       pure . Query $
         "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
@@ -231,17 +233,14 @@ createNews auth authID ls = do
     isPublished = getValue "is_published"
     getValue str = sndMaybe . LT.find (\(x, _) -> x == str) $ ls'
     sndMaybe Nothing = "Null"
-    sndMaybe (Just e) = snd e    
+    sndMaybe (Just e) = snd e
 
 -- Puts the photos from the query into the database and
 --  returns a list from the ID.
 photoIDLs :: [(BC.ByteString, BC.ByteString)] -> IO BC.ByteString
-photoIDLs ls = ls' >>= pure . (\x -> "'{" <> buildPhotoIdString x <> "}'")
-  --((\x -> "'{" <> x <> "}'") <$>) . (buildPhotoIdString <$>)
-    -- .  mapM (sendPhotoToDB . snd)
-    -- . filter ((== "photo") . fst)
+photoIDLs ls = ls' <&> (\x -> "'{" <> buildPhotoIdString x <> "}'")
   where
-    ls' = mapM (sendPhotoToDB . snd) . filter ((== "photo") . fst) $ ls    
+    ls' = mapM (sendPhotoToDB . snd) . filter ((== "photo") . fst) $ ls
 
 buildPhotoIdString :: [BC.ByteString] -> BC.ByteString
 buildPhotoIdString [] = ""
@@ -264,7 +263,7 @@ editNews auth ls = do
         "UPDATE news SET " <> photo' <> buildChanges ls'
           <> " WHERE news_id = "
           <> newsId
-          <> ";"   
+          <> ";"
   where
     newsId = case LT.find (\(x, _) -> x == "news_id") ls of
       Just (_, Just n) -> n
@@ -279,21 +278,21 @@ editNews auth ls = do
           x <- photoIDLs $ map (fromMaybe <$>) ls
           pure $ "photo = " <> x <> ", "
         else pure ""
-     
+
 -- Checks whether this user is the author of this news.
 authorNews :: BC.ByteString -> BC.ByteString -> IO Bool
 authorNews "Null" _ = pure False
 authorNews authId newsId = do
-    conn <- connectDB
-    ls <-
-      query
-        conn
-        "SELECT news_id FROM news WHERE user_id = ? AND \
-        \ news_id = ?;"
-        (authId, newsId) ::
-        IO [[Int]]
-    close conn
-    pure $ ls /= []
+  conn <- connectDB
+  ls <-
+    query
+      conn
+      "SELECT news_id FROM news WHERE user_id = ? AND \
+      \ news_id = ?;"
+      (authId, newsId) ::
+      IO [[Int]]
+  close conn
+  pure $ ls /= []
 
 -- Creates a row with updated news fields.
 buildChanges :: [(BC.ByteString, BC.ByteString)] -> BC.ByteString

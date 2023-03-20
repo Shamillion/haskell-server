@@ -23,13 +23,13 @@ checkAuth ls =
         writingLine ERROR x
         pure $ Left x
       Right [x, y] -> do
-          conn <- connectDB
-          let qry = getUser $ Query $ "WHERE login = '" <> x <> "'"
-          writingLineDebug qry
-          userList <- query_ conn qry :: IO [[T.Text]]
-          close conn
-          writingLineDebug userList
-          pure . isEmptyList $ checkPassword y userList
+        conn <- connectDB
+        let qry = getUser $ Query $ "WHERE login = '" <> x <> "'"
+        writingLineDebug qry
+        userList <- query_ conn qry :: IO [[T.Text]]
+        close conn
+        writingLineDebug userList
+        pure . isEmptyList $ checkPassword y userList
       _ -> pure $ Left "No Authorization"
   where
     fls = filter ((== "Authorization") . fst) ls
@@ -44,7 +44,7 @@ checkAuth ls =
         [parseUser u | validatePassword p $ BC.pack . T.unpack . last' $ u]
 
 -- Returns the user ID.
-authorID :: W.Request -> IO Query                     
+authorID :: W.Request -> IO Query
 authorID req = do
   checkAuth' <- checkAuth (W.requestHeaders req)
   pure $ case checkAuth' of
@@ -52,7 +52,7 @@ authorID req = do
     _ -> "Null"
 
 -- Checks the administrator rights of the user.
-isAdmin :: W.Request -> IO Bool                         
+isAdmin :: W.Request -> IO Bool
 isAdmin req = do
   checkAuth' <- checkAuth (W.requestHeaders req)
   pure $ case checkAuth' of
@@ -60,7 +60,7 @@ isAdmin req = do
     _ -> False
 
 -- Checks the user's ability to create news.
-isAuthor :: W.Request -> IO Bool                                  
+isAuthor :: W.Request -> IO Bool
 isAuthor req = do
   checkAuth' <- checkAuth (W.requestHeaders req)
   pure $ case checkAuth' of

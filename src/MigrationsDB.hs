@@ -8,7 +8,6 @@ import Database.PostgreSQL.Simple (close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import User (cryptoPass)
 
-
 -- Checking the availability of the necessary tables in the database.
 checkDB :: Int -> IO Int
 checkDB num
@@ -28,7 +27,8 @@ checkDB num
           pure num
         else do
           addAdmin' <- addAdmin
-          mapM_ (execute_ conn) 
+          mapM_
+            (execute_ conn)
             [ createTableUsers,
               addAdmin',
               createTableCategory,
@@ -44,7 +44,6 @@ checkDB num
     qry =
       "SELECT table_name FROM information_schema.tables \
       \ WHERE table_schema NOT IN ('information_schema','pg_catalog');"
-
 
 createTableUsers :: Query
 createTableUsers =
