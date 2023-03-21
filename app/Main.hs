@@ -21,15 +21,42 @@ import User (blockAdminRights, createUser, getUser, parseUser)
 setQueryAndRespond :: W.Request -> IO (DB.Query, [[T.Text]] -> IO LC.ByteString)
 setQueryAndRespond req = do
   case (reqMtd, entity) of
-    ("GET", "news") -> (,) <$> (getNews <$> authId <*> method) <*> pure ((encode <$>) . mapM parseNews)
-    ("POST", "news") -> (,) <$> createNews athr authId arr <*> pure encodeWith
-    ("PUT", "news") -> (,) <$> editNews authId arr <*> pure encodeWith
-    ("GET", "user") -> (,) <$> (getUser <$> limitOffset) <*> pure (pure . encode . map parseUser)
-    ("POST", "user") -> (,) <$> createUser adm arr <*> pure encodeWith
-    ("PUT", "user") -> (,) <$> (blockAdminRights <$> adm) <*> pure encodeWith
-    ("GET", "category") -> (,) <$> (getCategory <$> limitOffset) <*> pure (pure . encode . map parseCategory)
-    ("POST", "category") -> (,) <$> createCategory categoryHandler adm arr <*> pure encodeWith
-    ("PUT", "category") -> (,) <$> editCategory categoryHandler adm arr <*> pure encodeWith
+    ("GET", "news") ->
+      (,)
+        <$> (getNews <$> authId <*> method)
+        <*> pure ((encode <$>) . mapM parseNews)
+    ("POST", "news") ->
+      (,)
+        <$> createNews athr authId arr
+        <*> pure encodeWith
+    ("PUT", "news") ->
+      (,)
+        <$> editNews authId arr
+        <*> pure encodeWith
+    ("GET", "user") ->
+      (,)
+        <$> (getUser <$> limitOffset)
+        <*> pure (pure . encode . map parseUser)
+    ("POST", "user") ->
+      (,)
+        <$> createUser adm arr
+        <*> pure encodeWith
+    ("PUT", "user") ->
+      (,)
+        <$> (blockAdminRights <$> adm)
+        <*> pure encodeWith
+    ("GET", "category") ->
+      (,)
+        <$> (getCategory <$> limitOffset)
+        <*> pure (pure . encode . map parseCategory)
+    ("POST", "category") ->
+      (,)
+        <$> createCategory categoryHandler adm arr
+        <*> pure encodeWith
+    ("PUT", "category") ->
+      (,)
+        <$> editCategory categoryHandler adm arr
+        <*> pure encodeWith
     ("GET", "photo") -> pure (getPhoto arr, pure . decodeImage)
     _ -> pure ("404", const (pure "404"))
   where
@@ -41,7 +68,8 @@ setQueryAndRespond req = do
     limitOffset = setLimitAndOffset newsHandler . queryToQueryText $ arr
     adm = isAdmin req
     athr = isAuthor req
-    encodeWith = pure . (<> " position(s) done.") . LC.fromStrict . encodeUtf8 . drawOut
+    encodeWith =
+      pure . (<> " position(s) done.") . LC.fromStrict . encodeUtf8 . drawOut
 
 app :: W.Application
 app req respond = do

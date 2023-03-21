@@ -86,7 +86,8 @@ data News = News
   deriving (Show, Generic, ToJSON)
 
 errorNews :: IO News
-errorNews = pure $ News 0 "error" "error" errorUser ["error"] "error" ["error"] False
+errorNews =
+  pure $ News 0 "error" "error" errorUser ["error"] "error" ["error"] False
 
 data NewsyHandle m = NewsyHandle
   { limitElemH :: m Int,
