@@ -177,13 +177,13 @@ The request may include several parameters for filtering and a parameter for sor
 Example of a request to receive news created by the user Ann before 02.24.2022, 
 with the word "exhibition" in the title and sorted by the number of photos:
 ```
-curl -X GET 'http://localhost:8080/news?author=Ann&created_until=2022-02-24&title=exhibition&sort_by=photos'
+curl -X GET 'http://localhost:8080/news?author=Ann&created_until=2022-02-24&title=exhibition&sort_by=photo'
 ```
 
 ##### Limit and offset.
 Example of the last request with limit and offset:
 ```
-curl -X GET 'http://localhost:8080/news?author=Ann&created_until=2022-02-24&title=exhibition&sort_by=photos&limit=10&offset=3'
+curl -X GET 'http://localhost:8080/news?author=Ann&created_until=2022-02-24&title=exhibition&sort_by=photo&limit=10&offset=3'
 ```
 
 #### Creating news
@@ -256,7 +256,7 @@ curl -X GET 'http://localhost:8080/category'
 #### Creating category
 To create category, the user must have administrator rights.
 
-Example of creating a category named "Trees" and a parent category named "Nature":
+Example of creating a category named "Trees" in the parent category named "Nature":
 ```
 curl -X POST 'http://Sam:pass123@localhost:8080/category?Nature>Trees'
 ```
