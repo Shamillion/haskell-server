@@ -9,7 +9,6 @@ import Data.Time (getCurrentTime)
 import Data.Word (Word16)
 import qualified Database.PostgreSQL.Simple as PS
 import GHC.Generics (Generic)
-import qualified System.IO as I
 
 -- Data type for the configuration file.
 data Configuration = Configuration
@@ -34,11 +33,9 @@ getConfiguration fileName = do
   case obj of
     Right _ -> pure obj
     Left e -> do
-      let str = t ++ " UTC   " ++ "ERROR  " ++ " - " ++ e
+      let str = t <> " UTC   " <> "ERROR  " <> " - " <> e
       print str
-      file' <- file
-      I.hPutStrLn file' str
-      I.hFlush file'
+      appendFile logFile $ str <> "\n"
       pure obj
 
 -- The object is used when the configuration
@@ -97,10 +94,9 @@ connectDB = do
 data Priority = DEBUG | INFO | WARNING | ERROR
   deriving (Show, Eq, Ord, Generic, FromJSON)
 
--- Get Handle for the logfile.
-file :: IO I.Handle
-{-# NOINLINE file #-}
-file = I.openFile "../log.log" I.AppendMode
+-- Name of the logfile.
+logFile :: String
+logFile = "log.log"
 
 -- Function writes log information down.
 writingLine :: Priority -> String -> IO ()
@@ -109,13 +105,10 @@ writingLine lvl str = do
   if lvl >= logLevel'
     then do
       t <- time
-      let string = t ++ " UTC   " ++ fun lvl ++ " - " ++ str
+      let string = t <> " UTC   " <> fun lvl <> " - " <> str
       out <- logOutput <$> configuration
       case out of
-        "file" -> do
-          file' <- file
-          I.hPutStrLn file' string
-          I.hFlush file'
+        "file" -> appendFile logFile $ string <> "\n"
         _ -> putStrLn string
     else pure ()
   where

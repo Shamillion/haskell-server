@@ -125,5 +125,5 @@ main = do
     then print ("Error Database! Server can not be started!" :: String)
     else do
       port' <- port
-      writingLine INFO "Server is started."
+      mapM_ (\f -> f "Server is started.") [print, writingLine INFO]
       run port' app
