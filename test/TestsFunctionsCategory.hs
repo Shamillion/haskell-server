@@ -5,6 +5,7 @@ module TestsFunctionsCategory
 where
 
 import Category (CategoryHandle (..), createCategory, editCategory)
+import Config (Wrong (..))
 import qualified Data.ByteString.Char8 as BC
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.String (IsString)
@@ -17,66 +18,66 @@ categoryTestHandler = CategoryHandle {checkUniqCategoryH = testUniqCategory}
 testUniqCategory :: (Eq a, Data.String.IsString a) => a -> Identity Bool
 testUniqCategory e = pure $ e `notElem` ["parentCategory", "Null", "existCategory"]
 
-createCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+createCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Wrong Query
 createCategory' b ls = runIdentity $ createCategory categoryTestHandler (pure b) ls
 
 testsFunctionCreateCategory :: SpecWith ()
 testsFunctionCreateCategory = do
   it "User is not admin" $
-    createCategory' False [("Cars>Wheels", Nothing)] `shouldBe` Query "404"
+    createCategory' False [("Cars>Wheels", Nothing)] `shouldBe` Left Wrong
   it "User is not admin and list is empty" $
-    createCategory' False [] `shouldBe` Query "404"
+    createCategory' False [] `shouldBe` Left Wrong
   it "User is admin and list is empty" $
-    createCategory' True [] `shouldBe` Query "404"
+    createCategory' True [] `shouldBe` Left Wrong
   it "Everything is all right" $
     createCategory' True [("parentCategory>category", Nothing)]
-      `shouldBe` Query
+      `shouldBe` Right (Query 
         "INSERT INTO category (name_category, parent_category) \
-        \ VALUES ('category', 'parentCategory');"
+        \ VALUES ('category', 'parentCategory');")
   it "'Just' instead 'Nothing'" $
     createCategory' True [("parentCategory>category", Just "anything")]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "INSERT INTO category (name_category, parent_category) \
-        \ VALUES ('category', 'parentCategory');"
+        \ VALUES ('category', 'parentCategory');")
   it "Parent category does not exist" $
     createCategory' True [("notExistCategory>category", Nothing)]
-      `shouldBe` Query "406cp"
+      `shouldBe` Left NoParentCategory  
   it "Name of category is not unique" $
     createCategory' True [("parentCategory>existCategory", Nothing)]
-      `shouldBe` Query "406cu"
+      `shouldBe` Left CategoryExists
   it "Parent category does not exist and name of category is not unique" $
     createCategory' True [("notExistCategory>existCategory", Nothing)]
-      `shouldBe` Query "406cu"
+      `shouldBe` Left CategoryExists
   it "Name of category and name of parent category are equal" $
     createCategory' True [("parentCategory>parentCategory", Nothing)]
-      `shouldBe` Query "406cu"
+      `shouldBe` Left CategoryExists
   it "Name of category and name of parent category are equal and don't exist" $
     createCategory' True [("notExistCategory>notExistCategory", Nothing)]
-      `shouldBe` Query "406cp"
+      `shouldBe` Left NoParentCategory
   it "Syntax mistake in request" $
     createCategory' True [("parentCategory<category", Nothing)]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "INSERT INTO category (name_category, parent_category) \
-        \ VALUES ('parentCategory<category', 'Null');"
+        \ VALUES ('parentCategory<category', 'Null');")
   it "Syntax mistake in request - 2" $
     createCategory' True [("parentCategory>>category", Nothing)]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "INSERT INTO category (name_category, parent_category) \
-        \ VALUES ('category', 'parentCategory');"
+        \ VALUES ('category', 'parentCategory');")
   it "Categories are more than 2" $
     createCategory' True [("parentCategory>category_1>category_2", Nothing)]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "INSERT INTO category (name_category, parent_category) \
-        \ VALUES ('category_1', 'parentCategory');"
+        \ VALUES ('category_1', 'parentCategory');")
   it "2 elements into list" $
     createCategory'
       True
       [ ("parentCategory>category_1", Nothing),
         ("parentCategory>category_2", Nothing)
       ]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "INSERT INTO category (name_category, parent_category) \
-        \ VALUES ('category_1', 'parentCategory');"
+        \ VALUES ('category_1', 'parentCategory');")
   it "3 elements into list" $
     createCategory'
       True
@@ -84,22 +85,22 @@ testsFunctionCreateCategory = do
         ("parentCategory>category_2", Nothing),
         ("parentCategory>category_3", Nothing)
       ]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "INSERT INTO category (name_category, parent_category) \
-        \ VALUES ('category_1', 'parentCategory');"
+        \ VALUES ('category_1', 'parentCategory');")
   it "Without parent category" $
     createCategory' True [(">category", Nothing)]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "INSERT INTO category (name_category, parent_category) \
-        \ VALUES ('category', 'Null');"
+        \ VALUES ('category', 'Null');")
   it "Without category" $
     createCategory' True [("parentCategory>", Nothing)]
-      `shouldBe` Query "406cu"
+      `shouldBe` Left CategoryExists
   it "Without both categories" $
     createCategory' True [(">", Nothing)]
-      `shouldBe` Query "404"
+      `shouldBe` Left Wrong
 
-editCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Query
+editCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Wrong Query
 editCategory' b ls = runIdentity $ editCategory categoryTestHandler (pure b) ls
 
 testsFunctionEditCategory :: SpecWith ()
@@ -107,35 +108,35 @@ testsFunctionEditCategory = do
   -- [("change_name",Just "aaa>bbb")]
   it "User is not admin" $
     editCategory' False [("change_name", Just "existCategory>newCategory")]
-      `shouldBe` Query "404"
+      `shouldBe` Left Wrong
   it "User is not admin and list is empty" $
-    editCategory' False [] `shouldBe` Query "404"
+    editCategory' False [] `shouldBe` Left Wrong
   it "User is admin and list is empty" $
-    editCategory' True [] `shouldBe` Query "404"
+    editCategory' True [] `shouldBe` Left Wrong
   it "Unknown method" $
     editCategory' True [("changeName", Just "existCategory>newCategory")]
-      `shouldBe` Query "404"
+      `shouldBe` Left Wrong
   it "Without old name" $
     editCategory' True [("change_name", Just ">newCategory")]
-      `shouldBe` Query "404"
+      `shouldBe` Left Wrong
   it "Without new name" $
     editCategory' True [("change_name", Just "existCategory>")]
-      `shouldBe` Query "404"
+      `shouldBe` Left Wrong
   it "Without both names" $
     editCategory' True [("change_name", Just ">")]
-      `shouldBe` Query "404"
+      `shouldBe` Left Wrong
   it "Syntax error" $
     editCategory' True [("change_name", Just "existeCategorynewCategory")]
-      `shouldBe` Query "404"
+      `shouldBe` Left Wrong
   it "Syntax error 2" $
     editCategory' True [("change_name", Just "existCategory>>newCategory")]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "UPDATE category \
         \ SET   parent_category = 'newCategory' \
         \ WHERE parent_category = 'existCategory'; \
         \ UPDATE category \
         \ SET   name_category = 'newCategory' \
-        \ WHERE name_category = 'existCategory'; "
+        \ WHERE name_category = 'existCategory'; ")
   it "With 3 category's name" $
     editCategory'
       True
@@ -143,59 +144,59 @@ testsFunctionEditCategory = do
           Just "existCategory>newCategory>newCategory_2"
         )
       ]
-      `shouldBe` Query "404"
+      `shouldBe` Left Wrong
   it "With Nothing" $
     editCategory' True [("change_name", Nothing)]
-      `shouldBe` Query "404"
+      `shouldBe` Left Wrong
   it "Two elements in list. One element with syntax error" $
     editCategory'
       True
       [ ("change_name", Just "existCategory>newCategory"),
         ("change_name", Just "existCategory>>newCategory_2")
       ]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "UPDATE category \
         \ SET   parent_category = 'newCategory' \
         \ WHERE parent_category = 'existCategory'; \
         \ UPDATE category \
         \ SET   name_category = 'newCategory' \
-        \ WHERE name_category = 'existCategory'; "
+        \ WHERE name_category = 'existCategory'; ")
   it "Two elements in list with Nothing" $
     editCategory'
       True
       [ ("change_name", Just "existCategory>newCategory"),
         ("change_name", Nothing)
       ]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "UPDATE category \
         \ SET   parent_category = 'newCategory' \
         \ WHERE parent_category = 'existCategory'; \
         \ UPDATE category \
         \ SET   name_category = 'newCategory' \
-        \ WHERE name_category = 'existCategory'; "
+        \ WHERE name_category = 'existCategory'; ")
   it "Method is change_name: such category already exists" $
     editCategory' True [("change_name", Just "parentCategory>existCategory")]
-      `shouldBe` Query "406cu"
+      `shouldBe` Left CategoryExists
   it "Method is change_name: new name and old name are the same" $
     editCategory' True [("change_name", Just "existCategory>existCategory")]
-      `shouldBe` Query "406cu"
+      `shouldBe` Left CategoryExists
   it "Method is change_name: this category doesn't exist" $
     editCategory' True [("change_name", Just "someNameCategory>newCategory")]
-      `shouldBe` Query "406cn"
+      `shouldBe` Left NoCategory
   it "Method is change_name: everything is all right" $
     editCategory' True [("change_name", Just "existCategory>newCategory")]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "UPDATE category \
         \ SET   parent_category = 'newCategory' \
         \ WHERE parent_category = 'existCategory'; \
         \ UPDATE category \
         \ SET   name_category = 'newCategory' \
-        \ WHERE name_category = 'existCategory'; "
+        \ WHERE name_category = 'existCategory'; ")
   it
     "Method is change_parent: names of category and parent \
     \category are the same"
     $ editCategory' True [("change_parent", Just "existCategory>existCategory")]
-      `shouldBe` Query "406ce"
+      `shouldBe` Left CategoryParentItself
   it "Method is change_parent: this category doesn't exist" $
     editCategory'
       True
@@ -203,29 +204,29 @@ testsFunctionEditCategory = do
           Just "someNameCategory>parentCategory"
         )
       ]
-      `shouldBe` Query "406cn"
+      `shouldBe` Left NoCategory
   it "Method is change_parent: this parent category doesn't exist" $
     editCategory' True [("change_parent", Just "existCategory>someNameCategory")]
-      `shouldBe` Query "406cp"
+      `shouldBe` Left NoParentCategory
   it "Method is change_parent: everything is all right" $
     editCategory' True [("change_parent", Just "existCategory>parentCategory")]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "UPDATE category \
         \ SET parent_category = 'parentCategory' \
-        \ WHERE name_category = 'existCategory'; "
+        \ WHERE name_category = 'existCategory'; ")
   it "Method is change_parent: two elements in list" $
     editCategory'
       True
       [ ("change_parent", Just "existCategory>parentCategory"),
         ("change_parent", Just "parentCategory>Null")
       ]
-      `shouldBe` Query
+      `shouldBe` Right (Query
         "UPDATE category \
         \ SET parent_category = 'parentCategory' \
-        \ WHERE name_category = 'existCategory'; "
+        \ WHERE name_category = 'existCategory'; ")
   it "Method is change_parent: with 'Nothing'" $
     editCategory' True [("change_parent", Nothing)]
-      `shouldBe` Query "404"
+      `shouldBe` Left Wrong
   it "Method is change_parent: this category doesn't exist" $
     editCategory' True [("change_parent", Just "newCategory>parentCategory")]
-      `shouldBe` Query "406cn"
+      `shouldBe` Left NoCategory

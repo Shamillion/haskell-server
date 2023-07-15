@@ -3,7 +3,7 @@
 
 module Category where
 
-import Config (connectDB, writingLineDebug)
+import Config (connectDB, writingLineDebug, Wrong (Wrong, CategoryExists, NoParentCategory, NoCategory, CategoryParentItself))
 import Data.Aeson (ToJSON)
 import qualified Data.ByteString.Char8 as BC
 import Data.List as LT (find)
@@ -14,8 +14,8 @@ import GHC.Generics (Generic)
 import Lib (fromMaybe, head', readNum)
 
 -- Creating a database query to get a list of catygories.
-getCategory :: Query -> Query
-getCategory limitOffset =
+getCategory :: Query -> Either Wrong Query
+getCategory limitOffset = Right $
   "SELECT (category_id :: TEXT), parent_category, \
   \ name_category FROM category "
     <> limitOffset
@@ -72,11 +72,11 @@ createCategory ::
   CategoryHandle m ->
   m Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
-  m Query
+  m (Either Wrong Query)
 createCategory CategoryHandle {..} isAdm ls = do
   isAdm' <- isAdm
   if not isAdm' || null ls || null categorys
-    then pure "404"
+    then pure $ Left Wrong
     else do
       uniqName <- checkUniqCategoryH nameCategory
       uniqParent <- checkUniqCategoryH parentCategory
@@ -87,9 +87,9 @@ createCategory CategoryHandle {..} isAdm ls = do
     (parentCategory : nameCategory : _) =
       if length categorys == 1 then "Null" : categorys else categorys
     checkAndResponse uNm uPrnt
-      | not uNm = "406cu"
-      | uPrnt && parentCategory /= "Null" = "406cp"
-      | otherwise =
+      | not uNm = Left CategoryExists
+      | uPrnt && parentCategory /= "Null" = Left NoParentCategory
+      | otherwise = Right $
         Query $
           "INSERT INTO category (name_category, parent_category) \
           \ VALUES ('"
@@ -110,15 +110,15 @@ editCategory ::
   CategoryHandle m ->
   m Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
-  m Query
+  m (Either Wrong Query)
 editCategory CategoryHandle {..} isAdm ls = do
   isAdm' <- isAdm
   if not isAdm' || null ls || null fls || "" `elem` [name, new_name]
-    then pure "404"
+    then pure $ Left Wrong
     else do
       uniqName <- checkUniqCategoryH name
       if uniqName
-        then pure "406cn"
+        then pure $ Left NoCategory
         else do
           uniqNew_name <- checkUniqCategoryH new_name
           pure $ checkAndResponse uniqNew_name
@@ -135,11 +135,11 @@ editCategory CategoryHandle {..} isAdm ls = do
         )
         categorys
     checkAndResponse w
-      | method == "change_parent" && name == new_name = "406ce"
-      | method == "change_name" && not w = "406cu"
-      | method == "change_parent" && w && new_name /= "Null" = "406cp"
-      | otherwise = Query $ checkQuery $ map buildQuery fls''
-    checkQuery lq = if "404" `elem` lq then "404" else mconcat lq
+      | method == "change_parent" && name == new_name = Left CategoryParentItself
+      | method == "change_name" && not w = Left CategoryExists
+      | method == "change_parent" && w && new_name /= "Null" = Left NoParentCategory
+      | otherwise = checkQuery $ map buildQuery fls''
+    checkQuery lq = if "404" `elem` lq then Left Wrong else Right . Query $ mconcat lq
     buildQuery (meth, [nm, new_nm]) =
       case meth of
         "change_name" ->

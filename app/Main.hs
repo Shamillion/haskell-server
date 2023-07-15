@@ -2,7 +2,7 @@ module Main where
 
 import Auth (authorID, checkAuth, isAdmin, isAuthor)
 import Category (categoryHandler, createCategory, editCategory, getCategory, parseCategory)
-import Config (Priority (..), connectDB, port, writingLine, writingLineDebug)
+import Config (Priority (..), Wrong (..), connectDB, port, writingLine, writingLineDebug)
 import Data.Aeson (encode)
 import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.Text as T
@@ -18,7 +18,7 @@ import Photo (decodeImage, getPhoto)
 import User (blockAdminRights, createUser, getUser, parseUser)
 
 -- Defining the type of request and creating a response.
-setQueryAndRespond :: W.Request -> IO (DB.Query, [[T.Text]] -> IO LC.ByteString)
+setQueryAndRespond :: W.Request -> IO (Either Wrong DB.Query, [[T.Text]] -> IO LC.ByteString)
 setQueryAndRespond req = do
   case (reqMtd, entity) of
     ("GET", "news") ->
@@ -35,7 +35,7 @@ setQueryAndRespond req = do
         <*> pure encodeWith
     ("GET", "user") ->
       (,)
-        <$> (getUser <$> limitOffset)
+        <$> (pure . getUser <$> limitOffset)
         <*> pure (pure . encode . map parseUser)
     ("POST", "user") ->
       (,)
@@ -58,7 +58,7 @@ setQueryAndRespond req = do
         <$> editCategory categoryHandler adm arr
         <*> pure encodeWith
     ("GET", "photo") -> pure (getPhoto arr, pure . decodeImage)
-    _ -> pure ("404", const (pure "404"))
+    _ -> pure (Left Wrong, const (pure "Error"))
   where
     reqMtd = W.requestMethod req
     [entity] = W.pathInfo req
@@ -74,31 +74,21 @@ setQueryAndRespond req = do
 app :: W.Application
 app req respond = do
   writingLine INFO "Received a request."
-  (qry, resp) <- setQueryAndRespond req
+  (eitherQry, resp) <- setQueryAndRespond req
   writingLineDebug $ W.requestMethod req
   writingLineDebug $ W.requestHeaders req
   writingLineDebug =<< checkAuth (W.requestHeaders req)
   writingLineDebug $ W.pathInfo req
   writingLineDebug $ W.queryString req
-  writingLineDebug qry
-  case qry of
-    "404" -> responds status404 "text/plain" "404 Not Found.\n"
-    "406uu" -> responds status406 "text/plain" "This login is already in use.\n"
-    "406cu" -> responds status406 "text/plain" "This category already exists.\n"
-    "406cn" -> responds status406 "text/plain" "There is no such category.\n"
-    "406cp" ->
-      responds
-        status406
-        "text/plain"
-        "There is no such parent \
-        \category.\n"
-    "406ce" ->
-      responds
-        status406
-        "text/plain"
-        "A category cannot be a parent \
-        \to itself.\n"
-    _ -> do
+  writingLineDebug eitherQry
+  case eitherQry of
+    Left Wrong -> responds status404 "text/plain" "404 Not Found.\n"
+    Left LoginOccupied -> respondsSts406 "This login is already in use.\n"
+    Left CategoryExists -> respondsSts406 "This category already exists.\n"
+    Left NoCategory -> respondsSts406 "There is no such category.\n"
+    Left NoParentCategory -> respondsSts406 "There is no such parent category.\n"
+    Left CategoryParentItself -> respondsSts406 "A category cannot be a parent to itself.\n"
+    Right qry -> do
       conn <- connectDB
       val <- case W.requestMethod req of
         "GET" -> DB.query_ conn qry :: IO [[T.Text]]
@@ -115,6 +105,7 @@ app req respond = do
       responds status200 hdr ans
   where
     responds sts hdr = respond . W.responseLBS sts [("Content-Type", hdr)]
+    respondsSts406 = responds status406 "text/plain"
     getHdr = encodeUtf8 . T.drop 1 . T.takeWhile (/= ';') . T.dropWhile (/= ':')
 
 main :: IO ()

@@ -128,3 +128,6 @@ logLevel = priorityLevel <$> configuration
 -- TCP port number.
 port :: IO Int
 port = serverPort <$> configuration
+
+data Wrong = Wrong | LoginOccupied | CategoryExists | NoCategory | NoParentCategory | CategoryParentItself
+  deriving (Show, Eq)

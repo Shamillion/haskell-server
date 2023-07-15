@@ -4,7 +4,7 @@
 module News where
 
 import Category (getParentCategories)
-import Config (connectDB, limitElem)
+import Config (connectDB, limitElem, Wrong (Wrong))
 import Data.Aeson (ToJSON)
 import qualified Data.ByteString.Char8 as BC
 import Data.Functor ((<&>))
@@ -21,41 +21,14 @@ import Text.Read (readMaybe)
 import User (User, errorUser, parseUser)
 
 -- Creating a database query to get a list of news.
-getNews :: Query -> Maybe (Query, Query) -> Query
+getNews :: Query -> Maybe (Query, Query) -> Either Wrong Query
 getNews auth str =
   if isNothing str
-    then "404"
-    else
+    then Left Wrong
+    else Right $
       "SELECT (news_id :: TEXT), title, (news.creation_date :: TEXT), \
       \ (author :: TEXT), name_category, content, (photo :: TEXT), \
       \ (is_published :: TEXT) \
-      \ FROM news \
-      \ INNER JOIN category ON news.category_id = category.category_id \
-      \ INNER JOIN ( SELECT user_id, name_user, users.creation_date, is_admin, \
-      \ is_author, login \
-      \ FROM users ) author ON news.user_id = author.user_id \
-      \ WHERE (is_published = TRUE OR is_published = FALSE AND \
-      \ author.user_id = "
-        <> auth
-        <> ") AND "
-        <> fltr
-        <> " GROUP BY news_id, title, news.creation_date, author, author.name_user, \
-           \ name_category, photo, content, is_published "
-        <> srt
-        <> ";"
-  where
-    Just (fltr, srt) = str
-
--- Creating a database query to get a list of news with abbreviations of the text.
-getNews' :: Query -> Maybe (Query, Query) -> Query
-getNews' auth str =
-  if isNothing str
-    then "404"
-    else
-      "SELECT (news_id :: TEXT), substring(title from 1 for 12), \
-      \ (news.creation_date :: TEXT), (author :: TEXT), \
-      \ name_category, substring(content from 1 for 12), \
-      \ (photo :: TEXT), (is_published :: TEXT) \
       \ FROM news \
       \ INNER JOIN category ON news.category_id = category.category_id \
       \ INNER JOIN ( SELECT user_id, name_user, users.creation_date, is_admin, \
@@ -201,15 +174,15 @@ setLimitAndOffset NewsyHandle {..} ls = do
 -- '.../news?title=Text&category_id=3&content=Text&
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Wrong Query)
 createNews auth authID ls = do
   auth' <- auth
   if not auth' || null ls || nothingInLs
-    then pure "404"
+    then pure $ Left Wrong
     else do
       authID' <- authID
       photoIdList <- photoIDLs ls'
-      pure . Query $
+      pure . Right . Query $
         "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
         \ content, is_published) \
         \ VALUES ('"
@@ -252,15 +225,15 @@ buildPhotoIdString (x : xs) = x <> ", " <> buildPhotoIdString xs
 --    news?news_id=(id news needed to edit)&title=Text&category_id=3&
 --       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-editNews :: IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+editNews :: IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Wrong Query)
 editNews auth ls = do
   auth' <- auth
   author' <- authorNews (fromQuery auth') newsId
   if null ls || not author'
-    then pure "404"
+    then pure $ Left Wrong
     else do
       photo' <- photoIdList
-      pure . Query $
+      pure . Right . Query $
         "UPDATE news SET " <> photo' <> buildChanges ls'
           <> " WHERE news_id = "
           <> newsId
