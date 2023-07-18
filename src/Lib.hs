@@ -4,18 +4,6 @@ import Data.String (IsString)
 import qualified Data.Text as T
 import Text.Read (readMaybe)
 
-fromMaybe :: Data.String.IsString a => Maybe a -> a
-fromMaybe (Just e) = e
-fromMaybe Nothing = "???"
-
-head' :: Data.String.IsString a => [a] -> a
-head' [] = "???"
-head' ls = head ls
-
-last' :: Data.String.IsString a => [a] -> a
-last' [] = "???"
-last' ls = last ls
-
 readNum :: T.Text -> Int
 readNum n =
   case readMaybe $ T.unpack n of

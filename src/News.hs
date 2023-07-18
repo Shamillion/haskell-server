@@ -4,18 +4,19 @@
 module News where
 
 import Category (getParentCategories)
-import Config (connectDB, limitElem, Wrong (Wrong))
+import Config (Wrong (Wrong), connectDB, limitElem)
+import Control.Applicative (liftA2)
 import Data.Aeson (ToJSON)
 import qualified Data.ByteString.Char8 as BC
 import Data.Functor ((<&>))
 import Data.List as LT (filter, find)
-import Data.Maybe (isJust, isNothing)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.String (fromString)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import GHC.Generics (Generic)
-import Lib (fromMaybe, initTxt, readNum, splitOnTxt, tailTxt)
+import Lib (initTxt, readNum, splitOnTxt, tailTxt)
 import Photo (sendPhotoToDB)
 import Text.Read (readMaybe)
 import User (User, errorUser, parseUser)
@@ -25,24 +26,25 @@ getNews :: Query -> Maybe (Query, Query) -> Either Wrong Query
 getNews auth str =
   if isNothing str
     then Left Wrong
-    else Right $
-      "SELECT (news_id :: TEXT), title, (news.creation_date :: TEXT), \
-      \ (author :: TEXT), name_category, content, (photo :: TEXT), \
-      \ (is_published :: TEXT) \
-      \ FROM news \
-      \ INNER JOIN category ON news.category_id = category.category_id \
-      \ INNER JOIN ( SELECT user_id, name_user, users.creation_date, is_admin, \
-      \ is_author, login \
-      \ FROM users ) author ON news.user_id = author.user_id \
-      \ WHERE (is_published = TRUE OR is_published = FALSE AND \
-      \ author.user_id = "
-        <> auth
-        <> ") AND "
-        <> fltr
-        <> " GROUP BY news_id, title, news.creation_date, author, author.name_user, \
-           \ name_category, photo, content, is_published "
-        <> srt
-        <> ";"
+    else
+      Right $
+        "SELECT (news_id :: TEXT), title, (news.creation_date :: TEXT), \
+        \ (author :: TEXT), name_category, content, (photo :: TEXT), \
+        \ (is_published :: TEXT) \
+        \ FROM news \
+        \ INNER JOIN category ON news.category_id = category.category_id \
+        \ INNER JOIN ( SELECT user_id, name_user, users.creation_date, is_admin, \
+        \ is_author, login \
+        \ FROM users ) author ON news.user_id = author.user_id \
+        \ WHERE (is_published = TRUE OR is_published = FALSE AND \
+        \ author.user_id = "
+          <> auth
+          <> ") AND "
+          <> fltr
+          <> " GROUP BY news_id, title, news.creation_date, author, author.name_user, \
+             \ name_category, photo, content, is_published "
+          <> srt
+          <> ";"
   where
     Just (fltr, srt) = str
 
@@ -131,24 +133,17 @@ setFiltersNews ((mthd, param) : xs)
     nextStep n = ((n <> " AND ") <>) <$> setFiltersNews xs
     choiceFilter =
       case mthd of
-        "created_at" -> Just $ creationDate "="
-        "created_until" -> Just $ creationDate "<"
-        "created_since" -> Just $ creationDate ">="
-        "author" -> Just $ "name_user = '" <> fromMaybe' param <> "'"
-        "category" -> Just $ "News.category_id = " <> fromMaybe' param
-        "title" -> Just $ "title ILIKE '%" <> fromMaybe' param <> "%'"
-        "content" -> Just $ "content ILIKE '%" <> fromMaybe' param <> "%'"
-        "search" ->
-          Just $
-            "(content || name_user || name_category) ILIKE '%"
-              <> fromMaybe' param
-              <> "%'"
+        "created_at" -> creationDate "="
+        "created_until" -> creationDate "<"
+        "created_since" -> creationDate ">="
+        "author" -> param' <&> (("name_user = '" <>) . (<> "'"))
+        "category" -> ("News.category_id = " <>) <$> param'
+        "title" -> param' <&> (("title ILIKE '%" <>) . (<> "%'"))
+        "content" -> param' <&> (("content ILIKE '%" <>) . (<> "%'"))
+        "search" -> param' <&> (("(content || name_user || name_category) ILIKE '%" <>) . (<> "%'"))
         _ -> Nothing
-    fromMaybe' = fromString . T.unpack . fromMaybe
-    creationDate x =
-      "News.creation_date " <> x <> " '"
-        <> fromMaybe' param
-        <> "'"
+    param' = fromString . T.unpack <$> param
+    creationDate x = (("News.creation_date " <> x <> " '") <>) <$> param' <&> (<> "'")
 
 setLimitAndOffset ::
   Monad m =>
@@ -181,40 +176,45 @@ createNews auth authID ls = do
     then pure $ Left Wrong
     else do
       authID' <- authID
-      photoIdList <- photoIDLs ls'
-      pure . Right . Query $
-        "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
-        \ content, is_published) \
-        \ VALUES ('"
-          <> titleNws
-          <> "', NOW(), "
-          <> fromQuery authID'
-          <> ", "
-          <> categoryId
-          <> ", "
-          <> photoIdList
-          <> ", '"
-          <> contentNws
-          <> "', "
-          <> isPublished
-          <> ");"
+      photoIdList <- photoIDLs ls
+      let maybeStr =
+            foldr
+              (liftA2 (<>))
+              (Just "")
+              [ pure
+                  "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
+                  \ content, is_published) \
+                  \ VALUES ('",
+                titleNws,
+                pure "', NOW(), ",
+                pure $ fromQuery authID',
+                pure ", ",
+                categoryId,
+                pure ", ",
+                pure photoIdList,
+                pure ", '",
+                contentNws,
+                pure "', ",
+                isPublished,
+                pure ");"
+              ]
+      case maybeStr of
+        Just str -> pure . pure . Query $ str
+        Nothing -> pure $ Left Wrong
   where
     nothingInLs = any (\(_, y) -> isNothing y) ls
-    ls' = map (fromMaybe <$>) ls
     titleNws = getValue "title"
     categoryId = getValue "category_id"
     contentNws = getValue "content"
     isPublished = getValue "is_published"
-    getValue str = sndMaybe . LT.find (\(x, _) -> x == str) $ ls'
-    sndMaybe Nothing = "Null"
-    sndMaybe (Just e) = snd e
+    getValue str = LT.find (\(x, _) -> x == str) ls >>= snd
 
 -- Puts the photos from the query into the database and
 --  returns a list from the ID.
-photoIDLs :: [(BC.ByteString, BC.ByteString)] -> IO BC.ByteString
+photoIDLs :: [(BC.ByteString, Maybe BC.ByteString)] -> IO BC.ByteString
 photoIDLs ls = ls' <&> (\x -> "'{" <> buildPhotoIdString x <> "}'")
   where
-    ls' = mapM (sendPhotoToDB . snd) . filter ((== "photo") . fst) $ ls
+    ls' = mapM (sendPhotoToDB . fromMaybe "" . snd) . filter ((== "photo") . fst) $ ls
 
 buildPhotoIdString :: [BC.ByteString] -> BC.ByteString
 buildPhotoIdString [] = ""
@@ -233,23 +233,26 @@ editNews auth ls = do
     then pure $ Left Wrong
     else do
       photo' <- photoIdList
-      pure . Right . Query $
-        "UPDATE news SET " <> photo' <> buildChanges ls'
-          <> " WHERE news_id = "
-          <> newsId
-          <> ";"
+      let maybeStr =
+            buildChanges ls' >>= \str ->
+              pure $
+                "UPDATE news SET " <> photo' <> str
+                  <> " WHERE news_id = "
+                  <> newsId
+                  <> ";"
+      pure $ case maybeStr of
+        Just str -> Right $ Query str
+        Nothing -> Left Wrong
   where
     newsId = case LT.find (\(x, _) -> x == "news_id") ls of
       Just (_, Just n) -> n
       _ -> "0"
-    ls' =
-      map (fromMaybe <$>) $
-        LT.filter (\(x, y) -> elem x fields && isJust y) ls
+    ls' = LT.filter (\(x, y) -> elem x fields && isJust y) ls
     fields = ["title", "category_id", "content", "is_published"]
     photoIdList =
       if "photo" `elem` map fst ls
         then do
-          x <- photoIDLs $ map (fromMaybe <$>) ls
+          x <- photoIDLs ls
           pure $ "photo = " <> x <> ", "
         else pure ""
 
@@ -269,10 +272,10 @@ authorNews authId newsId = do
   pure $ ls /= []
 
 -- Creates a row with updated news fields.
-buildChanges :: [(BC.ByteString, BC.ByteString)] -> BC.ByteString
-buildChanges [] = ""
-buildChanges [(x, y)] = x <> " = " <> q <> y <> q
+buildChanges :: [(BC.ByteString, Maybe BC.ByteString)] -> Maybe BC.ByteString
+buildChanges [] = Nothing
+buildChanges [(x, y)] = y >>= \y' -> pure $ x <> " = " <> q <> y' <> q
   where
     q = if x `elem` fields then "'" else ""
     fields = ["title", "content"]
-buildChanges ((x, y) : xs) = buildChanges [(x, y)] <> ", " <> buildChanges xs
+buildChanges ((x, y) : xs) = buildChanges [(x, y)] <> pure ", " <> buildChanges xs

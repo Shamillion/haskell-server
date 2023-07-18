@@ -1,18 +1,19 @@
 module User where
 
-import Config (connectDB, writingLineDebug, Wrong (Wrong, LoginOccupied))
+import Config (Wrong (LoginOccupied, Wrong), connectDB, writingLineDebug)
 import Crypto.KDF.BCrypt (hashPassword)
 import Data.Aeson (ToJSON, object, toJSON, (.=))
 import qualified Data.ByteString.Char8 as BC
 import Data.Char (ord)
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Lib (fromMaybe, readNum)
+import Lib (readNum)
 
 -- Creating a database query to get a list of users
 getUser :: Query -> Query
-getUser str = 
+getUser str =
   "SELECT  (user_id :: TEXT), name_user, \
   \ (creation_date :: TEXT), (is_admin :: TEXT), (is_author :: TEXT), pass \
   \ FROM users "
@@ -81,16 +82,16 @@ createUser adm ls = do
         else pure $ Left LoginOccupied
   where
     checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
-    sndList = map (fromMaybe . snd) ls
-    searchNothing = "???" `elem` sndList
-    [nameUser, login, pass, isAdmin, isAuthor] = map (fromMaybe . snd) ls
+    searchNothing = elem Nothing $ map snd ls
+    [nameUser, login, pass, isAdmin, isAuthor] = map (fromMaybe "" . snd) ls
 
 -- Disables the administrator rights of an automatically created user.
 -- Request example '../user?block_admin=Adam'
 blockAdminRights :: Bool -> Either Wrong Query
 blockAdminRights False = Left Wrong
-blockAdminRights _ = Right  
-  "UPDATE users SET is_admin = FALSE WHERE user_id = 99 AND login = 'Adam';"
+blockAdminRights _ =
+  Right
+    "UPDATE users SET is_admin = FALSE WHERE user_id = 99 AND login = 'Adam';"
 
 -- Create a bcrypt hash for a password.
 cryptoPass :: Int -> BC.ByteString -> IO BC.ByteString

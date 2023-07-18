@@ -3,23 +3,25 @@
 
 module Category where
 
-import Config (connectDB, writingLineDebug, Wrong (Wrong, CategoryExists, NoParentCategory, NoCategory, CategoryParentItself))
+import Config (Wrong (CategoryExists, CategoryParentItself, NoCategory, NoParentCategory, Wrong), connectDB, writingLineDebug)
 import Data.Aeson (ToJSON)
 import qualified Data.ByteString.Char8 as BC
 import Data.List as LT (find)
+import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import GHC.Generics (Generic)
-import Lib (fromMaybe, head', readNum)
+import Lib (readNum)
 
 -- Creating a database query to get a list of catygories.
 getCategory :: Query -> Either Wrong Query
-getCategory limitOffset = Right $
-  "SELECT (category_id :: TEXT), parent_category, \
-  \ name_category FROM category "
-    <> limitOffset
-    <> ";"
+getCategory limitOffset =
+  Right $
+    "SELECT (category_id :: TEXT), parent_category, \
+    \ name_category FROM category "
+      <> limitOffset
+      <> ";"
 
 -- For getParentCategories.
 getCategory' :: Query
@@ -57,9 +59,9 @@ getParentCategories cat = do
   close conn
   writingLineDebug ls
   let buildingList pc = do
-        let val = LT.find (\(_ : y : _) -> y == head' pc) ls
+        let val = LT.find (\(_ : y : _) -> pure y == listToMaybe pc) ls
         case val of
-          Just el -> buildingList (head' el : pc)
+          Just (el : _) -> buildingList (el : pc)
           _ -> pc
   pure $ filter (/= "Null") $ buildingList [cat]
 
@@ -89,14 +91,15 @@ createCategory CategoryHandle {..} isAdm ls = do
     checkAndResponse uNm uPrnt
       | not uNm = Left CategoryExists
       | uPrnt && parentCategory /= "Null" = Left NoParentCategory
-      | otherwise = Right $
-        Query $
-          "INSERT INTO category (name_category, parent_category) \
-          \ VALUES ('"
-            <> nameCategory
-            <> "', '"
-            <> parentCategory
-            <> "');"
+      | otherwise =
+        Right $
+          Query $
+            "INSERT INTO category (name_category, parent_category) \
+            \ VALUES ('"
+              <> nameCategory
+              <> "', '"
+              <> parentCategory
+              <> "');"
 
 -- Request examples:
 --   Changing the category name: '.../category?change_name=aaa>bbb'
@@ -123,7 +126,7 @@ editCategory CategoryHandle {..} isAdm ls = do
           uniqNew_name <- checkUniqCategoryH new_name
           pure $ checkAndResponse uniqNew_name
   where
-    fls = filter ((/= "???") . snd) $ map (fmap fromMaybe) $ take 1 ls
+    fls = filter ((/= "") . snd) $ map (fmap (fromMaybe "")) $ take 1 ls
     fls' = map (fmap (BC.split '>')) fls
     categorys = map (filter (/= "") <$>) fls'
     fls''@((method, [name, new_name]) : _) =
