@@ -3,23 +3,25 @@
 
 module Category where
 
-import Config (connectDB, writingLineDebug)
+import Config (Wrong (CategoryExists, CategoryParentItself, NoCategory, NoParentCategory, Wrong), connectDB, writingLineDebug)
 import Data.Aeson (ToJSON)
 import qualified Data.ByteString.Char8 as BC
 import Data.List as LT (find)
+import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import GHC.Generics (Generic)
-import Lib (fromMaybe, head', readNum)
+import Lib (readNum)
 
 -- Creating a database query to get a list of catygories.
-getCategory :: Query -> Query
+getCategory :: Query -> Either Wrong Query
 getCategory limitOffset =
-  "SELECT (category_id :: TEXT), parent_category, \
-  \ name_category FROM category "
-    <> limitOffset
-    <> ";"
+  Right $
+    "SELECT (category_id :: TEXT), parent_category, \
+    \ name_category FROM category "
+      <> limitOffset
+      <> ";"
 
 -- For getParentCategories.
 getCategory' :: Query
@@ -57,9 +59,9 @@ getParentCategories cat = do
   close conn
   writingLineDebug ls
   let buildingList pc = do
-        let val = LT.find (\(_ : y : _) -> y == head' pc) ls
+        let val = LT.find (\(_ : y : _) -> pure y == listToMaybe pc) ls
         case val of
-          Just el -> buildingList (head' el : pc)
+          Just (el : _) -> buildingList (el : pc)
           _ -> pc
   pure $ filter (/= "Null") $ buildingList [cat]
 
@@ -72,11 +74,11 @@ createCategory ::
   CategoryHandle m ->
   m Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
-  m Query
+  m (Either Wrong Query)
 createCategory CategoryHandle {..} isAdm ls = do
   isAdm' <- isAdm
   if not isAdm' || null ls || null categorys
-    then pure "404"
+    then pure $ Left Wrong
     else do
       uniqName <- checkUniqCategoryH nameCategory
       uniqParent <- checkUniqCategoryH parentCategory
@@ -87,16 +89,17 @@ createCategory CategoryHandle {..} isAdm ls = do
     (parentCategory : nameCategory : _) =
       if length categorys == 1 then "Null" : categorys else categorys
     checkAndResponse uNm uPrnt
-      | not uNm = "406cu"
-      | uPrnt && parentCategory /= "Null" = "406cp"
+      | not uNm = Left CategoryExists
+      | uPrnt && parentCategory /= "Null" = Left NoParentCategory
       | otherwise =
-        Query $
-          "INSERT INTO category (name_category, parent_category) \
-          \ VALUES ('"
-            <> nameCategory
-            <> "', '"
-            <> parentCategory
-            <> "');"
+        Right $
+          Query $
+            "INSERT INTO category (name_category, parent_category) \
+            \ VALUES ('"
+              <> nameCategory
+              <> "', '"
+              <> parentCategory
+              <> "');"
 
 -- Request examples:
 --   Changing the category name: '.../category?change_name=aaa>bbb'
@@ -110,20 +113,20 @@ editCategory ::
   CategoryHandle m ->
   m Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
-  m Query
+  m (Either Wrong Query)
 editCategory CategoryHandle {..} isAdm ls = do
   isAdm' <- isAdm
   if not isAdm' || null ls || null fls || "" `elem` [name, new_name]
-    then pure "404"
+    then pure $ Left Wrong
     else do
       uniqName <- checkUniqCategoryH name
       if uniqName
-        then pure "406cn"
+        then pure $ Left NoCategory
         else do
           uniqNew_name <- checkUniqCategoryH new_name
           pure $ checkAndResponse uniqNew_name
   where
-    fls = filter ((/= "???") . snd) $ map (fmap fromMaybe) $ take 1 ls
+    fls = filter ((/= "") . snd) $ map (fmap (fromMaybe "")) $ take 1 ls
     fls' = map (fmap (BC.split '>')) fls
     categorys = map (filter (/= "") <$>) fls'
     fls''@((method, [name, new_name]) : _) =
@@ -135,11 +138,11 @@ editCategory CategoryHandle {..} isAdm ls = do
         )
         categorys
     checkAndResponse w
-      | method == "change_parent" && name == new_name = "406ce"
-      | method == "change_name" && not w = "406cu"
-      | method == "change_parent" && w && new_name /= "Null" = "406cp"
-      | otherwise = Query $ checkQuery $ map buildQuery fls''
-    checkQuery lq = if "404" `elem` lq then "404" else mconcat lq
+      | method == "change_parent" && name == new_name = Left CategoryParentItself
+      | method == "change_name" && not w = Left CategoryExists
+      | method == "change_parent" && w && new_name /= "Null" = Left NoParentCategory
+      | otherwise = checkQuery $ map buildQuery fls''
+    checkQuery lq = if "404" `elem` lq then Left Wrong else Right . Query $ mconcat lq
     buildQuery (meth, [nm, new_nm]) =
       case meth of
         "change_name" ->

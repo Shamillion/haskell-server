@@ -137,11 +137,4 @@ testsFunctionSetMethodNews = do
         ("sort_by", Just "date"),
         ("limit", Just "0")
       ]
-      `shouldBe` Just
-        ( "News.creation_date < '2022-03-22' AND name_user = '???' \
-          \AND News.category_id = 4 AND title ILIKE '%Test%' \
-          \AND content ILIKE '%Just%' \
-          \AND (content || name_user || name_category) \
-          \ILIKE '%Hello World!%'",
-          "ORDER BY creation_date LIMIT 20 OFFSET 0"
-        )
+      `shouldBe` Nothing

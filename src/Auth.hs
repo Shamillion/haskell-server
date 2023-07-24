@@ -8,7 +8,6 @@ import Data.String (fromString)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Lib (last')
 import Network.HTTP.Types.Header (RequestHeaders)
 import qualified Network.Wai as W
 import User (User (..), getUser, parseUser)
@@ -34,14 +33,16 @@ checkAuth ls =
   where
     fls = filter ((== "Authorization") . fst) ls
     [(_, str)] = fls
-    decodeLogAndPass = BC.split ':' <$> (BB.decode . last' . BC.split ' ' $ str)
+    decodeLogAndPass = BC.split ':' <$> (BB.decode =<< (lastElem . BC.split ' ' $ str))
     isEmptyList [] = Left "No such user in DB"
     isEmptyList ul = Right ul
+    lastElem [] = Left "Error! Empty list"
+    lastElem arr = pure . (\(x : _) -> x) . reverse $ arr
     checkPassword _ [] = []
     checkPassword p (u : _)
       | null u = []
       | otherwise =
-        [parseUser u | validatePassword p $ BC.pack . T.unpack . last' $ u]
+        [parseUser u | validatePassword p $ BC.pack . T.unpack . (\(x : _) -> x) . reverse $ u]
 
 -- Returns the user ID.
 authorID :: W.Request -> IO Query

@@ -1,6 +1,6 @@
 module Photo where
 
-import Config (connectDB)
+import Config (Wrong (Wrong), connectDB)
 import Data.ByteString.Base64.Lazy (decodeLenient)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
@@ -11,24 +11,24 @@ import Database.PostgreSQL.Simple (close, execute, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 
 -- Creating a query to the database to get one photo.
-getPhoto :: [(BC.ByteString, Maybe BC.ByteString)] -> Query
-getPhoto [] = "404"
-getPhoto (x : _) = Query $
+getPhoto :: [(BC.ByteString, Maybe BC.ByteString)] -> Either Wrong Query
+getPhoto [] = Left Wrong
+getPhoto (x : _) =
   case x of
-    (_, Nothing) -> "404"
-    (_, Just "") -> "404"
+    (_, Nothing) -> Left Wrong
+    (_, Just "") -> Left Wrong
     (_, Just n) ->
       if BC.all isDigit n
-        then "SELECT image FROM photo WHERE photo_id = " <> n <> ";"
-        else "404"
+        then Right . Query $ "SELECT image FROM photo WHERE photo_id = " <> n <> ";"
+        else Left Wrong
 
 -- Decoding photos from Base64.
 decodeImage :: [[T.Text]] -> LC.ByteString
-decodeImage [] = "404"
+decodeImage [] = "Error"
 decodeImage ([img] : _) = decodeLenient . LC.fromStrict . encodeUtf8 $ img'
   where
     img' = T.drop 1 . T.dropWhile (/= ',') $ img
-decodeImage (_ : _) = "404"
+decodeImage (_ : _) = "Error"
 
 -- The function sends the photo to the database and returns its ID in the table.
 sendPhotoToDB :: BC.ByteString -> IO BC.ByteString
