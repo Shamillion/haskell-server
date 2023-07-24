@@ -1,6 +1,6 @@
 module User where
 
-import Config (Wrong (LoginOccupied, Wrong), connectDB, writingLineDebug)
+import Config (connectDB, writingLineDebug)
 import Crypto.KDF.BCrypt (hashPassword)
 import Data.Aeson (ToJSON, object, toJSON, (.=))
 import qualified Data.ByteString.Char8 as BC
@@ -9,6 +9,7 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Error (Error (CommonError, LoginOccupied))
 import Lib (readNum)
 
 -- Creating a database query to get a list of users
@@ -55,11 +56,11 @@ parseUser ls
 
 -- Request example (strict order):
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
-createUser :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Wrong Query)
+createUser :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
 createUser adm ls = do
   adm' <- adm
   if not adm' || null ls || map fst ls /= checkList || searchNothing
-    then pure $ Left Wrong
+    then pure $ Left CommonError
     else do
       uniq <- checkUniqLogin login
       if uniq
@@ -87,8 +88,8 @@ createUser adm ls = do
 
 -- Disables the administrator rights of an automatically created user.
 -- Request example '../user?block_admin=Adam'
-blockAdminRights :: Bool -> Either Wrong Query
-blockAdminRights False = Left Wrong
+blockAdminRights :: Bool -> Either Error Query
+blockAdminRights False = Left CommonError
 blockAdminRights _ =
   Right
     "UPDATE users SET is_admin = FALSE WHERE user_id = 99 AND login = 'Adam';"

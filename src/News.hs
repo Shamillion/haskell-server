@@ -4,7 +4,7 @@
 module News where
 
 import Category (getParentCategories)
-import Config (Wrong (Wrong), connectDB, limitElem)
+import Config (connectDB, limitElem)
 import Control.Applicative (liftA2)
 import Data.Aeson (ToJSON)
 import qualified Data.ByteString.Char8 as BC
@@ -15,6 +15,7 @@ import Data.String (fromString)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Error (Error (CommonError))
 import GHC.Generics (Generic)
 import Lib (initTxt, readNum, splitOnTxt, tailTxt)
 import Photo (sendPhotoToDB)
@@ -22,10 +23,10 @@ import Text.Read (readMaybe)
 import User (User, errorUser, parseUser)
 
 -- Creating a database query to get a list of news.
-getNews :: Query -> Maybe (Query, Query) -> Either Wrong Query
+getNews :: Query -> Maybe (Query, Query) -> Either Error Query
 getNews auth str =
   if isNothing str
-    then Left Wrong
+    then Left CommonError
     else
       Right $
         "SELECT (news_id :: TEXT), title, (news.creation_date :: TEXT), \
@@ -169,11 +170,11 @@ setLimitAndOffset NewsyHandle {..} ls = do
 -- '.../news?title=Text&category_id=3&content=Text&
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Wrong Query)
+createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
 createNews auth authID ls = do
   auth' <- auth
   if not auth' || null ls || nothingInLs
-    then pure $ Left Wrong
+    then pure $ Left CommonError
     else do
       authID' <- authID
       photoIdList <- photoIDLs ls
@@ -200,7 +201,7 @@ createNews auth authID ls = do
               ]
       case maybeStr of
         Just str -> pure . pure . Query $ str
-        Nothing -> pure $ Left Wrong
+        Nothing -> pure $ Left CommonError
   where
     nothingInLs = any (\(_, y) -> isNothing y) ls
     titleNws = getValue "title"
@@ -225,12 +226,12 @@ buildPhotoIdString (x : xs) = x <> ", " <> buildPhotoIdString xs
 --    news?news_id=(id news needed to edit)&title=Text&category_id=3&
 --       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-editNews :: IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Wrong Query)
+editNews :: IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
 editNews auth ls = do
   auth' <- auth
   author' <- authorNews (fromQuery auth') newsId
   if null ls || not author'
-    then pure $ Left Wrong
+    then pure $ Left CommonError
     else do
       photo' <- photoIdList
       let maybeStr =
@@ -242,7 +243,7 @@ editNews auth ls = do
                   <> ";"
       pure $ case maybeStr of
         Just str -> Right $ Query str
-        Nothing -> Left Wrong
+        Nothing -> Left CommonError
   where
     newsId = case LT.find (\(x, _) -> x == "news_id") ls of
       Just (_, Just n) -> n
