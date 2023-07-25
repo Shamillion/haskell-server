@@ -1,3 +1,4 @@
+{-# LANGUAGE InstanceSigs #-}
 module User where
 
 import Config (connectDB, writingLineDebug)
@@ -7,10 +8,12 @@ import qualified Data.ByteString.Char8 as BC
 import Data.Char (ord)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (close, query_)
+import Database.PostgreSQL.Simple (FromRow, close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error (Error (CommonError, LoginOccupied))
 import Lib (readNum)
+import Database.PostgreSQL.Simple.FromRow (FromRow(fromRow), field)
+import qualified Database.PostgreSQL.Simple.FromRow as Database.PostgreSQL.Simple.Internal
 
 -- Creating a database query to get a list of users
 getUser :: Query -> Query
@@ -26,33 +29,48 @@ data User = User
     name_user :: T.Text,
     creation_date' :: T.Text,
     is_admin :: Bool,
-    is_author :: Bool
+    is_author :: Bool,
+    pass :: BC.ByteString
   }
   deriving (Show)
 
+instance FromRow User where
+  fromRow :: Database.PostgreSQL.Simple.Internal.RowParser User
+  fromRow =
+    User <$> field
+      <*> field
+      <*> field
+      <*> field
+      <*> field
+      <*> field
+
 instance ToJSON User where
-  toJSON (User userId nameUser creationDate isAdmin isAuthor) =
+  toJSON (User userId nameUser creationDate isAdmin isAuthor password) =
     object
       [ "user_id" .= userId,
         "name_user" .= nameUser,
         "creation_date" .= creationDate,
         "is_admin" .= isAdmin,
-        "is_author" .= isAuthor
+        "is_author" .= isAuthor,
+        "pass" .= BC.unpack password
       ]
 
 errorUser :: User
-errorUser = User 0 "error" "error" False False
+errorUser = User 0 "error" "error" False False "error"
 
 parseUser :: [T.Text] -> User
 parseUser ls
   | length ls /= 6 = errorUser
   | idUsr == 0 = errorUser
-  | otherwise = User idUsr u2 u3 isAdm isAth
+  | otherwise = User idUsr u2 u3 isAdm isAth (BC.pack $ T.unpack password)
   where
-    [u1, u2, u3, u4, u5, _] = ls
+    [u1, u2, u3, u4, u5, password] = ls
     idUsr = readNum u1
     isAdm = u4 == "t" || u4 == "true"
     isAth = u5 == "t" || u5 == "true"
+
+parseUserWithoutPass :: [T.Text] -> User
+parseUserWithoutPass = (\usr -> usr {pass = ""}) . parseUser
 
 -- Request example (strict order):
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
