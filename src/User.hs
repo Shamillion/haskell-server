@@ -1,4 +1,5 @@
-{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module User where
 
 import Config (connectDB, writingLineDebug)
@@ -12,17 +13,24 @@ import Database.PostgreSQL.Simple (FromRow, close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error (Error (CommonError, LoginOccupied))
 import Lib (readNum)
-import Database.PostgreSQL.Simple.FromRow (FromRow(fromRow), field)
-import qualified Database.PostgreSQL.Simple.FromRow as Database.PostgreSQL.Simple.Internal
+import GHC.Generics (Generic)
 
 -- Creating a database query to get a list of users
 getUser :: Query -> Query
 getUser str =
+  "SELECT  user_id, name_user, (creation_date :: TEXT), is_admin, is_author, \
+  \ pass FROM users "
+    <> str
+    <> ";"
+
+getUserAsText :: Query -> Query
+getUserAsText str =
   "SELECT  (user_id :: TEXT), name_user, \
-  \ (creation_date :: TEXT), (is_admin :: TEXT), (is_author :: TEXT), pass \
+  \ (creation_date :: TEXT), (is_admin :: TEXT), (is_author :: TEXT) \
   \ FROM users "
     <> str
     <> ";"
+
 
 data User = User
   { user_id :: Int,
@@ -32,27 +40,16 @@ data User = User
     is_author :: Bool,
     pass :: BC.ByteString
   }
-  deriving (Show)
-
-instance FromRow User where
-  fromRow :: Database.PostgreSQL.Simple.Internal.RowParser User
-  fromRow =
-    User <$> field
-      <*> field
-      <*> field
-      <*> field
-      <*> field
-      <*> field
+  deriving (Show, Generic, FromRow)
 
 instance ToJSON User where
-  toJSON (User userId nameUser creationDate isAdmin isAuthor password) =
+  toJSON (User userId nameUser creationDate isAdmin isAuthor _) =
     object
       [ "user_id" .= userId,
         "name_user" .= nameUser,
         "creation_date" .= creationDate,
         "is_admin" .= isAdmin,
-        "is_author" .= isAuthor,
-        "pass" .= BC.unpack password
+        "is_author" .= isAuthor
       ]
 
 errorUser :: User
@@ -60,17 +57,15 @@ errorUser = User 0 "error" "error" False False "error"
 
 parseUser :: [T.Text] -> User
 parseUser ls
-  | length ls /= 6 = errorUser
+  | length ls /= 5 = errorUser
   | idUsr == 0 = errorUser
-  | otherwise = User idUsr u2 u3 isAdm isAth (BC.pack $ T.unpack password)
+  | otherwise = User idUsr u2 u3 isAdm isAth ""
   where
-    [u1, u2, u3, u4, u5, password] = ls
+    [u1, u2, u3, u4, u5] = ls
     idUsr = readNum u1
     isAdm = u4 == "t" || u4 == "true"
     isAth = u5 == "t" || u5 == "true"
 
-parseUserWithoutPass :: [T.Text] -> User
-parseUserWithoutPass = (\usr -> usr {pass = ""}) . parseUser
 
 -- Request example (strict order):
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'

@@ -16,7 +16,7 @@ import qualified Network.Wai as W
 import Network.Wai.Handler.Warp (run)
 import News (createNews, editNews, getNews, newsHandler, parseNews, setLimitAndOffset, setMethodNews)
 import Photo (decodeImage, getPhoto)
-import User (blockAdminRights, createUser, getUser, parseUserWithoutPass)
+import User (blockAdminRights, createUser, parseUser, getUserAsText)
 
 -- Defining the type of request and creating a response.
 setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO LC.ByteString)
@@ -36,8 +36,8 @@ setQueryAndRespond req = do
         <*> pure encodeWith
     ("GET", "user") ->
       (,)
-        <$> (pure . getUser <$> limitOffset)
-        <*> pure (pure . encode . map parseUserWithoutPass)
+        <$> (pure . getUserAsText <$> limitOffset)
+        <*> pure (pure . encode . map parseUser)
     ("POST", "user") ->
       (,)
         <$> createUser adm arr

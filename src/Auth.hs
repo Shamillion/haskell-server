@@ -5,12 +5,11 @@ import Crypto.KDF.BCrypt (validatePassword)
 import qualified Data.ByteString.Base64 as BB
 import qualified Data.ByteString.Char8 as BC
 import Data.String (fromString)
-import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Network.HTTP.Types.Header (RequestHeaders)
 import qualified Network.Wai as W
-import User (User (..), getUser, parseUser)
+import User (User (..), getUser)
 
 -- Returns the user with the username and password from the request.
 checkAuth :: RequestHeaders -> IO (Either String User)
@@ -25,10 +24,10 @@ checkAuth ls =
         conn <- connectDB
         let qry = getUser $ Query $ "WHERE login = '" <> x <> "'"
         writingLineDebug qry
-        userList <- query_ conn qry :: IO [[T.Text]]
+        userList <- query_ conn qry :: IO [User]
         close conn
         writingLineDebug userList
-        pure . checkPassword y . map parseUser $ userList
+        pure $ checkPassword y userList
       _ -> pure $ Left "No Authorization"
   where
     fls = filter ((== "Authorization") . fst) ls

@@ -20,7 +20,7 @@ import GHC.Generics (Generic)
 import Lib (initTxt, readNum, splitOnTxt, tailTxt)
 import Photo (sendPhotoToDB)
 import Text.Read (readMaybe)
-import User (errorUser,parseUserWithoutPass, User)
+import User (errorUser, User, parseUser)
 
 -- Creating a database query to get a list of news.
 getNews :: Query -> Maybe (Query, Query) -> Either Error Query
@@ -35,7 +35,7 @@ getNews auth str =
         \ FROM news \
         \ INNER JOIN category ON news.category_id = category.category_id \
         \ INNER JOIN ( SELECT user_id, name_user, users.creation_date, is_admin, \
-        \ is_author, login \
+        \ is_author \
         \ FROM users ) author ON news.user_id = author.user_id \
         \ WHERE (is_published = TRUE OR is_published = FALSE AND \
         \ author.user_id = "
@@ -88,7 +88,7 @@ parseNews ls
     [n0, n1, n2, n3, n4, n5, n6, n7] = ls
     idNws = readNum n0
     splitText = splitOnTxt "," . tailTxt . initTxt
-    athr = parseUserWithoutPass $ splitText n3 
+    athr = parseUser $ splitText n3 
     pht = map ("/photo?get_photo=" <>) $ splitText n6
     isPbl = n7 == "true" || n7 == "t"
 
