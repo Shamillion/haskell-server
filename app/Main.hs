@@ -8,7 +8,7 @@ import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import qualified Database.PostgreSQL.Simple as DB
-import Error (Error (..))
+import Error (Error (..), ParseError (AnotherError))
 import Lib (drawOut)
 import MigrationsDB (checkDB)
 import Network.HTTP.Types (queryToQueryText, status200, status404, status406)
@@ -16,16 +16,18 @@ import qualified Network.Wai as W
 import Network.Wai.Handler.Warp (run)
 import News (createNews, editNews, getNews, newsHandler, parseNews, setLimitAndOffset, setMethodNews)
 import Photo (decodeImage, getPhoto)
-import User (blockAdminRights, createUser, parseUser, getUserAsText)
+import User (blockAdminRights, createUser, getUserAsText, parseUser)
 
 -- Defining the type of request and creating a response.
-setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO LC.ByteString)
+setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO (Either ParseError LC.ByteString))
 setQueryAndRespond req = do
   case (reqMtd, entity) of
     ("GET", "news") ->
       (,)
         <$> (getNews <$> authId <*> method)
-        <*> pure ((encode <$>) . mapM parseNews)
+          -- <*> (fmap encode . fmap sequence . mapM parseNews)
+          -- <*> pure (fmap (fmap encode) . fmap sequence . mapM parseNews)
+          <*> pure (fmap (fmap encode . sequence) . mapM parseNews)
     ("POST", "news") ->
       (,)
         <$> createNews athr authId arr
@@ -37,7 +39,7 @@ setQueryAndRespond req = do
     ("GET", "user") ->
       (,)
         <$> (pure . getUserAsText <$> limitOffset)
-        <*> pure (pure . encode . map parseUser)
+        <*> pure (pure . fmap encode . mapM parseUser)
     ("POST", "user") ->
       (,)
         <$> createUser adm arr
@@ -49,7 +51,7 @@ setQueryAndRespond req = do
     ("GET", "category") ->
       (,)
         <$> (getCategory <$> limitOffset)
-        <*> pure (pure . encode . map parseCategory)
+        <*> pure (pure . fmap encode . mapM parseCategory)
     ("POST", "category") ->
       (,)
         <$> createCategory categoryHandler adm arr
@@ -58,8 +60,8 @@ setQueryAndRespond req = do
       (,)
         <$> editCategory categoryHandler adm arr
         <*> pure encodeWith
-    ("GET", "photo") -> pure (getPhoto arr, pure . fromEither . decodeImage)
-    _ -> pure (Left CommonError, const (pure "Error"))
+    ("GET", "photo") -> pure (getPhoto arr, pure . decodeImage)
+    _ -> pure (Left CommonError, const (pure $ Left AnotherError))
   where
     reqMtd = W.requestMethod req
     [entity] = W.pathInfo req
@@ -70,10 +72,12 @@ setQueryAndRespond req = do
     adm = isAdmin req
     athr = isAuthor req
     encodeWith =
-      pure . (<> " position(s) done.") . LC.fromStrict . encodeUtf8 . drawOut
-    fromEither x = case x of
-      Right str -> str
-      _ -> mempty
+      pure
+        . pure
+        . (<> " position(s) done.")
+        . LC.fromStrict
+        . encodeUtf8
+        . drawOut
 
 app :: W.Application
 app req respond = do
@@ -105,8 +109,12 @@ app req respond = do
               else "text/plain"
           val' = drawOut val
       writingLine INFO "Sent a response to the request."
-      ans <- resp val
-      responds status200 hdr ans
+      eitherAns <- resp val
+      case eitherAns of
+        Left err -> do
+          writingLine ERROR $ show err
+          responds status404 "text/plain" "404 Not Found.\n"
+        Right ans -> responds status200 hdr ans
   where
     responds sts hdr = respond . W.responseLBS sts [("Content-Type", hdr)]
     respondsSts406 = responds status406 "text/plain"

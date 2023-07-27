@@ -15,12 +15,12 @@ import Data.String (fromString)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Error (Error (CommonError))
+import Error (Error (CommonError), ParseError (ParseNewsError))
 import GHC.Generics (Generic)
 import Lib (initTxt, readNum, splitOnTxt, tailTxt)
 import Photo (sendPhotoToDB)
 import Text.Read (readMaybe)
-import User (errorUser, User, parseUser)
+import User (User, parseUser)
 
 -- Creating a database query to get a list of news.
 getNews :: Query -> Maybe (Query, Query) -> Either Error Query
@@ -61,10 +61,6 @@ data News = News
   }
   deriving (Show, Generic, ToJSON)
 
-errorNews :: IO News
-errorNews =
-  pure $ News 0 "error" "error" errorUser ["error"] "error" ["error"] False
-
 data NewsyHandle m = NewsyHandle
   { limitElemH :: m Int,
     setLimitAndOffsetH :: [(T.Text, Maybe T.Text)] -> m Query
@@ -77,18 +73,18 @@ newsHandler =
       setLimitAndOffsetH = setLimitAndOffset newsHandler
     }
 
-parseNews :: [T.Text] -> IO News
+parseNews :: [T.Text] -> IO (Either ParseError News)
 parseNews ls
-  | length ls /= 8 = errorNews
-  | idNws == 0 = errorNews
+  | length ls /= 8 = pure $ Left ParseNewsError
+  | idNws == 0 = pure $ Left ParseNewsError
   | otherwise = do
     cats <- getParentCategories n4
-    pure $ News idNws n1 n2 athr cats n5 pht isPbl
+    pure $ eitherAuthor >>= \athr -> pure $ News idNws n1 n2 athr cats n5 pht isPbl
   where
     [n0, n1, n2, n3, n4, n5, n6, n7] = ls
     idNws = readNum n0
     splitText = splitOnTxt "," . tailTxt . initTxt
-    athr = parseUser $ splitText n3 
+    eitherAuthor = parseUser $ splitText n3
     pht = map ("/photo?get_photo=" <>) $ splitText n6
     isPbl = n7 == "true" || n7 == "t"
 

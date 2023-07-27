@@ -19,6 +19,7 @@ import Error
         NoCategory,
         NoParentCategory
       ),
+    ParseError (ParseCategoryError),
   )
 import GHC.Generics (Generic)
 import Lib (readNum)
@@ -43,14 +44,11 @@ data Category = Category
   }
   deriving (Show, Generic, ToJSON)
 
-errorCategory :: Category
-errorCategory = Category 0 "error" "error"
-
-parseCategory :: [T.Text] -> Category
+parseCategory :: [T.Text] -> Either ParseError Category
 parseCategory ls
-  | length ls /= 3 = errorCategory
-  | idCat == 0 = errorCategory
-  | otherwise = Category idCat pc nc
+  | length ls /= 3 = Left ParseCategoryError
+  | idCat == 0 = Left ParseCategoryError
+  | otherwise = pure $ Category idCat pc nc
   where
     idCat = readNum ic
     (ic : pc : nc : _) = ls

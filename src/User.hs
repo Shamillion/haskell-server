@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+
 module User where
 
 import Config (connectDB, writingLineDebug)
@@ -11,9 +12,9 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (FromRow, close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Error (Error (CommonError, LoginOccupied))
-import Lib (readNum)
+import Error (Error (CommonError, LoginOccupied), ParseError (ParseUserError))
 import GHC.Generics (Generic)
+import Lib (readNum)
 
 -- Creating a database query to get a list of users
 getUser :: Query -> Query
@@ -30,7 +31,6 @@ getUserAsText str =
   \ FROM users "
     <> str
     <> ";"
-
 
 data User = User
   { user_id :: Int,
@@ -52,20 +52,16 @@ instance ToJSON User where
         "is_author" .= isAuthor
       ]
 
-errorUser :: User
-errorUser = User 0 "error" "error" False False "error"
-
-parseUser :: [T.Text] -> User
+parseUser :: [T.Text] -> Either ParseError User
 parseUser ls
-  | length ls /= 5 = errorUser
-  | idUsr == 0 = errorUser
-  | otherwise = User idUsr u2 u3 isAdm isAth ""
+  | length ls /= 5 = Left ParseUserError
+  | idUsr == 0 = Left ParseUserError
+  | otherwise = pure $ User idUsr u2 u3 isAdm isAth ""
   where
     [u1, u2, u3, u4, u5] = ls
     idUsr = readNum u1
     isAdm = u4 == "t" || u4 == "true"
     isAth = u5 == "t" || u5 == "true"
-
 
 -- Request example (strict order):
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
