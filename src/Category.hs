@@ -12,12 +12,11 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error
-  ( Error
-      ( CategoryExists,
-        CategoryParentItself,
+  ( CategoryError (..),
+    Error
+      ( CategoryError,
         CommonError,
-        NoCategory,
-        NoParentCategory
+        ParseError
       ),
     ParseError (ParseCategoryError),
   )
@@ -44,10 +43,10 @@ data Category = Category
   }
   deriving (Show, Generic, ToJSON)
 
-parseCategory :: [T.Text] -> Either ParseError Category
+parseCategory :: [T.Text] -> Either Error Category
 parseCategory ls
-  | length ls /= 3 = Left ParseCategoryError
-  | idCat == 0 = Left ParseCategoryError
+  | length ls /= 3 = Left $ ParseError ParseCategoryError
+  | idCat == 0 = Left $ ParseError ParseCategoryError
   | otherwise = pure $ Category idCat pc nc
   where
     idCat = readNum ic
@@ -96,8 +95,8 @@ createCategory CategoryHandle {..} isAdm ls = do
     (parentCategory : nameCategory : _) =
       if length categorys == 1 then "Null" : categorys else categorys
     checkAndResponse uNm uPrnt
-      | not uNm = Left CategoryExists
-      | uPrnt && parentCategory /= "Null" = Left NoParentCategory
+      | not uNm = Left $ CategoryError CategoryExists
+      | uPrnt && parentCategory /= "Null" = Left $ CategoryError NoParentCategory
       | otherwise =
         Right $
           Query $
@@ -128,7 +127,7 @@ editCategory CategoryHandle {..} isAdm ls = do
     else do
       uniqName <- checkUniqCategoryH name
       if uniqName
-        then pure $ Left NoCategory
+        then pure $ Left $ CategoryError NoCategory
         else do
           uniqNew_name <- checkUniqCategoryH new_name
           pure $ checkAndResponse uniqNew_name
@@ -145,9 +144,9 @@ editCategory CategoryHandle {..} isAdm ls = do
         )
         categorys
     checkAndResponse w
-      | method == "change_parent" && name == new_name = Left CategoryParentItself
-      | method == "change_name" && not w = Left CategoryExists
-      | method == "change_parent" && w && new_name /= "Null" = Left NoParentCategory
+      | method == "change_parent" && name == new_name = Left $ CategoryError CategoryParentItself
+      | method == "change_name" && not w = Left $ CategoryError CategoryExists
+      | method == "change_parent" && w && new_name /= "Null" = Left $ CategoryError NoParentCategory
       | otherwise = checkQuery $ map buildQuery fls''
     checkQuery lq = if "404" `elem` lq then Left CommonError else Right . Query $ mconcat lq
     buildQuery (meth, [nm, new_nm]) =

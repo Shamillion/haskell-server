@@ -12,7 +12,7 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (FromRow, close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Error (Error (CommonError, LoginOccupied), ParseError (ParseUserError))
+import Error (Error (CommonError, LoginOccupied, ParseError), ParseError (ParseUserError))
 import GHC.Generics (Generic)
 import Lib (readNum)
 
@@ -52,10 +52,10 @@ instance ToJSON User where
         "is_author" .= isAuthor
       ]
 
-parseUser :: [T.Text] -> Either ParseError User
+parseUser :: [T.Text] -> Either Error User
 parseUser ls
-  | length ls /= 5 = Left ParseUserError
-  | idUsr == 0 = Left ParseUserError
+  | length ls /= 5 = Left $ ParseError ParseUserError
+  | idUsr == 0 = Left $ ParseError ParseUserError
   | otherwise = pure $ User idUsr u2 u3 isAdm isAth ""
   where
     [u1, u2, u3, u4, u5] = ls

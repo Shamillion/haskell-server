@@ -8,7 +8,7 @@ import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import qualified Database.PostgreSQL.Simple as DB
-import Error (Error (..), ParseError (AnotherError))
+import Error (CategoryError (..), Error (..))
 import Lib (drawOut)
 import MigrationsDB (checkDB)
 import Network.HTTP.Types (queryToQueryText, status200, status404, status406)
@@ -19,7 +19,7 @@ import Photo (decodeImage, getPhoto)
 import User (blockAdminRights, createUser, getUserAsText, parseUser)
 
 -- Defining the type of request and creating a response.
-setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO (Either ParseError LC.ByteString))
+setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO (Either Error LC.ByteString))
 setQueryAndRespond req = do
   case (reqMtd, entity) of
     ("GET", "news") ->
@@ -61,7 +61,7 @@ setQueryAndRespond req = do
         <$> editCategory categoryHandler adm arr
         <*> pure encodeWith
     ("GET", "photo") -> pure (getPhoto arr, pure . decodeImage)
-    _ -> pure (Left CommonError, const (pure $ Left AnotherError))
+    _ -> pure (Left CommonError, const (pure $ Left CommonError))
   where
     reqMtd = W.requestMethod req
     [entity] = W.pathInfo req
@@ -90,12 +90,17 @@ app req respond = do
   writingLineDebug $ W.queryString req
   writingLineDebug eitherQry
   case eitherQry of
-    Left CommonError -> responds status404 "text/plain" "404 Not Found.\n"
-    Left LoginOccupied -> respondsSts406 "This login is already in use.\n"
-    Left CategoryExists -> respondsSts406 "This category already exists.\n"
-    Left NoCategory -> respondsSts406 "There is no such category.\n"
-    Left NoParentCategory -> respondsSts406 "There is no such parent category.\n"
-    Left CategoryParentItself -> respondsSts406 "A category cannot be a parent to itself.\n"
+    Left LoginOccupied ->
+      respondsSts406 "This login is already in use.\n"
+    Left (CategoryError CategoryExists) ->
+      respondsSts406 "This category already exists.\n"
+    Left (CategoryError NoCategory) ->
+      respondsSts406 "There is no such category.\n"
+    Left (CategoryError NoParentCategory) ->
+      respondsSts406 "There is no such parent category.\n"
+    Left (CategoryError CategoryParentItself) ->
+      respondsSts406 "A category cannot be a parent to itself.\n"
+    Left _ -> responds status404 "text/plain" "404 Not Found.\n"
     Right qry -> do
       conn <- connectDB
       val <- case W.requestMethod req of

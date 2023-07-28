@@ -9,7 +9,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Database.PostgreSQL.Simple (close, execute, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Error (Error (CommonError), ParseError (DecodeImageError))
+import Error (Error (CommonError, ParseError), ParseError (DecodeImageError))
 
 -- Creating a query to the database to get one photo.
 getPhoto :: [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
@@ -24,12 +24,12 @@ getPhoto (x : _) =
         else Left CommonError
 
 -- Decoding photos from Base64.
-decodeImage :: [[T.Text]] -> Either ParseError LC.ByteString
-decodeImage [] = Left DecodeImageError
+decodeImage :: [[T.Text]] -> Either Error LC.ByteString
+decodeImage [] = Left $ ParseError DecodeImageError
 decodeImage ([img] : _) = pure . decodeLenient . LC.fromStrict . encodeUtf8 $ img'
   where
     img' = T.drop 1 . T.dropWhile (/= ',') $ img
-decodeImage (_ : _) = Left DecodeImageError
+decodeImage (_ : _) = Left $ ParseError DecodeImageError
 
 -- The function sends the photo to the database and returns its ID in the table.
 sendPhotoToDB :: BC.ByteString -> IO BC.ByteString

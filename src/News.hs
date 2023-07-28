@@ -15,7 +15,7 @@ import Data.String (fromString)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Error (Error (CommonError), ParseError (ParseNewsError))
+import Error (Error (CommonError, ParseError), ParseError (ParseNewsError))
 import GHC.Generics (Generic)
 import Lib (initTxt, readNum, splitOnTxt, tailTxt)
 import Photo (sendPhotoToDB)
@@ -73,10 +73,10 @@ newsHandler =
       setLimitAndOffsetH = setLimitAndOffset newsHandler
     }
 
-parseNews :: [T.Text] -> IO (Either ParseError News)
+parseNews :: [T.Text] -> IO (Either Error News)
 parseNews ls
-  | length ls /= 8 = pure $ Left ParseNewsError
-  | idNws == 0 = pure $ Left ParseNewsError
+  | length ls /= 8 = pure . Left $ ParseError ParseNewsError
+  | idNws == 0 = pure . Left $ ParseError ParseNewsError
   | otherwise = do
     cats <- getParentCategories n4
     pure $ eitherAuthor >>= \athr -> pure $ News idNws n1 n2 athr cats n5 pht isPbl
