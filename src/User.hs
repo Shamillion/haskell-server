@@ -1,21 +1,33 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module User where
 
-import Config (Wrong (LoginOccupied, Wrong), connectDB, writingLineDebug)
+import Config (connectDB, writingLineDebug)
 import Crypto.KDF.BCrypt (hashPassword)
 import Data.Aeson (ToJSON, object, toJSON, (.=))
 import qualified Data.ByteString.Char8 as BC
 import Data.Char (ord)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (close, query_)
+import Database.PostgreSQL.Simple (FromRow, close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Error (Error (CommonError, LoginOccupied), ParseError (ParseUserError))
+import GHC.Generics (Generic)
 import Lib (readNum)
 
 -- Creating a database query to get a list of users
 getUser :: Query -> Query
 getUser str =
+  "SELECT  user_id, name_user, (creation_date :: TEXT), is_admin, is_author, \
+  \ pass FROM users "
+    <> str
+    <> ";"
+
+getUserAsText :: Query -> Query
+getUserAsText str =
   "SELECT  (user_id :: TEXT), name_user, \
-  \ (creation_date :: TEXT), (is_admin :: TEXT), (is_author :: TEXT), pass \
+  \ (creation_date :: TEXT), (is_admin :: TEXT), (is_author :: TEXT) \
   \ FROM users "
     <> str
     <> ";"
@@ -25,12 +37,13 @@ data User = User
     name_user :: T.Text,
     creation_date' :: T.Text,
     is_admin :: Bool,
-    is_author :: Bool
+    is_author :: Bool,
+    pass :: BC.ByteString
   }
-  deriving (Show)
+  deriving (Show, Generic, FromRow)
 
 instance ToJSON User where
-  toJSON (User userId nameUser creationDate isAdmin isAuthor) =
+  toJSON (User userId nameUser creationDate isAdmin isAuthor _) =
     object
       [ "user_id" .= userId,
         "name_user" .= nameUser,
@@ -39,27 +52,24 @@ instance ToJSON User where
         "is_author" .= isAuthor
       ]
 
-errorUser :: User
-errorUser = User 0 "error" "error" False False
-
-parseUser :: [T.Text] -> User
+parseUser :: [T.Text] -> Either ParseError User
 parseUser ls
-  | length ls /= 6 = errorUser
-  | idUsr == 0 = errorUser
-  | otherwise = User idUsr u2 u3 isAdm isAth
+  | length ls /= 5 = Left ParseUserError
+  | idUsr == 0 = Left ParseUserError
+  | otherwise = pure $ User idUsr u2 u3 isAdm isAth ""
   where
-    [u1, u2, u3, u4, u5, _] = ls
+    [u1, u2, u3, u4, u5] = ls
     idUsr = readNum u1
     isAdm = u4 == "t" || u4 == "true"
     isAth = u5 == "t" || u5 == "true"
 
 -- Request example (strict order):
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
-createUser :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Wrong Query)
+createUser :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
 createUser adm ls = do
   adm' <- adm
   if not adm' || null ls || map fst ls /= checkList || searchNothing
-    then pure $ Left Wrong
+    then pure $ Left CommonError
     else do
       uniq <- checkUniqLogin login
       if uniq
@@ -87,8 +97,8 @@ createUser adm ls = do
 
 -- Disables the administrator rights of an automatically created user.
 -- Request example '../user?block_admin=Adam'
-blockAdminRights :: Bool -> Either Wrong Query
-blockAdminRights False = Left Wrong
+blockAdminRights :: Bool -> Either Error Query
+blockAdminRights False = Left CommonError
 blockAdminRights _ =
   Right
     "UPDATE users SET is_admin = FALSE WHERE user_id = 99 AND login = 'Adam';"

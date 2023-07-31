@@ -5,11 +5,11 @@ module TestsFunctionsCategory
 where
 
 import Category (CategoryHandle (..), createCategory, editCategory)
-import Config (Wrong (..))
 import qualified Data.ByteString.Char8 as BC
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.String (IsString)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Error (Error (..))
 import Test.Hspec (SpecWith, it, shouldBe)
 
 categoryTestHandler :: CategoryHandle Identity
@@ -18,17 +18,17 @@ categoryTestHandler = CategoryHandle {checkUniqCategoryH = testUniqCategory}
 testUniqCategory :: (Eq a, Data.String.IsString a) => a -> Identity Bool
 testUniqCategory e = pure $ e `notElem` ["parentCategory", "Null", "existCategory"]
 
-createCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Wrong Query
+createCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
 createCategory' b ls = runIdentity $ createCategory categoryTestHandler (pure b) ls
 
 testsFunctionCreateCategory :: SpecWith ()
 testsFunctionCreateCategory = do
   it "User is not admin" $
-    createCategory' False [("Cars>Wheels", Nothing)] `shouldBe` Left Wrong
+    createCategory' False [("Cars>Wheels", Nothing)] `shouldBe` Left CommonError
   it "User is not admin and list is empty" $
-    createCategory' False [] `shouldBe` Left Wrong
+    createCategory' False [] `shouldBe` Left CommonError
   it "User is admin and list is empty" $
-    createCategory' True [] `shouldBe` Left Wrong
+    createCategory' True [] `shouldBe` Left CommonError
   it "Everything is all right" $
     createCategory' True [("parentCategory>category", Nothing)]
       `shouldBe` Right
@@ -114,9 +114,9 @@ testsFunctionCreateCategory = do
       `shouldBe` Left CategoryExists
   it "Without both categories" $
     createCategory' True [(">", Nothing)]
-      `shouldBe` Left Wrong
+      `shouldBe` Left CommonError
 
-editCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Wrong Query
+editCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
 editCategory' b ls = runIdentity $ editCategory categoryTestHandler (pure b) ls
 
 testsFunctionEditCategory :: SpecWith ()
@@ -124,26 +124,26 @@ testsFunctionEditCategory = do
   -- [("change_name",Just "aaa>bbb")]
   it "User is not admin" $
     editCategory' False [("change_name", Just "existCategory>newCategory")]
-      `shouldBe` Left Wrong
+      `shouldBe` Left CommonError
   it "User is not admin and list is empty" $
-    editCategory' False [] `shouldBe` Left Wrong
+    editCategory' False [] `shouldBe` Left CommonError
   it "User is admin and list is empty" $
-    editCategory' True [] `shouldBe` Left Wrong
+    editCategory' True [] `shouldBe` Left CommonError
   it "Unknown method" $
     editCategory' True [("changeName", Just "existCategory>newCategory")]
-      `shouldBe` Left Wrong
+      `shouldBe` Left CommonError
   it "Without old name" $
     editCategory' True [("change_name", Just ">newCategory")]
-      `shouldBe` Left Wrong
+      `shouldBe` Left CommonError
   it "Without new name" $
     editCategory' True [("change_name", Just "existCategory>")]
-      `shouldBe` Left Wrong
+      `shouldBe` Left CommonError
   it "Without both names" $
     editCategory' True [("change_name", Just ">")]
-      `shouldBe` Left Wrong
+      `shouldBe` Left CommonError
   it "Syntax error" $
     editCategory' True [("change_name", Just "existeCategorynewCategory")]
-      `shouldBe` Left Wrong
+      `shouldBe` Left CommonError
   it "Syntax error 2" $
     editCategory' True [("change_name", Just "existCategory>>newCategory")]
       `shouldBe` Right
@@ -162,10 +162,10 @@ testsFunctionEditCategory = do
           Just "existCategory>newCategory>newCategory_2"
         )
       ]
-      `shouldBe` Left Wrong
+      `shouldBe` Left CommonError
   it "With Nothing" $
     editCategory' True [("change_name", Nothing)]
-      `shouldBe` Left Wrong
+      `shouldBe` Left CommonError
   it "Two elements in list. One element with syntax error" $
     editCategory'
       True
@@ -254,7 +254,7 @@ testsFunctionEditCategory = do
         )
   it "Method is change_parent: with 'Nothing'" $
     editCategory' True [("change_parent", Nothing)]
-      `shouldBe` Left Wrong
+      `shouldBe` Left CommonError
   it "Method is change_parent: this category doesn't exist" $
     editCategory' True [("change_parent", Just "newCategory>parentCategory")]
       `shouldBe` Left NoCategory

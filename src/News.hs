@@ -4,7 +4,7 @@
 module News where
 
 import Category (getParentCategories)
-import Config (Wrong (Wrong), connectDB, limitElem)
+import Config (connectDB, limitElem)
 import Control.Applicative (liftA2)
 import Data.Aeson (ToJSON)
 import qualified Data.ByteString.Char8 as BC
@@ -15,17 +15,18 @@ import Data.String (fromString)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Error (Error (CommonError), ParseError (ParseNewsError))
 import GHC.Generics (Generic)
 import Lib (initTxt, readNum, splitOnTxt, tailTxt)
 import Photo (sendPhotoToDB)
 import Text.Read (readMaybe)
-import User (User, errorUser, parseUser)
+import User (User, parseUser)
 
 -- Creating a database query to get a list of news.
-getNews :: Query -> Maybe (Query, Query) -> Either Wrong Query
+getNews :: Query -> Maybe (Query, Query) -> Either Error Query
 getNews auth str =
   if isNothing str
-    then Left Wrong
+    then Left CommonError
     else
       Right $
         "SELECT (news_id :: TEXT), title, (news.creation_date :: TEXT), \
@@ -34,7 +35,7 @@ getNews auth str =
         \ FROM news \
         \ INNER JOIN category ON news.category_id = category.category_id \
         \ INNER JOIN ( SELECT user_id, name_user, users.creation_date, is_admin, \
-        \ is_author, login \
+        \ is_author \
         \ FROM users ) author ON news.user_id = author.user_id \
         \ WHERE (is_published = TRUE OR is_published = FALSE AND \
         \ author.user_id = "
@@ -60,10 +61,6 @@ data News = News
   }
   deriving (Show, Generic, ToJSON)
 
-errorNews :: IO News
-errorNews =
-  pure $ News 0 "error" "error" errorUser ["error"] "error" ["error"] False
-
 data NewsyHandle m = NewsyHandle
   { limitElemH :: m Int,
     setLimitAndOffsetH :: [(T.Text, Maybe T.Text)] -> m Query
@@ -76,18 +73,18 @@ newsHandler =
       setLimitAndOffsetH = setLimitAndOffset newsHandler
     }
 
-parseNews :: [T.Text] -> IO News
+parseNews :: [T.Text] -> IO (Either ParseError News)
 parseNews ls
-  | length ls /= 8 = errorNews
-  | idNws == 0 = errorNews
+  | length ls /= 8 = pure $ Left ParseNewsError
+  | idNws == 0 = pure $ Left ParseNewsError
   | otherwise = do
     cats <- getParentCategories n4
-    pure $ News idNws n1 n2 athr cats n5 pht isPbl
+    pure $ eitherAuthor >>= \athr -> pure $ News idNws n1 n2 athr cats n5 pht isPbl
   where
     [n0, n1, n2, n3, n4, n5, n6, n7] = ls
     idNws = readNum n0
     splitText = splitOnTxt "," . tailTxt . initTxt
-    athr = parseUser $ splitText n3
+    eitherAuthor = parseUser $ splitText n3
     pht = map ("/photo?get_photo=" <>) $ splitText n6
     isPbl = n7 == "true" || n7 == "t"
 
@@ -169,11 +166,11 @@ setLimitAndOffset NewsyHandle {..} ls = do
 -- '.../news?title=Text&category_id=3&content=Text&
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Wrong Query)
+createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
 createNews auth authID ls = do
   auth' <- auth
   if not auth' || null ls || nothingInLs
-    then pure $ Left Wrong
+    then pure $ Left CommonError
     else do
       authID' <- authID
       photoIdList <- photoIDLs ls
@@ -200,7 +197,7 @@ createNews auth authID ls = do
               ]
       case maybeStr of
         Just str -> pure . pure . Query $ str
-        Nothing -> pure $ Left Wrong
+        Nothing -> pure $ Left CommonError
   where
     nothingInLs = any (\(_, y) -> isNothing y) ls
     titleNws = getValue "title"
@@ -225,12 +222,12 @@ buildPhotoIdString (x : xs) = x <> ", " <> buildPhotoIdString xs
 --    news?news_id=(id news needed to edit)&title=Text&category_id=3&
 --       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-editNews :: IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Wrong Query)
+editNews :: IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
 editNews auth ls = do
   auth' <- auth
   author' <- authorNews (fromQuery auth') newsId
   if null ls || not author'
-    then pure $ Left Wrong
+    then pure $ Left CommonError
     else do
       photo' <- photoIdList
       let maybeStr =
@@ -242,7 +239,7 @@ editNews auth ls = do
                   <> ";"
       pure $ case maybeStr of
         Just str -> Right $ Query str
-        Nothing -> Left Wrong
+        Nothing -> Left CommonError
   where
     newsId = case LT.find (\(x, _) -> x == "news_id") ls of
       Just (_, Just n) -> n

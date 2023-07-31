@@ -3,7 +3,7 @@
 
 module Category where
 
-import Config (Wrong (CategoryExists, CategoryParentItself, NoCategory, NoParentCategory, Wrong), connectDB, writingLineDebug)
+import Config (connectDB, writingLineDebug)
 import Data.Aeson (ToJSON)
 import qualified Data.ByteString.Char8 as BC
 import Data.List as LT (find)
@@ -11,11 +11,21 @@ import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Error
+  ( Error
+      ( CategoryExists,
+        CategoryParentItself,
+        CommonError,
+        NoCategory,
+        NoParentCategory
+      ),
+    ParseError (ParseCategoryError),
+  )
 import GHC.Generics (Generic)
 import Lib (readNum)
 
 -- Creating a database query to get a list of catygories.
-getCategory :: Query -> Either Wrong Query
+getCategory :: Query -> Either Error Query
 getCategory limitOffset =
   Right $
     "SELECT (category_id :: TEXT), parent_category, \
@@ -34,14 +44,11 @@ data Category = Category
   }
   deriving (Show, Generic, ToJSON)
 
-errorCategory :: Category
-errorCategory = Category 0 "error" "error"
-
-parseCategory :: [T.Text] -> Category
+parseCategory :: [T.Text] -> Either ParseError Category
 parseCategory ls
-  | length ls /= 3 = errorCategory
-  | idCat == 0 = errorCategory
-  | otherwise = Category idCat pc nc
+  | length ls /= 3 = Left ParseCategoryError
+  | idCat == 0 = Left ParseCategoryError
+  | otherwise = pure $ Category idCat pc nc
   where
     idCat = readNum ic
     (ic : pc : nc : _) = ls
@@ -74,11 +81,11 @@ createCategory ::
   CategoryHandle m ->
   m Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
-  m (Either Wrong Query)
+  m (Either Error Query)
 createCategory CategoryHandle {..} isAdm ls = do
   isAdm' <- isAdm
   if not isAdm' || null ls || null categorys
-    then pure $ Left Wrong
+    then pure $ Left CommonError
     else do
       uniqName <- checkUniqCategoryH nameCategory
       uniqParent <- checkUniqCategoryH parentCategory
@@ -113,11 +120,11 @@ editCategory ::
   CategoryHandle m ->
   m Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
-  m (Either Wrong Query)
+  m (Either Error Query)
 editCategory CategoryHandle {..} isAdm ls = do
   isAdm' <- isAdm
   if not isAdm' || null ls || null fls || "" `elem` [name, new_name]
-    then pure $ Left Wrong
+    then pure $ Left CommonError
     else do
       uniqName <- checkUniqCategoryH name
       if uniqName
@@ -142,7 +149,7 @@ editCategory CategoryHandle {..} isAdm ls = do
       | method == "change_name" && not w = Left CategoryExists
       | method == "change_parent" && w && new_name /= "Null" = Left NoParentCategory
       | otherwise = checkQuery $ map buildQuery fls''
-    checkQuery lq = if "404" `elem` lq then Left Wrong else Right . Query $ mconcat lq
+    checkQuery lq = if "404" `elem` lq then Left CommonError else Right . Query $ mconcat lq
     buildQuery (meth, [nm, new_nm]) =
       case meth of
         "change_name" ->

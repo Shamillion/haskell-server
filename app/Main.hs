@@ -2,12 +2,13 @@ module Main where
 
 import Auth (authorID, checkAuth, isAdmin, isAuthor)
 import Category (categoryHandler, createCategory, editCategory, getCategory, parseCategory)
-import Config (Priority (..), Wrong (..), connectDB, port, writingLine, writingLineDebug)
+import Config (Priority (..), connectDB, port, writingLine, writingLineDebug)
 import Data.Aeson (encode)
 import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import qualified Database.PostgreSQL.Simple as DB
+import Error (Error (..), ParseError (AnotherError))
 import Lib (drawOut)
 import MigrationsDB (checkDB)
 import Network.HTTP.Types (queryToQueryText, status200, status404, status406)
@@ -15,16 +16,18 @@ import qualified Network.Wai as W
 import Network.Wai.Handler.Warp (run)
 import News (createNews, editNews, getNews, newsHandler, parseNews, setLimitAndOffset, setMethodNews)
 import Photo (decodeImage, getPhoto)
-import User (blockAdminRights, createUser, getUser, parseUser)
+import User (blockAdminRights, createUser, getUserAsText, parseUser)
 
 -- Defining the type of request and creating a response.
-setQueryAndRespond :: W.Request -> IO (Either Wrong DB.Query, [[T.Text]] -> IO LC.ByteString)
+setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO (Either ParseError LC.ByteString))
 setQueryAndRespond req = do
   case (reqMtd, entity) of
     ("GET", "news") ->
       (,)
         <$> (getNews <$> authId <*> method)
-        <*> pure ((encode <$>) . mapM parseNews)
+          -- <*> (fmap encode . fmap sequence . mapM parseNews)
+          -- <*> pure (fmap (fmap encode) . fmap sequence . mapM parseNews)
+          <*> pure (fmap (fmap encode . sequence) . mapM parseNews)
     ("POST", "news") ->
       (,)
         <$> createNews athr authId arr
@@ -35,8 +38,8 @@ setQueryAndRespond req = do
         <*> pure encodeWith
     ("GET", "user") ->
       (,)
-        <$> (pure . getUser <$> limitOffset)
-        <*> pure (pure . encode . map parseUser)
+        <$> (pure . getUserAsText <$> limitOffset)
+        <*> pure (pure . fmap encode . mapM parseUser)
     ("POST", "user") ->
       (,)
         <$> createUser adm arr
@@ -48,7 +51,7 @@ setQueryAndRespond req = do
     ("GET", "category") ->
       (,)
         <$> (getCategory <$> limitOffset)
-        <*> pure (pure . encode . map parseCategory)
+        <*> pure (pure . fmap encode . mapM parseCategory)
     ("POST", "category") ->
       (,)
         <$> createCategory categoryHandler adm arr
@@ -58,7 +61,7 @@ setQueryAndRespond req = do
         <$> editCategory categoryHandler adm arr
         <*> pure encodeWith
     ("GET", "photo") -> pure (getPhoto arr, pure . decodeImage)
-    _ -> pure (Left Wrong, const (pure "Error"))
+    _ -> pure (Left CommonError, const (pure $ Left AnotherError))
   where
     reqMtd = W.requestMethod req
     [entity] = W.pathInfo req
@@ -69,7 +72,12 @@ setQueryAndRespond req = do
     adm = isAdmin req
     athr = isAuthor req
     encodeWith =
-      pure . (<> " position(s) done.") . LC.fromStrict . encodeUtf8 . drawOut
+      pure
+        . pure
+        . (<> " position(s) done.")
+        . LC.fromStrict
+        . encodeUtf8
+        . drawOut
 
 app :: W.Application
 app req respond = do
@@ -82,7 +90,7 @@ app req respond = do
   writingLineDebug $ W.queryString req
   writingLineDebug eitherQry
   case eitherQry of
-    Left Wrong -> responds status404 "text/plain" "404 Not Found.\n"
+    Left CommonError -> responds status404 "text/plain" "404 Not Found.\n"
     Left LoginOccupied -> respondsSts406 "This login is already in use.\n"
     Left CategoryExists -> respondsSts406 "This category already exists.\n"
     Left NoCategory -> respondsSts406 "There is no such category.\n"
@@ -101,8 +109,12 @@ app req respond = do
               else "text/plain"
           val' = drawOut val
       writingLine INFO "Sent a response to the request."
-      ans <- resp val
-      responds status200 hdr ans
+      eitherAns <- resp val
+      case eitherAns of
+        Left err -> do
+          writingLine ERROR $ show err
+          responds status404 "text/plain" "404 Not Found.\n"
+        Right ans -> responds status200 hdr ans
   where
     responds sts hdr = respond . W.responseLBS sts [("Content-Type", hdr)]
     respondsSts406 = responds status406 "text/plain"
