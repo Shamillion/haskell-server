@@ -25,9 +25,7 @@ setQueryAndRespond req = do
     ("GET", "news") ->
       (,)
         <$> (getNews <$> authId <*> method)
-          -- <*> (fmap encode . fmap sequence . mapM parseNews)
-          -- <*> pure (fmap (fmap encode) . fmap sequence . mapM parseNews)
-          <*> pure (fmap (fmap encode . sequence) . mapM parseNews)
+        <*> pure (fmap (fmap encode . sequence) . mapM parseNews)
     ("POST", "news") ->
       (,)
         <$> createNews athr authId arr

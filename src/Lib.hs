@@ -7,7 +7,7 @@ import Text.Read (readMaybe)
 readNum :: T.Text -> Int
 readNum n =
   case readMaybe $ T.unpack n of
-    Just x -> x
+    Just int -> int 
     _ -> 0
 
 initTxt :: T.Text -> T.Text

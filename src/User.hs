@@ -53,28 +53,27 @@ instance ToJSON User where
       ]
 
 parseUser :: [T.Text] -> Either Error User
-parseUser ls
-  | length ls /= 5 = Left $ ParseError ParseUserError
-  | idUsr == 0 = Left $ ParseError ParseUserError
-  | otherwise = pure $ User idUsr u2 u3 isAdm isAth ""
-  where
-    [u1, u2, u3, u4, u5] = ls
-    idUsr = readNum u1
-    isAdm = u4 == "t" || u4 == "true"
-    isAth = u5 == "t" || u5 == "true"
+parseUser [userIdTxt, nameUser, creationDate, isAdmn, isAuthr] = do
+  let idUsr = readNum userIdTxt
+      isAdm = isAdmn `elem` ["t", "true"]
+      isAth = isAuthr `elem` ["t", "true"]
+  if idUsr == 0 
+    then Left $ ParseError ParseUserError
+    else pure $ User idUsr nameUser creationDate isAdm isAth ""
+parseUser _ = Left $ ParseError ParseUserError      
 
 -- Request example (strict order):
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
 createUser :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
-createUser adm ls = do
-  adm' <- adm
-  if not adm' || null ls || map fst ls /= checkList || searchNothing
+createUser isAdmn ls = do
+  admin <- isAdmn
+  if not admin || null ls || map fst ls /= checkList || searchNothing
     then pure $ Left CommonError
     else do
       uniq <- checkUniqLogin login
       if uniq
         then do
-          pass' <- cryptoPass (sum . map ord . BC.unpack $ nameUser) pass
+          password <- cryptoPass (sum . map ord . BC.unpack $ nameUser) pass
           pure . Right . Query $
             "INSERT INTO users (name_user, login, pass, \
             \       creation_date, is_admin, is_author) \
@@ -83,7 +82,7 @@ createUser adm ls = do
               <> "', '"
               <> login
               <> "', '"
-              <> pass'
+              <> password
               <> "', NOW(), '"
               <> isAdmin
               <> "', '"
@@ -105,7 +104,7 @@ blockAdminRights _ =
 
 -- Create a bcrypt hash for a password.
 cryptoPass :: Int -> BC.ByteString -> IO BC.ByteString
-cryptoPass n = hashPassword (mod n 7 + 4)
+cryptoPass num = hashPassword (mod num 7 + 4)
 
 -- Checking the uniqueness of the login in the database.
 checkUniqLogin :: BC.ByteString -> IO Bool

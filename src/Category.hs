@@ -44,13 +44,12 @@ data Category = Category
   deriving (Show, Generic, ToJSON)
 
 parseCategory :: [T.Text] -> Either Error Category
-parseCategory ls
-  | length ls /= 3 = Left $ ParseError ParseCategoryError
-  | idCat == 0 = Left $ ParseError ParseCategoryError
-  | otherwise = pure $ Category idCat pc nc
-  where
-    idCat = readNum ic
-    (ic : pc : nc : _) = ls
+parseCategory [categoryIdTxt, parentCategory, nameCategory] = do
+  let idCategory = readNum categoryIdTxt
+  if idCategory == 0
+    then Left $ ParseError ParseCategoryError
+    else pure $ Category idCategory parentCategory nameCategory
+parseCategory _ = Left $ ParseError ParseCategoryError
 
 newtype CategoryHandle m = CategoryHandle
   {checkUniqCategoryH :: BC.ByteString -> m Bool}
@@ -59,17 +58,20 @@ categoryHandler :: CategoryHandle IO
 categoryHandler = CategoryHandle {checkUniqCategoryH = checkUniqCategory}
 
 getParentCategories :: T.Text -> IO [T.Text]
-getParentCategories cat = do
+getParentCategories category = do
   conn <- connectDB
-  ls <- query_ conn getCategory' :: IO [[T.Text]]
+  allCategoriesLs <- query_ conn getCategory' :: IO [[T.Text]]
   close conn
-  writingLineDebug ls
-  let buildingList pc = do
-        let val = LT.find (\(_ : y : _) -> pure y == listToMaybe pc) ls
+  writingLineDebug allCategoriesLs
+  let buildingList categoryLs = do
+        let val =
+              LT.find
+                (\(_ : nameCategory : _) -> pure nameCategory == listToMaybe categoryLs)
+                allCategoriesLs
         case val of
-          Just (el : _) -> buildingList (el : pc)
-          _ -> pc
-  pure $ filter (/= "Null") $ buildingList [cat]
+          Just (parentCategory : _) -> buildingList (parentCategory : categoryLs)
+          _ -> categoryLs
+  pure $ filter (/= "Null") $ buildingList [category]
 
 -- Request example:
 --  '.../category?aaa>bbb'
@@ -81,22 +83,22 @@ createCategory ::
   m Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
-createCategory CategoryHandle {..} isAdm ls = do
-  isAdm' <- isAdm
-  if not isAdm' || null ls || null categorys
+createCategory CategoryHandle {..} isAdmin ls = do
+  isAdm <- isAdmin
+  if not isAdm || null ls || null categorys
     then pure $ Left CommonError
     else do
-      uniqName <- checkUniqCategoryH nameCategory
-      uniqParent <- checkUniqCategoryH parentCategory
-      pure $ checkAndResponse uniqName uniqParent
+      isUniqName <- checkUniqCategoryH nameCategory
+      isUniqParent <- checkUniqCategoryH parentCategory
+      pure $ checkAndResponse isUniqName isUniqParent
   where
     (x : _) = map (BC.split '>' . fst) ls
     categorys = filter (/= "") x
     (parentCategory : nameCategory : _) =
       if length categorys == 1 then "Null" : categorys else categorys
-    checkAndResponse uNm uPrnt
-      | not uNm = Left $ CategoryError CategoryExists
-      | uPrnt && parentCategory /= "Null" = Left $ CategoryError NoParentCategory
+    checkAndResponse isUniqName isUniqParent
+      | not isUniqName = Left $ CategoryError CategoryExists
+      | isUniqParent && parentCategory /= "Null" = Left $ CategoryError NoParentCategory
       | otherwise =
         Right $
           Query $
@@ -120,20 +122,20 @@ editCategory ::
   m Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
-editCategory CategoryHandle {..} isAdm ls = do
-  isAdm' <- isAdm
-  if not isAdm' || null ls || null fls || "" `elem` [name, new_name]
+editCategory CategoryHandle {..} isAdmin ls = do
+  isAdm <- isAdmin
+  if not isAdm || null ls || null filteredLs || "" `elem` [name, new_name]
     then pure $ Left CommonError
     else do
-      uniqName <- checkUniqCategoryH name
-      if uniqName
+      isUniqName <- checkUniqCategoryH name
+      if isUniqName
         then pure $ Left $ CategoryError NoCategory
         else do
-          uniqNew_name <- checkUniqCategoryH new_name
-          pure $ checkAndResponse uniqNew_name
+          isUniqNew_name <- checkUniqCategoryH new_name
+          pure $ checkAndResponse isUniqNew_name
   where
-    fls = filter ((/= "") . snd) $ map (fmap (fromMaybe "")) $ take 1 ls
-    fls' = map (fmap (BC.split '>')) fls
+    filteredLs = filter ((/= "") . snd) $ map (fmap (fromMaybe "")) $ take 1 ls
+    fls' = map (fmap (BC.split '>')) filteredLs
     categorys = map (filter (/= "") <$>) fls'
     fls''@((method, [name, new_name]) : _) =
       map
