@@ -135,46 +135,46 @@ editCategory CategoryHandle {..} isAdmin ls = do
           pure $ checkAndResponse isUniqNew_name
   where
     filteredLs = filter ((/= "") . snd) $ map (fmap (fromMaybe "")) $ take 1 ls
-    fls' = map (fmap (BC.split '>')) filteredLs
-    categorys = map (filter (/= "") <$>) fls'
-    fls''@((method, [name, new_name]) : _) =
+    splitedFilteredLs = map (fmap (BC.split '>')) filteredLs
+    categories = map (filter (/= "") <$>) splitedFilteredLs
+    methodAndNames@((method, [name, new_name]) : _) =
       map
         ( \x ->
             if length (snd x) /= 2
               then ("404", ["", ""])
               else x
         )
-        categorys
-    checkAndResponse w
+        categories
+    checkAndResponse isUniq
       | method == "change_parent" && name == new_name = Left $ CategoryError CategoryParentItself
-      | method == "change_name" && not w = Left $ CategoryError CategoryExists
-      | method == "change_parent" && w && new_name /= "Null" = Left $ CategoryError NoParentCategory
-      | otherwise = checkQuery $ map buildQuery fls''
+      | method == "change_name" && not isUniq = Left $ CategoryError CategoryExists
+      | method == "change_parent" && isUniq && new_name /= "Null" = Left $ CategoryError NoParentCategory
+      | otherwise = checkQuery $ map buildQuery methodAndNames
     checkQuery lq = if "404" `elem` lq then Left CommonError else Right . Query $ mconcat lq
-    buildQuery (meth, [nm, new_nm]) =
+    buildQuery (meth, [nameCategory, newNameCategory]) =
       case meth of
         "change_name" ->
           "UPDATE category \
           \ SET   parent_category = '"
-            <> new_nm
+            <> newNameCategory
             <> "' \
                \ WHERE parent_category = '"
-            <> nm
+            <> nameCategory
             <> "'; \
                \ UPDATE category \
                \ SET   name_category = '"
-            <> new_nm
+            <> newNameCategory
             <> "' \
                \ WHERE name_category = '"
-            <> nm
+            <> nameCategory
             <> "'; "
         "change_parent" ->
           "UPDATE category \
           \ SET parent_category = '"
-            <> new_nm
+            <> newNameCategory
             <> "' \
                \ WHERE name_category = '"
-            <> nm
+            <> nameCategory
             <> "'; "
         _ -> "404"
     buildQuery (_, _) = "404"

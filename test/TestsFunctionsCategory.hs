@@ -16,10 +16,10 @@ categoryTestHandler :: CategoryHandle Identity
 categoryTestHandler = CategoryHandle {checkUniqCategoryH = testUniqCategory}
 
 testUniqCategory :: (Eq a, Data.String.IsString a) => a -> Identity Bool
-testUniqCategory e = pure $ e `notElem` ["parentCategory", "Null", "existCategory"]
+testUniqCategory val = pure $ val `notElem` ["parentCategory", "Null", "existCategory"]
 
 createCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
-createCategory' b ls = runIdentity $ createCategory categoryTestHandler (pure b) ls
+createCategory' bool ls = runIdentity $ createCategory categoryTestHandler (pure bool) ls
 
 testsFunctionCreateCategory :: SpecWith ()
 testsFunctionCreateCategory = do
@@ -117,7 +117,7 @@ testsFunctionCreateCategory = do
       `shouldBe` Left CommonError
 
 editCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
-editCategory' b ls = runIdentity $ editCategory categoryTestHandler (pure b) ls
+editCategory' bool ls = runIdentity $ editCategory categoryTestHandler (pure bool) ls
 
 testsFunctionEditCategory :: SpecWith ()
 testsFunctionEditCategory = do

@@ -21,7 +21,7 @@ import User (blockAdminRights, createUser, getUserAsText, parseUser)
 -- Defining the type of request and creating a response.
 setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO (Either Error LC.ByteString))
 setQueryAndRespond req = do
-  case (reqMtd, entity) of
+  case (reqMethod, entity) of
     ("GET", "news") ->
       (,)
         <$> (getNews <$> authId <*> method)
@@ -61,7 +61,7 @@ setQueryAndRespond req = do
     ("GET", "photo") -> pure (getPhoto arr, pure . decodeImage)
     _ -> pure (Left CommonError, const (pure $ Left CommonError))
   where
-    reqMtd = W.requestMethod req
+    reqMethod = W.requestMethod req
     [entity] = W.pathInfo req
     authId = authorID req
     arr = W.queryString req
@@ -101,35 +101,36 @@ app req respond = do
     Left _ -> responds status404 "text/plain" "404 Not Found.\n"
     Right qry -> do
       conn <- connectDB
-      val <- case W.requestMethod req of
+      dataFromDB <- case W.requestMethod req of
         "GET" -> DB.query_ conn qry :: IO [[T.Text]]
         _ -> (\x -> [[T.pack $ show x]]) <$> DB.execute_ conn qry
-      writingLineDebug val
+      writingLineDebug dataFromDB
       DB.close conn
-      let hdr =
+      let header =
             if W.pathInfo req == ["photo"]
-              then getHdr val'
+              then getHeader headerForPhoto
               else "text/plain"
-          val' = drawOut val
+          headerForPhoto = drawOut dataFromDB
       writingLine INFO "Sent a response to the request."
-      eitherAns <- resp val
+      eitherAns <- resp dataFromDB
+      writingLineDebug eitherAns
       case eitherAns of
         Left err -> do
           writingLine ERROR $ show err
           responds status404 "text/plain" "404 Not Found.\n"
-        Right ans -> responds status200 hdr ans
+        Right ans -> responds status200 header ans
   where
-    responds sts hdr = respond . W.responseLBS sts [("Content-Type", hdr)]
+    responds status header = respond . W.responseLBS status [("Content-Type", header)]
     respondsSts406 = responds status406 "text/plain"
-    getHdr = encodeUtf8 . T.drop 1 . T.takeWhile (/= ';') . T.dropWhile (/= ':')
+    getHeader = encodeUtf8 . T.drop 1 . T.takeWhile (/= ';') . T.dropWhile (/= ':')
 
 main :: IO ()
 main = do
-  x <- checkDB 1
-  writingLine DEBUG $ "checkDB was runing " <> show x <> " times."
-  if x > 2
-    then print ("Error Database! Server can not be started!" :: String)
+  num <- checkDB 1
+  writingLine DEBUG $ "checkDB was runing " <> show num <> " times."
+  if num > 2
+    then putStrLn "Error Database! Server can not be started!"
     else do
       port' <- port
-      mapM_ (\f -> f "Server is started.") [print, writingLine INFO]
+      mapM_ (\func -> func "Server is started.") [print, writingLine INFO]
       run port' app

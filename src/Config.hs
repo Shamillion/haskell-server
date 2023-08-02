@@ -32,8 +32,8 @@ getConfiguration fileName = do
   let obj = eitherDecode content
   case obj of
     Right _ -> pure obj
-    Left e -> do
-      let str = t <> " UTC   " <> "ERROR  " <> " - " <> e
+    Left err -> do
+      let str = t <> " UTC   " <> "ERROR  " <> " - " <> err
       print str
       appendFile logFile $ str <> "\n"
       pure obj
@@ -59,7 +59,7 @@ configuration :: IO Configuration
 configuration = do
   getConf <- getConfiguration "config.json"
   pure $ case getConf of
-    Right v -> v
+    Right conf -> conf
     Left _ -> errorConfig
 
 -- Get current time for the logger.
@@ -100,19 +100,19 @@ logFile = "log.log"
 
 -- Function writes log information down.
 writingLine :: Priority -> String -> IO ()
-writingLine lvl str = do
+writingLine level str = do
   logLevel' <- logLevel
-  if lvl >= logLevel'
+  if level >= logLevel'
     then do
       t <- time
-      let string = t <> " UTC   " <> fun lvl <> " - " <> str
+      let string = t <> " UTC   " <> showLevel level <> " - " <> str
       out <- logOutput <$> configuration
       case out of
         "file" -> appendFile logFile $ string <> "\n"
         _ -> putStrLn string
     else pure ()
   where
-    fun val = case val of
+    showLevel priority = case priority of
       DEBUG -> "DEBUG  "
       INFO -> "INFO   "
       WARNING -> "WARNING"
