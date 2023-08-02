@@ -9,6 +9,7 @@ import Data.Time (getCurrentTime)
 import Data.Word (Word16)
 import qualified Database.PostgreSQL.Simple as PS
 import GHC.Generics (Generic)
+import System.Exit (die)
 
 -- Data type for the configuration file.
 data Configuration = Configuration
@@ -24,43 +25,18 @@ data Configuration = Configuration
   }
   deriving (Show, Generic, FromJSON)
 
--- Function reads configuration information from file.
-getConfiguration :: String -> IO (Either String Configuration)
-getConfiguration fileName = do
-  t <- time
-  content <- L.readFile fileName
-  let obj = eitherDecode content
-  case obj of
-    Right _ -> pure obj
+-- Getting information from configuration file.
+readConfigFile :: IO Configuration
+readConfigFile = do
+  time' <- time
+  content <- L.readFile "config.json"
+  case eitherDecode content of
+    Right conf -> pure conf
     Left err -> do
-      let str = t <> " UTC   " <> "ERROR  " <> " - " <> err
+      let str = time' ++ " UTC   " ++ "ERROR  " ++ " - " ++ err
       print str
-      appendFile logFile $ str <> "\n"
-      pure obj
-
--- The object is used when the configuration
---   file is read unsuccessfully.
-errorConfig :: Configuration
-errorConfig =
-  Configuration
-    { serverPort = 0,
-      dbHost = "Error",
-      dbPort = 0,
-      dbname = "Error",
-      dbUser = "Error",
-      dbPassword = "Error",
-      maxElem = 0,
-      priorityLevel = ERROR,
-      logOutput = "cons"
-    }
-
--- Try to read configuration file.
-configuration :: IO Configuration
-configuration = do
-  getConf <- getConfiguration "config.json"
-  pure $ case getConf of
-    Right conf -> conf
-    Left _ -> errorConfig
+      appendFile logFile $ str ++ "\n"
+      die "Error reading the configuration file! Check out config.json!"
 
 -- Get current time for the logger.
 time :: IO String
@@ -69,7 +45,7 @@ time = take 19 . show <$> getCurrentTime
 -- Parameters for connecting to the database.
 connectInfo :: IO PS.ConnectInfo
 connectInfo = do
-  conf <- configuration
+  conf <- readConfigFile
   pure $
     PS.ConnectInfo
       { PS.connectHost = dbHost conf,
@@ -81,7 +57,7 @@ connectInfo = do
 
 -- Maximum number of items returned by the database in response to a request.
 limitElem :: IO Int
-limitElem = maxElem <$> configuration
+limitElem = maxElem <$> readConfigFile
 
 -- Establishing a connection to the database.
 connectDB :: IO PS.Connection
@@ -106,7 +82,7 @@ writingLine level str = do
     then do
       t <- time
       let string = t <> " UTC   " <> showLevel level <> " - " <> str
-      out <- logOutput <$> configuration
+      out <- logOutput <$> readConfigFile
       case out of
         "file" -> appendFile logFile $ string <> "\n"
         _ -> putStrLn string
@@ -123,8 +99,8 @@ writingLineDebug s = writingLine DEBUG $ show s
 
 -- Logging level.
 logLevel :: IO Priority
-logLevel = priorityLevel <$> configuration
+logLevel = priorityLevel <$> readConfigFile
 
 -- TCP port number.
 port :: IO Int
-port = serverPort <$> configuration
+port = serverPort <$> readConfigFile

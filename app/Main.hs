@@ -132,5 +132,5 @@ main = do
     then putStrLn "Error Database! Server can not be started!"
     else do
       port' <- port
-      mapM_ (\func -> func "Server is started.") [print, writingLine INFO]
+      mapM_ (\func -> func "Server is started.") [putStrLn, writingLine INFO]
       run port' app
