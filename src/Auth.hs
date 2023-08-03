@@ -14,30 +14,30 @@ import User (User (..), getUser)
 -- Returns the user with the username and password from the request.
 checkAuth :: RequestHeaders -> IO (Either String User)
 checkAuth ls =
-  if null fls
+  if null filteredLs
     then pure $ Left "No Authorization"
     else case decodeLogAndPass of
-      Left x -> do
-        writingLine ERROR x
-        pure $ Left x
-      Right [x, y] -> do
+      Left err -> do
+        writingLine ERROR err
+        pure $ Left err
+      Right [login, password] -> do
         conn <- connectDB
-        let qry = getUser $ Query $ "WHERE login = '" <> x <> "'"
+        let qry = getUser $ Query $ "WHERE login = '" <> login <> "'"
         writingLineDebug qry
         userList <- query_ conn qry :: IO [User]
         close conn
         writingLineDebug userList
-        pure $ checkPassword y userList
+        pure $ checkPassword password userList
       _ -> pure $ Left "No Authorization"
   where
-    fls = filter ((== "Authorization") . fst) ls
-    [(_, str)] = fls
+    filteredLs = filter ((== "Authorization") . fst) ls
+    [(_, str)] = filteredLs
     decodeLogAndPass = BC.split ':' <$> (BB.decode =<< (lastElem . BC.split ' ' $ str))
     lastElem [] = Left "Error! Empty list"
     lastElem arr = pure . (\(x : _) -> x) . reverse $ arr
     checkPassword _ [] = Left "No such user in DB"
-    checkPassword p (u : _)
-      | validatePassword p $ pass u = Right u
+    checkPassword password (user : _)
+      | validatePassword password $ pass user = Right user
       | otherwise = Left "No such user in DB"
 
 -- Returns the user ID.
@@ -45,7 +45,7 @@ authorID :: W.Request -> IO Query
 authorID req = do
   checkAuth' <- checkAuth (W.requestHeaders req)
   pure $ case checkAuth' of
-    Right u -> fromString $ show $ user_id u
+    Right user -> fromString $ show $ user_id user
     _ -> "Null"
 
 -- Checks the administrator rights of the user.
@@ -53,7 +53,7 @@ isAdmin :: W.Request -> IO Bool
 isAdmin req = do
   checkAuth' <- checkAuth (W.requestHeaders req)
   pure $ case checkAuth' of
-    Right u -> is_admin u
+    Right user -> is_admin user
     _ -> False
 
 -- Checks the user's ability to create news.
@@ -61,5 +61,5 @@ isAuthor :: W.Request -> IO Bool
 isAuthor req = do
   checkAuth' <- checkAuth (W.requestHeaders req)
   pure $ case checkAuth' of
-    Right u -> is_author u
+    Right user -> is_author user
     _ -> False

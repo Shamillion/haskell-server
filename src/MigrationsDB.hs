@@ -59,12 +59,12 @@ createTableUsers =
 -- Creating the first administrator. Required to create other users.
 addAdmin :: IO Query
 addAdmin = do
-  pass' <- cryptoPass (sum . map ord . BC.unpack $ "Adam") "sixthDay"
+  pass <- cryptoPass (sum . map ord . BC.unpack $ "Adam") "sixthDay"
   pure . Query $
     "INSERT INTO users \
     \ (user_id, name_user, login, pass, creation_date, is_admin, is_author) \
     \ VALUES (99, 'Adam', 'Adam', '"
-      <> pass'
+      <> pass
       <> "', NOW(), TRUE, FALSE) \
          \ ON CONFLICT DO NOTHING;"
 

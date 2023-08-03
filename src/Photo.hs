@@ -9,7 +9,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Database.PostgreSQL.Simple (close, execute, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Error (Error (CommonError), ParseError (DecodeImageError))
+import Error (Error (CommonError, ParseError), ParseError (DecodeImageError))
 
 -- Creating a query to the database to get one photo.
 getPhoto :: [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
@@ -18,25 +18,24 @@ getPhoto (x : _) =
   case x of
     (_, Nothing) -> Left CommonError
     (_, Just "") -> Left CommonError
-    (_, Just n) ->
-      if BC.all isDigit n
-        then Right . Query $ "SELECT image FROM photo WHERE photo_id = " <> n <> ";"
+    (_, Just numStr) ->
+      if BC.all isDigit numStr
+        then Right . Query $ "SELECT image FROM photo WHERE photo_id = " <> numStr <> ";"
         else Left CommonError
 
 -- Decoding photos from Base64.
-decodeImage :: [[T.Text]] -> Either ParseError LC.ByteString
-decodeImage [] = Left DecodeImageError
-decodeImage ([img] : _) = pure . decodeLenient . LC.fromStrict . encodeUtf8 $ img'
+decodeImage :: [[T.Text]] -> Either Error LC.ByteString
+decodeImage [] = Left $ ParseError DecodeImageError
+decodeImage ([image] : _) = pure . decodeLenient . LC.fromStrict . encodeUtf8 $ clearedImage
   where
-    img' = T.drop 1 . T.dropWhile (/= ',') $ img
-decodeImage (_ : _) = Left DecodeImageError
+    clearedImage = T.drop 1 . T.dropWhile (/= ',') $ image
+decodeImage (_ : _) = Left $ ParseError DecodeImageError
 
 -- The function sends the photo to the database and returns its ID in the table.
 sendPhotoToDB :: BC.ByteString -> IO BC.ByteString
 sendPhotoToDB str = do
   conn <- connectDB
   _ <- execute conn "INSERT INTO photo (image) VALUES (?);" [str]
-  num <- query_ conn "SELECT max(photo_id) FROM photo;" :: IO [[Int]]
+  [[val]] <- query_ conn "SELECT (max(photo_id) :: varchar) FROM photo;" :: IO [[BC.ByteString]]
   close conn
-  let [[num']] = num
-  pure . BC.pack . show $ num'
+  pure val

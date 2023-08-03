@@ -8,7 +8,7 @@ import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import qualified Database.PostgreSQL.Simple as DB
-import Error (Error (..), ParseError (AnotherError))
+import Error (CategoryError (..), Error (..))
 import Lib (drawOut)
 import MigrationsDB (checkDB)
 import Network.HTTP.Types (queryToQueryText, status200, status404, status406)
@@ -19,15 +19,13 @@ import Photo (decodeImage, getPhoto)
 import User (blockAdminRights, createUser, getUserAsText, parseUser)
 
 -- Defining the type of request and creating a response.
-setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO (Either ParseError LC.ByteString))
+setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO (Either Error LC.ByteString))
 setQueryAndRespond req = do
-  case (reqMtd, entity) of
+  case (reqMethod, entity) of
     ("GET", "news") ->
       (,)
         <$> (getNews <$> authId <*> method)
-          -- <*> (fmap encode . fmap sequence . mapM parseNews)
-          -- <*> pure (fmap (fmap encode) . fmap sequence . mapM parseNews)
-          <*> pure (fmap (fmap encode . sequence) . mapM parseNews)
+        <*> pure (fmap (fmap encode . sequence) . mapM parseNews)
     ("POST", "news") ->
       (,)
         <$> createNews athr authId arr
@@ -61,9 +59,9 @@ setQueryAndRespond req = do
         <$> editCategory categoryHandler adm arr
         <*> pure encodeWith
     ("GET", "photo") -> pure (getPhoto arr, pure . decodeImage)
-    _ -> pure (Left CommonError, const (pure $ Left AnotherError))
+    _ -> pure (Left CommonError, const (pure $ Left CommonError))
   where
-    reqMtd = W.requestMethod req
+    reqMethod = W.requestMethod req
     [entity] = W.pathInfo req
     authId = authorID req
     arr = W.queryString req
@@ -90,43 +88,49 @@ app req respond = do
   writingLineDebug $ W.queryString req
   writingLineDebug eitherQry
   case eitherQry of
-    Left CommonError -> responds status404 "text/plain" "404 Not Found.\n"
-    Left LoginOccupied -> respondsSts406 "This login is already in use.\n"
-    Left CategoryExists -> respondsSts406 "This category already exists.\n"
-    Left NoCategory -> respondsSts406 "There is no such category.\n"
-    Left NoParentCategory -> respondsSts406 "There is no such parent category.\n"
-    Left CategoryParentItself -> respondsSts406 "A category cannot be a parent to itself.\n"
+    Left LoginOccupied ->
+      respondsSts406 "This login is already in use.\n"
+    Left (CategoryError CategoryExists) ->
+      respondsSts406 "This category already exists.\n"
+    Left (CategoryError NoCategory) ->
+      respondsSts406 "There is no such category.\n"
+    Left (CategoryError NoParentCategory) ->
+      respondsSts406 "There is no such parent category.\n"
+    Left (CategoryError CategoryParentItself) ->
+      respondsSts406 "A category cannot be a parent to itself.\n"
+    Left _ -> responds status404 "text/plain" "404 Not Found.\n"
     Right qry -> do
       conn <- connectDB
-      val <- case W.requestMethod req of
+      dataFromDB <- case W.requestMethod req of
         "GET" -> DB.query_ conn qry :: IO [[T.Text]]
         _ -> (\x -> [[T.pack $ show x]]) <$> DB.execute_ conn qry
-      writingLineDebug val
+      writingLineDebug dataFromDB
       DB.close conn
-      let hdr =
+      let header =
             if W.pathInfo req == ["photo"]
-              then getHdr val'
+              then getHeader headerForPhoto
               else "text/plain"
-          val' = drawOut val
+          headerForPhoto = drawOut dataFromDB
       writingLine INFO "Sent a response to the request."
-      eitherAns <- resp val
+      eitherAns <- resp dataFromDB
+      writingLineDebug eitherAns
       case eitherAns of
         Left err -> do
           writingLine ERROR $ show err
           responds status404 "text/plain" "404 Not Found.\n"
-        Right ans -> responds status200 hdr ans
+        Right ans -> responds status200 header ans
   where
-    responds sts hdr = respond . W.responseLBS sts [("Content-Type", hdr)]
+    responds status header = respond . W.responseLBS status [("Content-Type", header)]
     respondsSts406 = responds status406 "text/plain"
-    getHdr = encodeUtf8 . T.drop 1 . T.takeWhile (/= ';') . T.dropWhile (/= ':')
+    getHeader = encodeUtf8 . T.drop 1 . T.takeWhile (/= ';') . T.dropWhile (/= ':')
 
 main :: IO ()
 main = do
-  x <- checkDB 1
-  writingLine DEBUG $ "checkDB was runing " <> show x <> " times."
-  if x > 2
-    then print ("Error Database! Server can not be started!" :: String)
+  num <- checkDB 1
+  writingLine DEBUG $ "checkDB was runing " <> show num <> " times."
+  if num > 2
+    then putStrLn "Error Database! Server can not be started!"
     else do
       port' <- port
-      mapM_ (\f -> f "Server is started.") [print, writingLine INFO]
+      mapM_ (\func -> func "Server is started.") [putStrLn, writingLine INFO]
       run port' app

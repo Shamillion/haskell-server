@@ -9,17 +9,17 @@ import qualified Data.ByteString.Char8 as BC
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.String (IsString)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Error (Error (..))
+import Error (CategoryError (..), Error (..))
 import Test.Hspec (SpecWith, it, shouldBe)
 
 categoryTestHandler :: CategoryHandle Identity
 categoryTestHandler = CategoryHandle {checkUniqCategoryH = testUniqCategory}
 
 testUniqCategory :: (Eq a, Data.String.IsString a) => a -> Identity Bool
-testUniqCategory e = pure $ e `notElem` ["parentCategory", "Null", "existCategory"]
+testUniqCategory val = pure $ val `notElem` ["parentCategory", "Null", "existCategory"]
 
 createCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
-createCategory' b ls = runIdentity $ createCategory categoryTestHandler (pure b) ls
+createCategory' bool ls = runIdentity $ createCategory categoryTestHandler (pure bool) ls
 
 testsFunctionCreateCategory :: SpecWith ()
 testsFunctionCreateCategory = do
@@ -45,19 +45,19 @@ testsFunctionCreateCategory = do
         )
   it "Parent category does not exist" $
     createCategory' True [("notExistCategory>category", Nothing)]
-      `shouldBe` Left NoParentCategory
+      `shouldBe` Left (CategoryError NoParentCategory)
   it "Name of category is not unique" $
     createCategory' True [("parentCategory>existCategory", Nothing)]
-      `shouldBe` Left CategoryExists
+      `shouldBe` Left (CategoryError CategoryExists)
   it "Parent category does not exist and name of category is not unique" $
     createCategory' True [("notExistCategory>existCategory", Nothing)]
-      `shouldBe` Left CategoryExists
+      `shouldBe` Left (CategoryError CategoryExists)
   it "Name of category and name of parent category are equal" $
     createCategory' True [("parentCategory>parentCategory", Nothing)]
-      `shouldBe` Left CategoryExists
+      `shouldBe` Left (CategoryError CategoryExists)
   it "Name of category and name of parent category are equal and don't exist" $
     createCategory' True [("notExistCategory>notExistCategory", Nothing)]
-      `shouldBe` Left NoParentCategory
+      `shouldBe` Left (CategoryError NoParentCategory)
   it "Syntax mistake in request" $
     createCategory' True [("parentCategory<category", Nothing)]
       `shouldBe` Right
@@ -111,13 +111,13 @@ testsFunctionCreateCategory = do
         )
   it "Without category" $
     createCategory' True [("parentCategory>", Nothing)]
-      `shouldBe` Left CategoryExists
+      `shouldBe` Left (CategoryError CategoryExists)
   it "Without both categories" $
     createCategory' True [(">", Nothing)]
       `shouldBe` Left CommonError
 
 editCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
-editCategory' b ls = runIdentity $ editCategory categoryTestHandler (pure b) ls
+editCategory' bool ls = runIdentity $ editCategory categoryTestHandler (pure bool) ls
 
 testsFunctionEditCategory :: SpecWith ()
 testsFunctionEditCategory = do
@@ -198,13 +198,13 @@ testsFunctionEditCategory = do
         )
   it "Method is change_name: such category already exists" $
     editCategory' True [("change_name", Just "parentCategory>existCategory")]
-      `shouldBe` Left CategoryExists
+      `shouldBe` Left (CategoryError CategoryExists)
   it "Method is change_name: new name and old name are the same" $
     editCategory' True [("change_name", Just "existCategory>existCategory")]
-      `shouldBe` Left CategoryExists
+      `shouldBe` Left (CategoryError CategoryExists)
   it "Method is change_name: this category doesn't exist" $
     editCategory' True [("change_name", Just "someNameCategory>newCategory")]
-      `shouldBe` Left NoCategory
+      `shouldBe` Left (CategoryError NoCategory)
   it "Method is change_name: everything is all right" $
     editCategory' True [("change_name", Just "existCategory>newCategory")]
       `shouldBe` Right
@@ -220,7 +220,7 @@ testsFunctionEditCategory = do
     "Method is change_parent: names of category and parent \
     \category are the same"
     $ editCategory' True [("change_parent", Just "existCategory>existCategory")]
-      `shouldBe` Left CategoryParentItself
+      `shouldBe` Left (CategoryError CategoryParentItself)
   it "Method is change_parent: this category doesn't exist" $
     editCategory'
       True
@@ -228,10 +228,10 @@ testsFunctionEditCategory = do
           Just "someNameCategory>parentCategory"
         )
       ]
-      `shouldBe` Left NoCategory
+      `shouldBe` Left (CategoryError NoCategory)
   it "Method is change_parent: this parent category doesn't exist" $
     editCategory' True [("change_parent", Just "existCategory>someNameCategory")]
-      `shouldBe` Left NoParentCategory
+      `shouldBe` Left (CategoryError NoParentCategory)
   it "Method is change_parent: everything is all right" $
     editCategory' True [("change_parent", Just "existCategory>parentCategory")]
       `shouldBe` Right
@@ -257,4 +257,4 @@ testsFunctionEditCategory = do
       `shouldBe` Left CommonError
   it "Method is change_parent: this category doesn't exist" $
     editCategory' True [("change_parent", Just "newCategory>parentCategory")]
-      `shouldBe` Left NoCategory
+      `shouldBe` Left (CategoryError NoCategory)

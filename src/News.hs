@@ -15,7 +15,7 @@ import Data.String (fromString)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Error (Error (CommonError), ParseError (ParseNewsError))
+import Error (Error (CommonError, ParseError), ParseError (ParseNewsError))
 import GHC.Generics (Generic)
 import Lib (initTxt, readNum, splitOnTxt, tailTxt)
 import Photo (sendPhotoToDB)
@@ -24,8 +24,8 @@ import User (User, parseUser)
 
 -- Creating a database query to get a list of news.
 getNews :: Query -> Maybe (Query, Query) -> Either Error Query
-getNews auth str =
-  if isNothing str
+getNews author parametersForNews =
+  if isNothing parametersForNews
     then Left CommonError
     else
       Right $
@@ -39,15 +39,15 @@ getNews auth str =
         \ FROM users ) author ON news.user_id = author.user_id \
         \ WHERE (is_published = TRUE OR is_published = FALSE AND \
         \ author.user_id = "
-          <> auth
+          <> author
           <> ") AND "
-          <> fltr
+          <> filterForNews
           <> " GROUP BY news_id, title, news.creation_date, author, author.name_user, \
              \ name_category, photo, content, is_published "
-          <> srt
+          <> sortOptions
           <> ";"
   where
-    Just (fltr, srt) = str
+    Just (filterForNews, sortOptions) = parametersForNews
 
 data News = News
   { news_id :: Int,
@@ -73,20 +73,22 @@ newsHandler =
       setLimitAndOffsetH = setLimitAndOffset newsHandler
     }
 
-parseNews :: [T.Text] -> IO (Either ParseError News)
-parseNews ls
-  | length ls /= 8 = pure $ Left ParseNewsError
-  | idNws == 0 = pure $ Left ParseNewsError
-  | otherwise = do
-    cats <- getParentCategories n4
-    pure $ eitherAuthor >>= \athr -> pure $ News idNws n1 n2 athr cats n5 pht isPbl
-  where
-    [n0, n1, n2, n3, n4, n5, n6, n7] = ls
-    idNws = readNum n0
-    splitText = splitOnTxt "," . tailTxt . initTxt
-    eitherAuthor = parseUser $ splitText n3
-    pht = map ("/photo?get_photo=" <>) $ splitText n6
-    isPbl = n7 == "true" || n7 == "t"
+parseNews :: [T.Text] -> IO (Either Error News)
+parseNews [newsIdTxt, title, creation_date, authorTxt, categoryTxt, content, photoTxt, isPublishedTxt] = do
+  let news_id = readNum newsIdTxt
+      splitText = splitOnTxt "," . tailTxt . initTxt
+      eitherAuthor = parseUser $ splitText authorTxt
+      photo = map ("/photo?get_photo=" <>) $ splitText photoTxt
+      is_published = isPublishedTxt == "true" || isPublishedTxt == "t"
+  if news_id == 0
+    then pure . Left $ ParseError ParseNewsError
+    else do
+      categories <- getParentCategories categoryTxt
+      pure $
+        eitherAuthor >>= \author ->
+          pure $
+            News news_id title creation_date author categories content photo is_published
+parseNews _ = pure . Left $ ParseError ParseNewsError
 
 setMethodNews ::
   Monad m =>
@@ -97,23 +99,23 @@ setMethodNews NewsyHandle {..} ls = do
   setLimOffs <- setLimitAndOffsetH ls
   let sortNewsLimitOffset = fmap (<> setLimOffs) sortNews
   pure $ do
-    a <- filterNews
-    b <- sortNewsLimitOffset
-    pure (a, b)
+    filterForNews <- filterNews
+    sortAndLimitAndOffset <- sortNewsLimitOffset
+    pure (filterForNews, sortAndLimitAndOffset)
   where
     filterNews = setFiltersNews $ LT.filter ((`notElem` fields) . fst) ls
     fields = ["sort_by", "limit", "offset"]
     sortNews =
       case findSort of
-        [("sort_by", Just x)] -> sortBy x
+        [("sort_by", Just param)] -> sortBy param
         _ -> pure ""
     findSort = LT.filter ((== "sort_by") . fst) ls
 
 -- Processing of the "sort_by=..." part of the request.
 sortBy :: T.Text -> Maybe Query
-sortBy mthd =
+sortBy field =
   ("ORDER BY " <>)
-    <$> case mthd of
+    <$> case field of
       "date" -> Just "creation_date"
       "author" -> Just "author.name_user"
       "category" -> Just "name_category"
@@ -123,24 +125,24 @@ sortBy mthd =
 -- Processing parts of the request for filtering and searching.
 setFiltersNews :: [(T.Text, Maybe T.Text)] -> Maybe Query
 setFiltersNews [] = pure "title LIKE '%'"
-setFiltersNews ((mthd, param) : xs)
+setFiltersNews ((field, param) : xs)
   | null xs = choiceFilter
   | otherwise = choiceFilter >>= nextStep
   where
-    nextStep n = ((n <> " AND ") <>) <$> setFiltersNews xs
+    nextStep maybeQuery = ((maybeQuery <> " AND ") <>) <$> setFiltersNews xs
     choiceFilter =
-      case mthd of
+      case field of
         "created_at" -> creationDate "="
         "created_until" -> creationDate "<"
         "created_since" -> creationDate ">="
-        "author" -> param' <&> (("name_user = '" <>) . (<> "'"))
-        "category" -> ("News.category_id = " <>) <$> param'
-        "title" -> param' <&> (("title ILIKE '%" <>) . (<> "%'"))
-        "content" -> param' <&> (("content ILIKE '%" <>) . (<> "%'"))
-        "search" -> param' <&> (("(content || name_user || name_category) ILIKE '%" <>) . (<> "%'"))
+        "author" -> argument <&> (("name_user = '" <>) . (<> "'"))
+        "category" -> ("News.category_id = " <>) <$> argument
+        "title" -> argument <&> (("title ILIKE '%" <>) . (<> "%'"))
+        "content" -> argument <&> (("content ILIKE '%" <>) . (<> "%'"))
+        "search" -> argument <&> (("(content || name_user || name_category) ILIKE '%" <>) . (<> "%'"))
         _ -> Nothing
-    param' = fromString . T.unpack <$> param
-    creationDate x = (("News.creation_date " <> x <> " '") <>) <$> param' <&> (<> "'")
+    argument = fromString . T.unpack <$> param
+    creationDate x = (("News.creation_date " <> x <> " '") <>) <$> argument <&> (<> "'")
 
 setLimitAndOffset ::
   Monad m =>
@@ -148,18 +150,18 @@ setLimitAndOffset ::
   [(T.Text, Maybe T.Text)] ->
   m Query
 setLimitAndOffset NewsyHandle {..} ls = do
-  val <- limitElemH
-  let lmt = listToValue "limit" lessVal val
-      lessVal x = if x > 0 && x < val then x else val
-  pure . Query $ " LIMIT " <> lmt <> " OFFSET " <> ofst
+  limitInFile <- limitElemH
+  let limit = listToValue "limit" setLimit limitInFile
+      setLimit val = if val > 0 && val < limitInFile then val else limitInFile
+  pure . Query $ " LIMIT " <> limit <> " OFFSET " <> offset
   where
-    ofst = listToValue "offset" (max 0) 0
-    getMaybe wrd f =
-      (LT.find ((== wrd) . fst) ls >>= snd >>= readMaybe . T.unpack) <&> f
-    listToValue wrd f x = toByteString $
-      case getMaybe wrd f of
-        Just n -> n
-        _ -> x
+    offset = listToValue "offset" (max 0) 0
+    getMaybe param func =
+      (LT.find ((== param) . fst) ls >>= snd >>= readMaybe . T.unpack) <&> func
+    listToValue param func defaultVal = toByteString $
+      case getMaybe param func of
+        Just val -> val
+        _ -> defaultVal
     toByteString = BC.pack . show
 
 -- Request example:
@@ -167,9 +169,9 @@ setLimitAndOffset NewsyHandle {..} ls = do
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
 createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
-createNews auth authID ls = do
-  auth' <- auth
-  if not auth' || null ls || nothingInLs
+createNews isAuth authID ls = do
+  isAuth' <- isAuth
+  if not isAuth' || null ls || nothingInLs
     then pure $ Left CommonError
     else do
       authID' <- authID
@@ -209,9 +211,9 @@ createNews auth authID ls = do
 -- Puts the photos from the query into the database and
 --  returns a list from the ID.
 photoIDLs :: [(BC.ByteString, Maybe BC.ByteString)] -> IO BC.ByteString
-photoIDLs ls = ls' <&> (\x -> "'{" <> buildPhotoIdString x <> "}'")
+photoIDLs ls = idLs <&> (\x -> "'{" <> buildPhotoIdString x <> "}'")
   where
-    ls' = mapM (sendPhotoToDB . fromMaybe "" . snd) . filter ((== "photo") . fst) $ ls
+    idLs = mapM (sendPhotoToDB . fromMaybe "" . snd) . filter ((== "photo") . fst) $ ls
 
 buildPhotoIdString :: [BC.ByteString] -> BC.ByteString
 buildPhotoIdString [] = ""
@@ -223,17 +225,17 @@ buildPhotoIdString (x : xs) = x <> ", " <> buildPhotoIdString xs
 --       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
 editNews :: IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
-editNews auth ls = do
-  auth' <- auth
-  author' <- authorNews (fromQuery auth') newsId
-  if null ls || not author'
+editNews authId ls = do
+  authId' <- authId
+  isAuth <- authorNews (fromQuery authId') newsId
+  if null ls || not isAuth
     then pure $ Left CommonError
     else do
-      photo' <- photoIdList
+      photoIdStr <- photoIdList
       let maybeStr =
-            buildChanges ls' >>= \str ->
+            buildChanges filteredLs >>= \str ->
               pure $
-                "UPDATE news SET " <> photo' <> str
+                "UPDATE news SET " <> photoIdStr <> str
                   <> " WHERE news_id = "
                   <> newsId
                   <> ";"
@@ -244,13 +246,13 @@ editNews auth ls = do
     newsId = case LT.find (\(x, _) -> x == "news_id") ls of
       Just (_, Just n) -> n
       _ -> "0"
-    ls' = LT.filter (\(x, y) -> elem x fields && isJust y) ls
+    filteredLs = LT.filter (\(x, y) -> elem x fields && isJust y) ls
     fields = ["title", "category_id", "content", "is_published"]
     photoIdList =
       if "photo" `elem` map fst ls
         then do
-          x <- photoIDLs ls
-          pure $ "photo = " <> x <> ", "
+          str <- photoIDLs ls
+          pure $ "photo = " <> str <> ", "
         else pure ""
 
 -- Checks whether this user is the author of this news.
@@ -271,8 +273,8 @@ authorNews authId newsId = do
 -- Creates a row with updated news fields.
 buildChanges :: [(BC.ByteString, Maybe BC.ByteString)] -> Maybe BC.ByteString
 buildChanges [] = Nothing
-buildChanges [(x, y)] = y >>= \y' -> pure $ x <> " = " <> q <> y' <> q
+buildChanges [(field, maybeParam)] = maybeParam >>= \param -> pure $ field <> " = " <> q <> param <> q
   where
-    q = if x `elem` fields then "'" else ""
+    q = if field `elem` fields then "'" else ""
     fields = ["title", "content"]
-buildChanges ((x, y) : xs) = buildChanges [(x, y)] <> pure ", " <> buildChanges xs
+buildChanges ((field, maybeParam) : xs) = buildChanges [(field, maybeParam)] <> pure ", " <> buildChanges xs

@@ -1,7 +1,22 @@
 module Error where
 
-data Error = CommonError | LoginOccupied | CategoryExists | NoCategory | NoParentCategory | CategoryParentItself
+data Error
+  = CommonError
+  | LoginOccupied
+  | CategoryError CategoryError
+  | ParseError ParseError
   deriving (Show, Eq)
 
-data ParseError = DecodeImageError | ParseCategoryError | ParseNewsError | ParseUserError | AnotherError
+data CategoryError
+  = CategoryExists
+  | NoCategory
+  | NoParentCategory
+  | CategoryParentItself
+  deriving (Show, Eq)
+
+data ParseError
+  = DecodeImageError
+  | ParseCategoryError
+  | ParseNewsError
+  | ParseUserError
   deriving (Show, Eq)
