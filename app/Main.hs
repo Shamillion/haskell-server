@@ -14,9 +14,25 @@ import MigrationsDB (checkDB)
 import Network.HTTP.Types (queryToQueryText, status200, status404, status406)
 import qualified Network.Wai as W
 import Network.Wai.Handler.Warp (run)
-import News (createNews, editNews, getNews, newsHandler, parseNews, setLimitAndOffset, setMethodNews)
+import News (createNews, editNews, getNews, newsHandler, parseNews, setLimitAndOffset, setMethodNews, getNewsHandler)
 import Photo (decodeImage, getPhoto)
 import User (blockAdminRights, createUser, getUserAsText, parseUser)
+
+handler :: W.Request -> IO LC.ByteString
+handler req = do
+  case (reqMethod, entity) of
+    ("GET", "news") -> getNewsHandler req
+--     ("POST", "news") -> createNewsHandler req
+--     ("PUT", "news") -> editNews req
+--     ("GET", "user") -> getUserAsText req
+--     ("GET", "category") -> getCategory req
+--     ("POST", "category") -> createCategory req
+--     ("PUT", "category") -> editCategory req
+--     ("GET", "photo") -> getPhoto req
+    _ -> pure "Error"
+  where
+    reqMethod = W.requestMethod req
+    [entity] = W.pathInfo req    
 
 -- Defining the type of request and creating a response.
 setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO (Either Error LC.ByteString))

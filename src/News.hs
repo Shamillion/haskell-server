@@ -3,24 +3,29 @@
 
 module News where
 
+import Auth (authorID)
 import Category (getParentCategories)
-import Config (connectDB, limitElem)
+import Config (Priority (ERROR), connectDB, limitElem, writingLine, writingLineDebug)
 import Control.Applicative (liftA2)
-import Data.Aeson (ToJSON)
+import Data.Aeson (ToJSON, encode)
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.Functor ((<&>))
 import Data.List as LT (filter, find)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.String (fromString)
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (close, query)
+import Database.PostgreSQL.Simple (close, query, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error (Error (CommonError, ParseError), ParseError (ParseNewsError))
 import GHC.Generics (Generic)
 import Lib (initTxt, readNum, splitOnTxt, tailTxt)
+import Network.HTTP.Types (queryToQueryText)
+import qualified Network.Wai as W
 import Photo (sendPhotoToDB)
 import Text.Read (readMaybe)
 import User (User, parseUser)
+import Control.Exception (throwIO)
 
 -- Creating a database query to get a list of news.
 getNews :: Query -> Maybe (Query, Query) -> Either Error Query
@@ -89,6 +94,23 @@ parseNews [newsIdTxt, title, creation_date, authorTxt, categoryTxt, content, pho
           pure $
             News news_id title creation_date author categories content photo is_published
 parseNews _ = pure . Left $ ParseError ParseNewsError
+
+parseNews' :: [T.Text] -> IO News
+parseNews' [newsIdTxt, title, creation_date, authorTxt, categoryTxt, content, photoTxt, isPublishedTxt] = do
+  let news_id = readNum newsIdTxt
+      splitText = splitOnTxt "," . tailTxt . initTxt
+      eitherAuthor = parseUser $ splitText authorTxt
+      photo = map ("/photo?get_photo=" <>) $ splitText photoTxt
+      is_published = isPublishedTxt == "true" || isPublishedTxt == "t"
+  if news_id == 0
+    then throwIO $ ParseError ParseNewsError
+    else do
+      case eitherAuthor of
+        Left err -> throwIO err
+        Right author -> do
+          categories <- getParentCategories categoryTxt
+          pure $ News news_id title creation_date author categories content photo is_published
+parseNews' _ = throwIO $ ParseError ParseNewsError
 
 setMethodNews ::
   Monad m =>
@@ -278,3 +300,32 @@ buildChanges [(field, maybeParam)] = maybeParam >>= \param -> pure $ field <> " 
     q = if field `elem` fields then "'" else ""
     fields = ["title", "content"]
 buildChanges ((field, maybeParam) : xs) = buildChanges [(field, maybeParam)] <> pure ", " <> buildChanges xs
+
+getNewsHandler :: W.Request -> IO LC.ByteString
+getNewsHandler req = do
+  queryNews <- mkGetNewsQuery req -- 1 формируем запрос к бд - это у тебя (getNews <$> authId <*> method)
+  newsTxt <- runQuery queryNews -- 2 запускаем запрос, функция `runQuery` у тебя сейчас внутри app, нужно ее вынести отдельно
+  encodeNews newsTxt -- 3 формируем ответ - это просто `encode`
+
+mkGetNewsQuery :: W.Request -> IO (Either Error Query)
+mkGetNewsQuery req = getNews <$> authorID req <*> method
+  where
+    method = setMethodNews newsHandler . queryToQueryText $ W.queryString req
+
+runQuery :: Either Error Query -> IO [[T.Text]]
+runQuery eitherQry = do
+  case eitherQry of
+    Left err -> do
+      writingLine ERROR $ show err
+      throwIO err
+    Right qry -> do
+      conn <- connectDB
+      dataFromDB <- query_ conn qry :: IO [[T.Text]]
+      writingLineDebug dataFromDB
+      close conn
+      pure dataFromDB
+
+encodeNews :: [[T.Text]] -> IO LC.ByteString
+encodeNews = fmap encode . mapM parseNews' 
+  
+ 

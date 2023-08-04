@@ -141,7 +141,7 @@ editCategory CategoryHandle {..} isAdmin ls = do
       map
         ( \x ->
             if length (snd x) /= 2
-              then ("404", ["", ""])
+              then ("", ["", ""])
               else x
         )
         categories
@@ -149,35 +149,36 @@ editCategory CategoryHandle {..} isAdmin ls = do
       | method == "change_parent" && name == new_name = Left $ CategoryError CategoryParentItself
       | method == "change_name" && not isUniq = Left $ CategoryError CategoryExists
       | method == "change_parent" && isUniq && new_name /= "Null" = Left $ CategoryError NoParentCategory
-      | otherwise = checkQuery $ map buildQuery methodAndNames
-    checkQuery lq = if "404" `elem` lq then Left CommonError else Right . Query $ mconcat lq
+      | otherwise = Query . mconcat <$> mapM buildQuery methodAndNames
     buildQuery (meth, [nameCategory, newNameCategory]) =
       case meth of
         "change_name" ->
-          "UPDATE category \
-          \ SET   parent_category = '"
-            <> newNameCategory
-            <> "' \
-               \ WHERE parent_category = '"
-            <> nameCategory
-            <> "'; \
-               \ UPDATE category \
-               \ SET   name_category = '"
-            <> newNameCategory
-            <> "' \
-               \ WHERE name_category = '"
-            <> nameCategory
-            <> "'; "
+          pure $
+            "UPDATE category \
+            \ SET   parent_category = '"
+              <> newNameCategory
+              <> "' \
+                 \ WHERE parent_category = '"
+              <> nameCategory
+              <> "'; \
+                 \ UPDATE category \
+                 \ SET   name_category = '"
+              <> newNameCategory
+              <> "' \
+                 \ WHERE name_category = '"
+              <> nameCategory
+              <> "'; "
         "change_parent" ->
-          "UPDATE category \
-          \ SET parent_category = '"
-            <> newNameCategory
-            <> "' \
-               \ WHERE name_category = '"
-            <> nameCategory
-            <> "'; "
-        _ -> "404"
-    buildQuery (_, _) = "404"
+          pure $
+            "UPDATE category \
+            \ SET parent_category = '"
+              <> newNameCategory
+              <> "' \
+                 \ WHERE name_category = '"
+              <> nameCategory
+              <> "'; "
+        _ -> Left CommonError
+    buildQuery (_, _) = Left CommonError
 
 -- Checking the uniqueness of the category name in the database.
 checkUniqCategory :: BC.ByteString -> IO Bool
