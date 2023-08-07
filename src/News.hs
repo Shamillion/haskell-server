@@ -3,19 +3,21 @@
 
 module News where
 
-import Auth (authorID)
+import Auth (authorID, isAuthor)
 import Category (getParentCategories)
-import Config (Priority (ERROR), connectDB, limitElem, writingLine, writingLineDebug)
+import Config (connectDB, limitElem, writingLineDebug)
 import Control.Applicative (liftA2)
+import Control.Exception (throwIO)
 import Data.Aeson (ToJSON, encode)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.Functor ((<&>))
+import Data.Int (Int64)
 import Data.List as LT (filter, find)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.String (fromString)
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (close, query, query_)
+import Database.PostgreSQL.Simple (close, execute_, query, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error (Error (CommonError, ParseError), ParseError (ParseNewsError))
 import GHC.Generics (Generic)
@@ -25,32 +27,30 @@ import qualified Network.Wai as W
 import Photo (sendPhotoToDB)
 import Text.Read (readMaybe)
 import User (User, parseUser)
-import Control.Exception (throwIO)
 
 -- Creating a database query to get a list of news.
-getNews :: Query -> Maybe (Query, Query) -> Either Error Query
-getNews author parametersForNews =
-  if isNothing parametersForNews
-    then Left CommonError
-    else
-      Right $
-        "SELECT (news_id :: TEXT), title, (news.creation_date :: TEXT), \
-        \ (author :: TEXT), name_category, content, (photo :: TEXT), \
-        \ (is_published :: TEXT) \
-        \ FROM news \
-        \ INNER JOIN category ON news.category_id = category.category_id \
-        \ INNER JOIN ( SELECT user_id, name_user, users.creation_date, is_admin, \
-        \ is_author \
-        \ FROM users ) author ON news.user_id = author.user_id \
-        \ WHERE (is_published = TRUE OR is_published = FALSE AND \
-        \ author.user_id = "
-          <> author
-          <> ") AND "
-          <> filterForNews
-          <> " GROUP BY news_id, title, news.creation_date, author, author.name_user, \
-             \ name_category, photo, content, is_published "
-          <> sortOptions
-          <> ";"
+getNews :: W.Request -> Maybe (Query, Query) -> IO Query
+getNews _ Nothing = throwIO CommonError
+getNews req parametersForNews = do
+  author <- authorID req
+  pure $
+    "SELECT (news_id :: TEXT), title, (news.creation_date :: TEXT), \
+    \ (author :: TEXT), name_category, content, (photo :: TEXT), \
+    \ (is_published :: TEXT) \
+    \ FROM news \
+    \ INNER JOIN category ON news.category_id = category.category_id \
+    \ INNER JOIN ( SELECT user_id, name_user, users.creation_date, is_admin, \
+    \ is_author \
+    \ FROM users ) author ON news.user_id = author.user_id \
+    \ WHERE (is_published = TRUE OR is_published = FALSE AND \
+    \ author.user_id = "
+      <> author
+      <> ") AND "
+      <> filterForNews
+      <> " GROUP BY news_id, title, news.creation_date, author, author.name_user, \
+         \ name_category, photo, content, is_published "
+      <> sortOptions
+      <> ";"
   where
     Just (filterForNews, sortOptions) = parametersForNews
 
@@ -230,6 +230,46 @@ createNews isAuth authID ls = do
     isPublished = getValue "is_published"
     getValue str = LT.find (\(x, _) -> x == str) ls >>= snd
 
+createNews' :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+createNews' isAuth authID ls = do
+  isAuth' <- isAuth
+  if not isAuth' || null ls || nothingInLs
+    then throwIO CommonError
+    else do
+      authID' <- authID
+      photoIdList <- photoIDLs ls
+      let maybeStr =
+            foldr
+              (liftA2 (<>))
+              (Just "")
+              [ pure
+                  "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
+                  \ content, is_published) \
+                  \ VALUES ('",
+                titleNws,
+                pure "', NOW(), ",
+                pure $ fromQuery authID',
+                pure ", ",
+                categoryId,
+                pure ", ",
+                pure photoIdList,
+                pure ", '",
+                contentNws,
+                pure "', ",
+                isPublished,
+                pure ");"
+              ]
+      case maybeStr of
+        Just str -> pure $ Query str
+        Nothing -> throwIO CommonError
+  where
+    nothingInLs = any (\(_, y) -> isNothing y) ls
+    titleNws = getValue "title"
+    categoryId = getValue "category_id"
+    contentNws = getValue "content"
+    isPublished = getValue "is_published"
+    getValue str = LT.find (\(x, _) -> x == str) ls >>= snd
+
 -- Puts the photos from the query into the database and
 --  returns a list from the ID.
 photoIDLs :: [(BC.ByteString, Maybe BC.ByteString)] -> IO BC.ByteString
@@ -277,6 +317,37 @@ editNews authId ls = do
           pure $ "photo = " <> str <> ", "
         else pure ""
 
+editNews' :: IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+editNews' authId ls = do
+  authId' <- authId
+  isAuth <- authorNews (fromQuery authId') newsId
+  if null ls || not isAuth
+    then throwIO CommonError
+    else do
+      photoIdStr <- photoIdList
+      let maybeStr =
+            buildChanges filteredLs >>= \str ->
+              pure $
+                "UPDATE news SET " <> photoIdStr <> str
+                  <> " WHERE news_id = "
+                  <> newsId
+                  <> ";"
+      case maybeStr of
+        Just str -> pure $ Query str
+        Nothing -> throwIO CommonError
+  where
+    newsId = case LT.find (\(x, _) -> x == "news_id") ls of
+      Just (_, Just n) -> n
+      _ -> "0"
+    filteredLs = LT.filter (\(x, y) -> elem x fields && isJust y) ls
+    fields = ["title", "category_id", "content", "is_published"]
+    photoIdList =
+      if "photo" `elem` map fst ls
+        then do
+          str <- photoIDLs ls
+          pure $ "photo = " <> str <> ", "
+        else pure ""
+
 -- Checks whether this user is the author of this news.
 authorNews :: BC.ByteString -> BC.ByteString -> IO Bool
 authorNews "Null" _ = pure False
@@ -304,28 +375,45 @@ buildChanges ((field, maybeParam) : xs) = buildChanges [(field, maybeParam)] <> 
 getNewsHandler :: W.Request -> IO LC.ByteString
 getNewsHandler req = do
   queryNews <- mkGetNewsQuery req -- 1 формируем запрос к бд - это у тебя (getNews <$> authId <*> method)
-  newsTxt <- runQuery queryNews -- 2 запускаем запрос, функция `runQuery` у тебя сейчас внутри app, нужно ее вынести отдельно
+  newsTxt <- runGetQuery queryNews -- 2 запускаем запрос, функция `runQuery` у тебя сейчас внутри app, нужно ее вынести отдельно
   encodeNews newsTxt -- 3 формируем ответ - это просто `encode`
 
-mkGetNewsQuery :: W.Request -> IO (Either Error Query)
-mkGetNewsQuery req = getNews <$> authorID req <*> method
+mkGetNewsQuery :: W.Request -> IO Query
+mkGetNewsQuery req = method >>= getNews req
   where
     method = setMethodNews newsHandler . queryToQueryText $ W.queryString req
 
-runQuery :: Either Error Query -> IO [[T.Text]]
-runQuery eitherQry = do
-  case eitherQry of
-    Left err -> do
-      writingLine ERROR $ show err
-      throwIO err
-    Right qry -> do
-      conn <- connectDB
-      dataFromDB <- query_ conn qry :: IO [[T.Text]]
-      writingLineDebug dataFromDB
-      close conn
-      pure dataFromDB
+runGetQuery :: Query -> IO [[T.Text]]
+runGetQuery qry = do
+  conn <- connectDB
+  dataFromDB <- query_ conn qry :: IO [[T.Text]]
+  writingLineDebug dataFromDB
+  close conn
+  pure dataFromDB
 
 encodeNews :: [[T.Text]] -> IO LC.ByteString
-encodeNews = fmap encode . mapM parseNews' 
-  
- 
+encodeNews = fmap encode . mapM parseNews'
+
+createNewsHandler :: W.Request -> IO LC.ByteString
+createNewsHandler req = do
+  queryNews <- mkCreateNewsQuery req -- 1 формируем запрос к бд - это у тебя (getNews <$> authId <*> method)
+  num <- runPostQuery queryNews -- 2 запускаем запрос, функция `runQuery` у тебя сейчас внутри app, нужно ее вынести отдельно
+  sendComment num -- 3 формируем ответ - это просто `encode`
+
+mkCreateNewsQuery :: W.Request -> IO Query
+mkCreateNewsQuery req = createNews' athr authId arr
+  where
+    athr = isAuthor req
+    authId = authorID req
+    arr = W.queryString req
+
+runPostQuery :: Query -> IO Int64
+runPostQuery qry = do
+  conn <- connectDB
+  num <- execute_ conn qry
+  close conn
+  writingLineDebug num
+  pure num
+
+sendComment :: Int64 -> IO LC.ByteString
+sendComment num = pure $ LC.pack (show num) <> " position(s) done."
