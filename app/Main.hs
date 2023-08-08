@@ -2,7 +2,7 @@
 
 module Main where
 
-import Auth (authorID, checkAuth, isAdmin, isAuthor)
+import Auth (checkAuth, isAdmin)
 import Category (categoryHandler, createCategory, editCategory, getCategory, parseCategory)
 import Config (Priority (..), port, writingLine, writingLineDebug)
 import Control.Exception (catch)
@@ -12,22 +12,24 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import qualified Database.PostgreSQL.Simple as DB
 import Error (CategoryError (..), Error (..))
-import Lib (drawOut)
+import Lib (createAndEditHandler, drawOut, limitAndOffsetHandler, setLimitAndOffset)
 import MigrationsDB (checkDB)
 import Network.HTTP.Types (queryToQueryText, status200, status404, status406)
 import qualified Network.Wai as W
 import Network.Wai.Handler.Warp (run)
-import News (createNews, createNewsHandler, editNews, getNewsHandler, newsHandler, setLimitAndOffset)
+import News (getNewsHandler, mkCreateNewsQuery, mkEditNewsQuery)
 import Photo (decodeImage, getPhoto)
-import User (blockAdminRights, createUser, getUserAsText, parseUser)
+import User (getUserHandler, mkCreateUserQuery, mkEditUserQuery)
 
 handler :: W.Request -> IO LC.ByteString
 handler req = do
   case (reqMethod, entity) of
     ("GET", "news") -> getNewsHandler req
-    ("POST", "news") -> createNewsHandler req
-    --     ("PUT", "news") -> editNews req
-    --     ("GET", "user") -> getUserAsText req
+    ("POST", "news") -> createAndEditHandler mkCreateNewsQuery req
+    ("PUT", "news") -> createAndEditHandler mkEditNewsQuery req
+    ("GET", "user") -> getUserHandler req
+    ("POST", "user") -> createAndEditHandler (mkCreateUserQuery adm) req
+    ("PUT", "user") -> createAndEditHandler (mkEditUserQuery adm) req
     --     ("GET", "category") -> getCategory req
     --     ("POST", "category") -> createCategory req
     --     ("PUT", "category") -> editCategory req
@@ -36,6 +38,7 @@ handler req = do
   where
     reqMethod = W.requestMethod req
     [entity] = W.pathInfo req
+    adm = isAdmin req
 
 -- Defining the type of request and creating a response.
 setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO (Either Error LC.ByteString))
@@ -45,26 +48,26 @@ setQueryAndRespond req = do
     --   (,)
     --     <$> (getNews <$> authId <*> method)
     --     <*> pure (fmap (fmap encode . sequence) . mapM parseNews)
-    ("POST", "news") ->
-      (,)
-        <$> createNews athr authId arr
-        <*> pure encodeWith
-    ("PUT", "news") ->
-      (,)
-        <$> editNews authId arr
-        <*> pure encodeWith
-    ("GET", "user") ->
-      (,)
-        <$> (pure . getUserAsText <$> limitOffset)
-        <*> pure (pure . fmap encode . mapM parseUser)
-    ("POST", "user") ->
-      (,)
-        <$> createUser adm arr
-        <*> pure encodeWith
-    ("PUT", "user") ->
-      (,)
-        <$> (blockAdminRights <$> adm)
-        <*> pure encodeWith
+    -- ("POST", "news") ->
+    --   (,)
+    --     <$> createNews athr authId arr
+    --     <*> pure encodeWith
+    -- ("PUT", "news") ->
+    --   (,)
+    --     <$> editNews authId arr
+    --     <*> pure encodeWith
+    -- ("GET", "user") ->
+    --   (,)
+    --     <$> (pure . getUserAsText <$> limitOffset)
+    --     <*> pure (pure . fmap encode . mapM parseUser)
+    -- ("POST", "user") ->
+    --   (,)
+    --     <$> createUser adm arr
+    --     <*> pure encodeWith
+    -- ("PUT", "user") ->
+    --   (,)
+    --     <$> (blockAdminRights <$> adm)
+    --     <*> pure encodeWith
     ("GET", "category") ->
       (,)
         <$> (getCategory <$> limitOffset)
@@ -82,12 +85,12 @@ setQueryAndRespond req = do
   where
     reqMethod = W.requestMethod req
     [entity] = W.pathInfo req
-    authId = authorID req
+    --  authId = authorID req
     arr = W.queryString req
     --  method = setMethodNews newsHandler . queryToQueryText $ arr
-    limitOffset = setLimitAndOffset newsHandler . queryToQueryText $ arr
+    limitOffset = setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
     adm = isAdmin req
-    athr = isAuthor req
+    --   athr = isAuthor req
     encodeWith =
       pure
         . pure

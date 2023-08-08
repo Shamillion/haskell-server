@@ -4,9 +4,11 @@
 module User where
 
 import Config (connectDB, writingLineDebug)
+import Control.Exception (throwIO)
 import Crypto.KDF.BCrypt (hashPassword)
-import Data.Aeson (ToJSON, object, toJSON, (.=))
+import Data.Aeson (ToJSON, encode, object, toJSON, (.=))
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.Char (ord)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
@@ -14,7 +16,9 @@ import Database.PostgreSQL.Simple (FromRow, close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error (Error (CommonError, LoginOccupied, ParseError), ParseError (ParseUserError))
 import GHC.Generics (Generic)
-import Lib (readNum)
+import Lib (limitAndOffsetHandler, readNum, runGetQuery, setLimitAndOffset)
+import Network.HTTP.Types (queryToQueryText)
+import qualified Network.Wai as W
 
 -- Creating a database query to get a list of users
 getUser :: Query -> Query
@@ -57,24 +61,24 @@ parseUser [userIdTxt, nameUser, creationDate, isAdmn, isAuthr] = do
   let idUsr = readNum userIdTxt
       isAdm = isAdmn `elem` ["t", "true"]
       isAth = isAuthr `elem` ["t", "true"]
-  if idUsr == 0 
+  if idUsr == 0
     then Left $ ParseError ParseUserError
     else pure $ User idUsr nameUser creationDate isAdm isAth ""
-parseUser _ = Left $ ParseError ParseUserError      
+parseUser _ = Left $ ParseError ParseUserError
 
 -- Request example (strict order):
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
-createUser :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
+createUser :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
 createUser isAdmn ls = do
   admin <- isAdmn
   if not admin || null ls || map fst ls /= checkList || searchNothing
-    then pure $ Left CommonError
+    then throwIO CommonError
     else do
       uniq <- checkUniqLogin login
       if uniq
         then do
           password <- cryptoPass (sum . map ord . BC.unpack $ nameUser) pass
-          pure . Right . Query $
+          pure . Query $
             "INSERT INTO users (name_user, login, pass, \
             \       creation_date, is_admin, is_author) \
             \ VALUES ('"
@@ -88,7 +92,7 @@ createUser isAdmn ls = do
               <> "', '"
               <> isAuthor
               <> "');"
-        else pure $ Left LoginOccupied
+        else throwIO LoginOccupied
   where
     checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
     searchNothing = elem Nothing $ map snd ls
@@ -121,3 +125,33 @@ checkUniqLogin str = do
   close conn
   writingLineDebug ls
   pure $ null ls
+
+getUserHandler :: W.Request -> IO LC.ByteString
+getUserHandler req = do
+  queryUser <- mkGetUserQuery req -- 1 формируем запрос к бд - это у тебя (getNews <$> authId <*> method)
+  userTxt <- runGetQuery queryUser -- 2 запускаем запрос, функция `runQuery` у тебя сейчас внутри app, нужно ее вынести отдельно
+  encodeUser userTxt -- 3 формируем ответ - это просто `encode`
+
+mkGetUserQuery :: W.Request -> IO Query
+mkGetUserQuery req = getUserAsText <$> limitOffset
+  where
+    arr = W.queryString req
+    limitOffset = setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
+
+encodeUser :: [[T.Text]] -> IO LC.ByteString
+encodeUser ls =
+  case eitherUsers of
+    Left err -> throwIO err
+    Right users -> pure users
+  where
+    eitherUsers = fmap encode . mapM parseUser $ ls
+
+mkCreateUserQuery :: IO Bool -> W.Request -> IO Query
+mkCreateUserQuery isAdmin req = createUser isAdmin $ W.queryString req
+
+mkEditUserQuery :: IO Bool -> W.Request -> IO Query
+mkEditUserQuery isAdmin _ = do
+  eitherQuery <- blockAdminRights <$> isAdmin
+  case eitherQuery of
+    Left err -> throwIO err
+    Right qry -> pure qry

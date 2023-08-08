@@ -7,18 +7,21 @@ where
 import Data.Functor.Identity (Identity, runIdentity)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple.Types (Query (..))
-import News (NewsyHandle (..), setLimitAndOffset, setMethodNews)
+import Lib
+  ( LimitAndOffsetHandle (..),
+    setLimitAndOffset,
+  )
+import News (setMethodNews)
 import Test.Hspec (SpecWith, it, shouldBe)
 
-newsHandler :: NewsyHandle Identity
-newsHandler =
-  NewsyHandle
-    { limitElemH = pure 20,
-      setLimitAndOffsetH = pure . setLimitAndOffset'
+testHandler :: LimitAndOffsetHandle Identity
+testHandler =
+  LimitAndOffsetHandle
+    { limitElemH = pure 20
     }
 
 setLimitAndOffset' :: [(T.Text, Maybe T.Text)] -> Query
-setLimitAndOffset' = runIdentity . setLimitAndOffset newsHandler
+setLimitAndOffset' = runIdentity . setLimitAndOffset testHandler
 
 testsFunctionSetLimitAndOffset :: SpecWith ()
 testsFunctionSetLimitAndOffset = do
@@ -59,7 +62,7 @@ testsFunctionSetLimitAndOffset = do
       `shouldBe` Query " LIMIT 20 OFFSET 0"
 
 setMethodNews' :: [(T.Text, Maybe T.Text)] -> Maybe (Query, Query)
-setMethodNews' = runIdentity . setMethodNews newsHandler
+setMethodNews' = runIdentity . setMethodNews testHandler
 
 testsFunctionSetMethodNews :: SpecWith ()
 testsFunctionSetMethodNews = do

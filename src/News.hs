@@ -5,27 +5,34 @@ module News where
 
 import Auth (authorID, isAuthor)
 import Category (getParentCategories)
-import Config (connectDB, limitElem, writingLineDebug)
+import Config (connectDB)
 import Control.Applicative (liftA2)
 import Control.Exception (throwIO)
 import Data.Aeson (ToJSON, encode)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.Functor ((<&>))
-import Data.Int (Int64)
 import Data.List as LT (filter, find)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.String (fromString)
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (close, execute_, query, query_)
+import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error (Error (CommonError, ParseError), ParseError (ParseNewsError))
 import GHC.Generics (Generic)
-import Lib (initTxt, readNum, splitOnTxt, tailTxt)
+import Lib
+  ( LimitAndOffsetHandle (..),
+    initTxt,
+    limitAndOffsetHandler,
+    readNum,
+    runGetQuery,
+    setLimitAndOffset,
+    splitOnTxt,
+    tailTxt,
+  )
 import Network.HTTP.Types (queryToQueryText)
 import qualified Network.Wai as W
 import Photo (sendPhotoToDB)
-import Text.Read (readMaybe)
 import User (User, parseUser)
 
 -- Creating a database query to get a list of news.
@@ -66,37 +73,8 @@ data News = News
   }
   deriving (Show, Generic, ToJSON)
 
-data NewsyHandle m = NewsyHandle
-  { limitElemH :: m Int,
-    setLimitAndOffsetH :: [(T.Text, Maybe T.Text)] -> m Query
-  }
-
-newsHandler :: NewsyHandle IO
-newsHandler =
-  NewsyHandle
-    { limitElemH = limitElem,
-      setLimitAndOffsetH = setLimitAndOffset newsHandler
-    }
-
-parseNews :: [T.Text] -> IO (Either Error News)
+parseNews :: [T.Text] -> IO News
 parseNews [newsIdTxt, title, creation_date, authorTxt, categoryTxt, content, photoTxt, isPublishedTxt] = do
-  let news_id = readNum newsIdTxt
-      splitText = splitOnTxt "," . tailTxt . initTxt
-      eitherAuthor = parseUser $ splitText authorTxt
-      photo = map ("/photo?get_photo=" <>) $ splitText photoTxt
-      is_published = isPublishedTxt == "true" || isPublishedTxt == "t"
-  if news_id == 0
-    then pure . Left $ ParseError ParseNewsError
-    else do
-      categories <- getParentCategories categoryTxt
-      pure $
-        eitherAuthor >>= \author ->
-          pure $
-            News news_id title creation_date author categories content photo is_published
-parseNews _ = pure . Left $ ParseError ParseNewsError
-
-parseNews' :: [T.Text] -> IO News
-parseNews' [newsIdTxt, title, creation_date, authorTxt, categoryTxt, content, photoTxt, isPublishedTxt] = do
   let news_id = readNum newsIdTxt
       splitText = splitOnTxt "," . tailTxt . initTxt
       eitherAuthor = parseUser $ splitText authorTxt
@@ -110,15 +88,15 @@ parseNews' [newsIdTxt, title, creation_date, authorTxt, categoryTxt, content, ph
         Right author -> do
           categories <- getParentCategories categoryTxt
           pure $ News news_id title creation_date author categories content photo is_published
-parseNews' _ = throwIO $ ParseError ParseNewsError
+parseNews _ = throwIO $ ParseError ParseNewsError
 
 setMethodNews ::
   Monad m =>
-  NewsyHandle m ->
+  LimitAndOffsetHandle m ->
   [(T.Text, Maybe T.Text)] ->
   m (Maybe (Query, Query))
-setMethodNews NewsyHandle {..} ls = do
-  setLimOffs <- setLimitAndOffsetH ls
+setMethodNews LimitAndOffsetHandle {..} ls = do
+  setLimOffs <- setLimitAndOffset LimitAndOffsetHandle {..} ls
   let sortNewsLimitOffset = fmap (<> setLimOffs) sortNews
   pure $ do
     filterForNews <- filterNews
@@ -166,72 +144,12 @@ setFiltersNews ((field, param) : xs)
     argument = fromString . T.unpack <$> param
     creationDate x = (("News.creation_date " <> x <> " '") <>) <$> argument <&> (<> "'")
 
-setLimitAndOffset ::
-  Monad m =>
-  NewsyHandle m ->
-  [(T.Text, Maybe T.Text)] ->
-  m Query
-setLimitAndOffset NewsyHandle {..} ls = do
-  limitInFile <- limitElemH
-  let limit = listToValue "limit" setLimit limitInFile
-      setLimit val = if val > 0 && val < limitInFile then val else limitInFile
-  pure . Query $ " LIMIT " <> limit <> " OFFSET " <> offset
-  where
-    offset = listToValue "offset" (max 0) 0
-    getMaybe param func =
-      (LT.find ((== param) . fst) ls >>= snd >>= readMaybe . T.unpack) <&> func
-    listToValue param func defaultVal = toByteString $
-      case getMaybe param func of
-        Just val -> val
-        _ -> defaultVal
-    toByteString = BC.pack . show
-
 -- Request example:
 -- '.../news?title=Text&category_id=3&content=Text&
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
+createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
 createNews isAuth authID ls = do
-  isAuth' <- isAuth
-  if not isAuth' || null ls || nothingInLs
-    then pure $ Left CommonError
-    else do
-      authID' <- authID
-      photoIdList <- photoIDLs ls
-      let maybeStr =
-            foldr
-              (liftA2 (<>))
-              (Just "")
-              [ pure
-                  "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
-                  \ content, is_published) \
-                  \ VALUES ('",
-                titleNws,
-                pure "', NOW(), ",
-                pure $ fromQuery authID',
-                pure ", ",
-                categoryId,
-                pure ", ",
-                pure photoIdList,
-                pure ", '",
-                contentNws,
-                pure "', ",
-                isPublished,
-                pure ");"
-              ]
-      case maybeStr of
-        Just str -> pure . pure . Query $ str
-        Nothing -> pure $ Left CommonError
-  where
-    nothingInLs = any (\(_, y) -> isNothing y) ls
-    titleNws = getValue "title"
-    categoryId = getValue "category_id"
-    contentNws = getValue "content"
-    isPublished = getValue "is_published"
-    getValue str = LT.find (\(x, _) -> x == str) ls >>= snd
-
-createNews' :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
-createNews' isAuth authID ls = do
   isAuth' <- isAuth
   if not isAuth' || null ls || nothingInLs
     then throwIO CommonError
@@ -286,41 +204,10 @@ buildPhotoIdString (x : xs) = x <> ", " <> buildPhotoIdString xs
 --    news?news_id=(id news needed to edit)&title=Text&category_id=3&
 --       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-editNews :: IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO (Either Error Query)
-editNews authId ls = do
-  authId' <- authId
-  isAuth <- authorNews (fromQuery authId') newsId
-  if null ls || not isAuth
-    then pure $ Left CommonError
-    else do
-      photoIdStr <- photoIdList
-      let maybeStr =
-            buildChanges filteredLs >>= \str ->
-              pure $
-                "UPDATE news SET " <> photoIdStr <> str
-                  <> " WHERE news_id = "
-                  <> newsId
-                  <> ";"
-      pure $ case maybeStr of
-        Just str -> Right $ Query str
-        Nothing -> Left CommonError
-  where
-    newsId = case LT.find (\(x, _) -> x == "news_id") ls of
-      Just (_, Just n) -> n
-      _ -> "0"
-    filteredLs = LT.filter (\(x, y) -> elem x fields && isJust y) ls
-    fields = ["title", "category_id", "content", "is_published"]
-    photoIdList =
-      if "photo" `elem` map fst ls
-        then do
-          str <- photoIDLs ls
-          pure $ "photo = " <> str <> ", "
-        else pure ""
-
-editNews' :: IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
-editNews' authId ls = do
-  authId' <- authId
-  isAuth <- authorNews (fromQuery authId') newsId
+editNews :: W.Request -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+editNews req ls = do
+  authId <- authorID req
+  isAuth <- authorNews (fromQuery authId) newsId
   if null ls || not isAuth
     then throwIO CommonError
     else do
@@ -381,39 +268,29 @@ getNewsHandler req = do
 mkGetNewsQuery :: W.Request -> IO Query
 mkGetNewsQuery req = method >>= getNews req
   where
-    method = setMethodNews newsHandler . queryToQueryText $ W.queryString req
-
-runGetQuery :: Query -> IO [[T.Text]]
-runGetQuery qry = do
-  conn <- connectDB
-  dataFromDB <- query_ conn qry :: IO [[T.Text]]
-  writingLineDebug dataFromDB
-  close conn
-  pure dataFromDB
+    method = setMethodNews limitAndOffsetHandler . queryToQueryText $ W.queryString req
 
 encodeNews :: [[T.Text]] -> IO LC.ByteString
-encodeNews = fmap encode . mapM parseNews'
+encodeNews = fmap encode . mapM parseNews
 
-createNewsHandler :: W.Request -> IO LC.ByteString
-createNewsHandler req = do
-  queryNews <- mkCreateNewsQuery req -- 1 формируем запрос к бд - это у тебя (getNews <$> authId <*> method)
-  num <- runPostQuery queryNews -- 2 запускаем запрос, функция `runQuery` у тебя сейчас внутри app, нужно ее вынести отдельно
-  sendComment num -- 3 формируем ответ - это просто `encode`
+-- createNewsHandler :: W.Request -> IO LC.ByteString
+-- createNewsHandler req = do
+--   queryNews <- mkCreateNewsQuery req
+--   num <- runPostOrPutQuery queryNews
+--   sendComment num
 
 mkCreateNewsQuery :: W.Request -> IO Query
-mkCreateNewsQuery req = createNews' athr authId arr
+mkCreateNewsQuery req = createNews athr authId arr
   where
     athr = isAuthor req
     authId = authorID req
     arr = W.queryString req
 
-runPostQuery :: Query -> IO Int64
-runPostQuery qry = do
-  conn <- connectDB
-  num <- execute_ conn qry
-  close conn
-  writingLineDebug num
-  pure num
+-- editNewsHandler :: W.Request -> IO LC.ByteString
+-- editNewsHandler req = do
+--   queryNews <- mkEditNewsQuery req
+--   num <- runPostOrPutQuery queryNews
+--   sendComment num
 
-sendComment :: Int64 -> IO LC.ByteString
-sendComment num = pure $ LC.pack (show num) <> " position(s) done."
+mkEditNewsQuery :: W.Request -> IO Query
+mkEditNewsQuery req = editNews req $ W.queryString req
