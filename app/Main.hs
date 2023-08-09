@@ -3,22 +3,19 @@
 module Main where
 
 import Auth (checkAuth, isAdmin)
-import Category (categoryHandler, createCategory, editCategory, getCategory, parseCategory)
+import Category (getCategoryHandler, mkCreateCategoryQuery, mkEditCategoryQuery)
 import Config (Priority (..), port, writingLine, writingLineDebug)
-import Control.Exception (catch)
-import Data.Aeson (encode)
+import Control.Exception (catch, throwIO)
+import qualified Data.Bifunctor as BF
 import qualified Data.ByteString.Lazy.Char8 as LC
-import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
-import qualified Database.PostgreSQL.Simple as DB
 import Error (CategoryError (..), Error (..))
-import Lib (createAndEditHandler, drawOut, limitAndOffsetHandler, setLimitAndOffset)
+import Lib (createAndEditHandler)
 import MigrationsDB (checkDB)
-import Network.HTTP.Types (queryToQueryText, status200, status404, status406)
+import Network.HTTP.Types (status200, status404, status406)
 import qualified Network.Wai as W
 import Network.Wai.Handler.Warp (run)
 import News (getNewsHandler, mkCreateNewsQuery, mkEditNewsQuery)
-import Photo (decodeImage, getPhoto)
+import Photo (getPhotoHandler)
 import User (getUserHandler, mkCreateUserQuery, mkEditUserQuery)
 
 handler :: W.Request -> IO LC.ByteString
@@ -30,79 +27,19 @@ handler req = do
     ("GET", "user") -> getUserHandler req
     ("POST", "user") -> createAndEditHandler (mkCreateUserQuery adm) req
     ("PUT", "user") -> createAndEditHandler (mkEditUserQuery adm) req
-    --     ("GET", "category") -> getCategory req
-    --     ("POST", "category") -> createCategory req
-    --     ("PUT", "category") -> editCategory req
-    --     ("GET", "photo") -> getPhoto req
-    _ -> pure "Error"
+    ("GET", "category") -> getCategoryHandler req
+    ("POST", "category") -> createAndEditHandler (mkCreateCategoryQuery adm) req
+    ("PUT", "category") -> createAndEditHandler (mkEditCategoryQuery adm) req
+    ("GET", "photo") -> getPhotoHandler req
+    _ -> throwIO CommonError
   where
     reqMethod = W.requestMethod req
     [entity] = W.pathInfo req
     adm = isAdmin req
-
--- Defining the type of request and creating a response.
-setQueryAndRespond :: W.Request -> IO (Either Error DB.Query, [[T.Text]] -> IO (Either Error LC.ByteString))
-setQueryAndRespond req = do
-  case (reqMethod, entity) of
-    -- ("GET", "news") ->
-    --   (,)
-    --     <$> (getNews <$> authId <*> method)
-    --     <*> pure (fmap (fmap encode . sequence) . mapM parseNews)
-    -- ("POST", "news") ->
-    --   (,)
-    --     <$> createNews athr authId arr
-    --     <*> pure encodeWith
-    -- ("PUT", "news") ->
-    --   (,)
-    --     <$> editNews authId arr
-    --     <*> pure encodeWith
-    -- ("GET", "user") ->
-    --   (,)
-    --     <$> (pure . getUserAsText <$> limitOffset)
-    --     <*> pure (pure . fmap encode . mapM parseUser)
-    -- ("POST", "user") ->
-    --   (,)
-    --     <$> createUser adm arr
-    --     <*> pure encodeWith
-    -- ("PUT", "user") ->
-    --   (,)
-    --     <$> (blockAdminRights <$> adm)
-    --     <*> pure encodeWith
-    ("GET", "category") ->
-      (,)
-        <$> (getCategory <$> limitOffset)
-        <*> pure (pure . fmap encode . mapM parseCategory)
-    ("POST", "category") ->
-      (,)
-        <$> createCategory categoryHandler adm arr
-        <*> pure encodeWith
-    ("PUT", "category") ->
-      (,)
-        <$> editCategory categoryHandler adm arr
-        <*> pure encodeWith
-    ("GET", "photo") -> pure (getPhoto arr, pure . decodeImage)
-    _ -> pure (Left CommonError, const (pure $ Left CommonError))
-  where
-    reqMethod = W.requestMethod req
-    [entity] = W.pathInfo req
-    --  authId = authorID req
-    arr = W.queryString req
-    --  method = setMethodNews newsHandler . queryToQueryText $ arr
-    limitOffset = setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
-    adm = isAdmin req
-    --   athr = isAuthor req
-    encodeWith =
-      pure
-        . pure
-        . (<> " position(s) done.")
-        . LC.fromStrict
-        . encodeUtf8
-        . drawOut
 
 app :: W.Application
 app req respond = do
   writingLine INFO "Received a request."
-  -- (eitherQry, resp) <- setQueryAndRespond req
   writingLineDebug $ W.requestMethod req
   writingLineDebug $ W.requestHeaders req
   writingLineDebug =<< checkAuth (W.requestHeaders req)
@@ -124,31 +61,15 @@ app req respond = do
             respondsSts406 "A category cannot be a parent to itself.\n" >> pure ""
           _ -> responds status404 "text/plain" "404 Not Found.\n" >> pure ""
       )
-  -- Right qry -> do
-  --   conn <- connectDB
-  --   dataFromDB <- case W.requestMethod req of
-  --     "GET" -> DB.query_ conn qry :: IO [[T.Text]]
-  --     _ -> (\x -> [[T.pack $ show x]]) <$> DB.execute_ conn qry
-  --   writingLineDebug dataFromDB
-  --   DB.close conn
-  let header = "text/plain"
-  --   if W.pathInfo req == ["photo"]
-  --     then getHeader headerForPhoto
-  --     else "text/plain"
-  -- headerForPhoto = drawOut dataFromDB
-  --   writingLine INFO "Sent a response to the request."
-  --   eitherAns <- resp dataFromDB
-  --   writingLineDebug eitherAns
-  --   case eitherAns of
-  --     Left err -> do
-  --       writingLine ERROR $ show err
-  --       responds status404 "text/plain" "404 Not Found.\n"
-  responds status200 header ans
+  let (header, answer) =
+        if W.pathInfo req == ["photo"]
+          then headerAndImage ans
+          else ("text/plain", ans)
+  responds status200 header answer
   where
     responds status header = respond . W.responseLBS status [("Content-Type", header)]
     respondsSts406 = responds status406 "text/plain"
-
---   getHeader = encodeUtf8 . T.drop 1 . T.takeWhile (/= ';') . T.dropWhile (/= ':')
+    headerAndImage = BF.first LC.toStrict . fmap (LC.drop 1) . LC.span (/= ';')
 
 main :: IO ()
 main = do

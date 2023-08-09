@@ -4,8 +4,10 @@
 module Category where
 
 import Config (connectDB, writingLineDebug)
-import Data.Aeson (ToJSON)
+import Control.Exception (throwIO)
+import Data.Aeson (ToJSON, encode)
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.List as LT (find)
 import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
@@ -21,15 +23,18 @@ import Error
     ParseError (ParseCategoryError),
   )
 import GHC.Generics (Generic)
-import Lib (readNum)
+import Lib (limitAndOffsetHandler, readNum, runGetQuery, setLimitAndOffset)
+import Network.HTTP.Types (queryToQueryText)
+import qualified Network.Wai as W
 
 -- Creating a database query to get a list of catygories.
-getCategory :: Query -> Either Error Query
-getCategory limitOffset =
-  Right $
+getCategory :: IO Query -> IO Query
+getCategory limitOffset = do
+  limitOffset' <- limitOffset
+  pure $
     "SELECT (category_id :: TEXT), parent_category, \
     \ name_category FROM category "
-      <> limitOffset
+      <> limitOffset'
       <> ";"
 
 -- For getParentCategories.
@@ -195,3 +200,44 @@ checkUniqCategory str = do
   close conn
   writingLineDebug ls
   pure $ null ls
+
+getCategoryHandler :: W.Request -> IO LC.ByteString
+getCategoryHandler req = do
+  queryCategory <- mkGetCategoryQuery req -- 1 формируем запрос к бд - это у тебя (getNews <$> authId <*> method)
+  categoryTxt <- runGetQuery queryCategory -- 2 запускаем запрос, функция `runQuery` у тебя сейчас внутри app, нужно ее вынести отдельно
+  encodeCategory categoryTxt -- 3 формируем ответ - это просто `encode`
+
+mkGetCategoryQuery :: W.Request -> IO Query
+mkGetCategoryQuery req = getCategory limitOffset
+  where
+    arr = W.queryString req
+    limitOffset = setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
+
+encodeCategory :: [[T.Text]] -> IO LC.ByteString
+encodeCategory ls =
+  case eitherCategory of
+    Left err -> throwIO err
+    Right categories -> pure categories
+  where
+    eitherCategory = fmap encode . mapM parseCategory $ ls
+
+mkCreateOrEditCategoryQuery ::
+  ( CategoryHandle IO ->
+    IO Bool ->
+    [(BC.ByteString, Maybe BC.ByteString)] ->
+    IO (Either Error Query)
+  ) ->
+  IO Bool ->
+  W.Request ->
+  IO Query
+mkCreateOrEditCategoryQuery func isAdmin req = do
+  eitherQuery <- func categoryHandler isAdmin $ W.queryString req
+  case eitherQuery of
+    Left err -> throwIO err
+    Right qry -> pure qry
+
+mkCreateCategoryQuery :: IO Bool -> W.Request -> IO Query
+mkCreateCategoryQuery = mkCreateOrEditCategoryQuery createCategory
+
+mkEditCategoryQuery :: IO Bool -> W.Request -> IO Query
+mkEditCategoryQuery = mkCreateOrEditCategoryQuery editCategory
