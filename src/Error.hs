@@ -28,3 +28,11 @@ data ParseError
   deriving (Show, Eq)
 
 instance Exception ParseError
+
+data AuthError
+  = NoAuthorization
+  | DecodeLoginAndPassError
+  | NoSuchUserInDB
+  deriving (Show, Eq)
+
+instance Exception AuthError

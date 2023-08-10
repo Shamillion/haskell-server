@@ -261,9 +261,9 @@ buildChanges ((field, maybeParam) : xs) = buildChanges [(field, maybeParam)] <> 
 
 getNewsHandler :: W.Request -> IO LC.ByteString
 getNewsHandler req = do
-  queryNews <- mkGetNewsQuery req -- 1 формируем запрос к бд - это у тебя (getNews <$> authId <*> method)
-  newsTxt <- runGetQuery queryNews -- 2 запускаем запрос, функция `runQuery` у тебя сейчас внутри app, нужно ее вынести отдельно
-  encodeNews newsTxt -- 3 формируем ответ - это просто `encode`
+  queryNews <- mkGetNewsQuery req 
+  newsTxt <- runGetQuery queryNews :: IO [[T.Text]]
+  encodeNews newsTxt 
 
 mkGetNewsQuery :: W.Request -> IO Query
 mkGetNewsQuery req = method >>= getNews req
@@ -273,24 +273,12 @@ mkGetNewsQuery req = method >>= getNews req
 encodeNews :: [[T.Text]] -> IO LC.ByteString
 encodeNews = fmap encode . mapM parseNews
 
--- createNewsHandler :: W.Request -> IO LC.ByteString
--- createNewsHandler req = do
---   queryNews <- mkCreateNewsQuery req
---   num <- runPostOrPutQuery queryNews
---   sendComment num
-
 mkCreateNewsQuery :: W.Request -> IO Query
 mkCreateNewsQuery req = createNews athr authId arr
   where
     athr = isAuthor req
     authId = authorID req
     arr = W.queryString req
-
--- editNewsHandler :: W.Request -> IO LC.ByteString
--- editNewsHandler req = do
---   queryNews <- mkEditNewsQuery req
---   num <- runPostOrPutQuery queryNews
---   sendComment num
 
 mkEditNewsQuery :: W.Request -> IO Query
 mkEditNewsQuery req = editNews req $ W.queryString req

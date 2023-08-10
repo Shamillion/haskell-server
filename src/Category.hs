@@ -11,19 +11,17 @@ import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.List as LT (find)
 import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (close, query_)
+import Database.PostgreSQL.Simple (close, query_, FromRow)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error
   ( CategoryError (..),
     Error
       ( CategoryError,
-        CommonError,
-        ParseError
-      ),
-    ParseError (ParseCategoryError),
+        CommonError        
+      )    
   )
 import GHC.Generics (Generic)
-import Lib (limitAndOffsetHandler, readNum, runGetQuery, setLimitAndOffset)
+import Lib (limitAndOffsetHandler, runGetQuery, setLimitAndOffset)
 import Network.HTTP.Types (queryToQueryText)
 import qualified Network.Wai as W
 
@@ -32,29 +30,21 @@ getCategory :: IO Query -> IO Query
 getCategory limitOffset = do
   limitOffset' <- limitOffset
   pure $
-    "SELECT (category_id :: TEXT), parent_category, \
+    "SELECT category_id, parent_category, \
     \ name_category FROM category "
       <> limitOffset'
       <> ";"
 
 -- For getParentCategories.
-getCategory' :: Query
-getCategory' = "SELECT parent_category, name_category FROM category;"
+getCategoryForList :: Query
+getCategoryForList = "SELECT parent_category, name_category FROM category;"
 
 data Category = Category
   { category_id :: Int,
     parent_category :: T.Text,
     name_category :: T.Text
   }
-  deriving (Show, Generic, ToJSON)
-
-parseCategory :: [T.Text] -> Either Error Category
-parseCategory [categoryIdTxt, parentCategory, nameCategory] = do
-  let idCategory = readNum categoryIdTxt
-  if idCategory == 0
-    then Left $ ParseError ParseCategoryError
-    else pure $ Category idCategory parentCategory nameCategory
-parseCategory _ = Left $ ParseError ParseCategoryError
+  deriving (Show, Generic, FromRow, ToJSON)
 
 newtype CategoryHandle m = CategoryHandle
   {checkUniqCategoryH :: BC.ByteString -> m Bool}
@@ -65,7 +55,7 @@ categoryHandler = CategoryHandle {checkUniqCategoryH = checkUniqCategory}
 getParentCategories :: T.Text -> IO [T.Text]
 getParentCategories category = do
   conn <- connectDB
-  allCategoriesLs <- query_ conn getCategory' :: IO [[T.Text]]
+  allCategoriesLs <- query_ conn getCategoryForList :: IO [[T.Text]]
   close conn
   writingLineDebug allCategoriesLs
   let buildingList categoryLs = do
@@ -203,23 +193,15 @@ checkUniqCategory str = do
 
 getCategoryHandler :: W.Request -> IO LC.ByteString
 getCategoryHandler req = do
-  queryCategory <- mkGetCategoryQuery req -- 1 формируем запрос к бд - это у тебя (getNews <$> authId <*> method)
-  categoryTxt <- runGetQuery queryCategory -- 2 запускаем запрос, функция `runQuery` у тебя сейчас внутри app, нужно ее вынести отдельно
-  encodeCategory categoryTxt -- 3 формируем ответ - это просто `encode`
+  queryCategory <- mkGetCategoryQuery req
+  category <- runGetQuery queryCategory :: IO [Category]
+  pure $ encode category
 
 mkGetCategoryQuery :: W.Request -> IO Query
 mkGetCategoryQuery req = getCategory limitOffset
   where
     arr = W.queryString req
     limitOffset = setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
-
-encodeCategory :: [[T.Text]] -> IO LC.ByteString
-encodeCategory ls =
-  case eitherCategory of
-    Left err -> throwIO err
-    Right categories -> pure categories
-  where
-    eitherCategory = fmap encode . mapM parseCategory $ ls
 
 mkCreateOrEditCategoryQuery ::
   ( CategoryHandle IO ->

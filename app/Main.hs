@@ -2,7 +2,7 @@
 
 module Main where
 
-import Auth (checkAuth, isAdmin)
+import Auth (isAdmin)
 import Category (getCategoryHandler, mkCreateCategoryQuery, mkEditCategoryQuery)
 import Config (Priority (..), port, writingLine, writingLineDebug)
 import Control.Exception (catch, throwIO)
@@ -42,7 +42,6 @@ app req respond = do
   writingLine INFO "Received a request."
   writingLineDebug $ W.requestMethod req
   writingLineDebug $ W.requestHeaders req
-  writingLineDebug =<< checkAuth (W.requestHeaders req)
   writingLineDebug $ W.pathInfo req
   writingLineDebug $ W.queryString req
   ans <-

@@ -29,10 +29,10 @@ getPhoto (x : _) =
 -- Decoding photos from Base64.
 decodeImage :: [[T.Text]] -> Either Error LC.ByteString
 decodeImage [] = Left $ ParseError DecodeImageError
-decodeImage ([txt] : _) = pure $ header <> ";" <> image2
+decodeImage ([txt] : _) = pure $ header <> ";" <> image
   where
-    image = T.drop 1 . T.dropWhile (/= ',') $ txt
-    image2 = decodeLenient . LC.fromStrict . encodeUtf8 $ image
+    clearedTxt = T.drop 1 . T.dropWhile (/= ',') $ txt
+    image = decodeLenient . LC.fromStrict . encodeUtf8 $ clearedTxt
     header = LC.fromStrict . encodeUtf8 . T.drop 1 . T.takeWhile (/= ';') . T.dropWhile (/= ':') $ txt
 decodeImage (_ : _) = Left $ ParseError DecodeImageError
 

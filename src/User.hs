@@ -28,14 +28,6 @@ getUser str =
     <> str
     <> ";"
 
-getUserAsText :: Query -> Query
-getUserAsText str =
-  "SELECT  (user_id :: TEXT), name_user, \
-  \ (creation_date :: TEXT), (is_admin :: TEXT), (is_author :: TEXT) \
-  \ FROM users "
-    <> str
-    <> ";"
-
 data User = User
   { user_id :: Int,
     name_user :: T.Text,
@@ -128,23 +120,15 @@ checkUniqLogin str = do
 
 getUserHandler :: W.Request -> IO LC.ByteString
 getUserHandler req = do
-  queryUser <- mkGetUserQuery req -- 1 формируем запрос к бд - это у тебя (getNews <$> authId <*> method)
-  userTxt <- runGetQuery queryUser -- 2 запускаем запрос, функция `runQuery` у тебя сейчас внутри app, нужно ее вынести отдельно
-  encodeUser userTxt -- 3 формируем ответ - это просто `encode`
+  queryUser <- mkGetUserQuery req
+  user <- runGetQuery queryUser :: IO [User]
+  pure $ encode user
 
 mkGetUserQuery :: W.Request -> IO Query
-mkGetUserQuery req = getUserAsText <$> limitOffset
+mkGetUserQuery req = getUser <$> limitOffset
   where
     arr = W.queryString req
     limitOffset = setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
-
-encodeUser :: [[T.Text]] -> IO LC.ByteString
-encodeUser ls =
-  case eitherUsers of
-    Left err -> throwIO err
-    Right users -> pure users
-  where
-    eitherUsers = fmap encode . mapM parseUser $ ls
 
 mkCreateUserQuery :: IO Bool -> W.Request -> IO Query
 mkCreateUserQuery isAdmin req = createUser isAdmin $ W.queryString req

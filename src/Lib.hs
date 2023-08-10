@@ -8,7 +8,7 @@ import Data.Int (Int64)
 import qualified Data.List as LT
 import Data.String (IsString)
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (Query, close, execute_, query_)
+import Database.PostgreSQL.Simple (Query, close, execute_, query_, FromRow)
 import Database.PostgreSQL.Simple.Types (Query (Query))
 import qualified Network.Wai as W
 import Text.Read (readMaybe)
@@ -68,10 +68,10 @@ setLimitAndOffset LimitAndOffsetHandle {..} ls = do
         _ -> defaultVal
     toByteString = BC.pack . show
 
-runGetQuery :: Query -> IO [[T.Text]]
+runGetQuery :: (Show r, FromRow r) => Query -> IO [r]
 runGetQuery qry = do
   conn <- connectDB
-  dataFromDB <- query_ conn qry :: IO [[T.Text]]
+  dataFromDB <- query_ conn qry 
   writingLineDebug dataFromDB
   close conn
   pure dataFromDB
