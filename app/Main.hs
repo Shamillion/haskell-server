@@ -9,7 +9,7 @@ import Control.Exception (catch, throwIO)
 import qualified Data.Bifunctor as BF
 import qualified Data.ByteString.Lazy.Char8 as LC
 import Error (CategoryError (..), Error (..))
-import Lib (createAndEditHandler)
+import Lib (createAndEditObjectsHandler)
 import MigrationsDB (checkDB)
 import Network.HTTP.Types (status200, status404, status406)
 import qualified Network.Wai as W
@@ -22,14 +22,14 @@ handler :: W.Request -> IO LC.ByteString
 handler req = do
   case (reqMethod, entity) of
     ("GET", "news") -> getNewsHandler req
-    ("POST", "news") -> createAndEditHandler mkCreateNewsQuery req
-    ("PUT", "news") -> createAndEditHandler mkEditNewsQuery req
+    ("POST", "news") -> createAndEditObjectsHandler mkCreateNewsQuery req
+    ("PUT", "news") -> createAndEditObjectsHandler mkEditNewsQuery req
     ("GET", "user") -> getUserHandler req
-    ("POST", "user") -> createAndEditHandler (mkCreateUserQuery adm) req
-    ("PUT", "user") -> createAndEditHandler (mkEditUserQuery adm) req
+    ("POST", "user") -> createAndEditObjectsHandler (mkCreateUserQuery adm) req
+    ("PUT", "user") -> createAndEditObjectsHandler (mkEditUserQuery adm) req
     ("GET", "category") -> getCategoryHandler req
-    ("POST", "category") -> createAndEditHandler (mkCreateCategoryQuery adm) req
-    ("PUT", "category") -> createAndEditHandler (mkEditCategoryQuery adm) req
+    ("POST", "category") -> createAndEditObjectsHandler (mkCreateCategoryQuery adm) req
+    ("PUT", "category") -> createAndEditObjectsHandler (mkEditCategoryQuery adm) req
     ("GET", "photo") -> getPhotoHandler req
     _ -> throwIO CommonError
   where

@@ -8,7 +8,7 @@ import Data.Int (Int64)
 import qualified Data.List as LT
 import Data.String (IsString)
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (Query, close, execute_, query_, FromRow)
+import Database.PostgreSQL.Simple (FromRow, Query, close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (Query))
 import qualified Network.Wai as W
 import Text.Read (readMaybe)
@@ -71,7 +71,7 @@ setLimitAndOffset LimitAndOffsetHandle {..} ls = do
 runGetQuery :: (Show r, FromRow r) => Query -> IO [r]
 runGetQuery qry = do
   conn <- connectDB
-  dataFromDB <- query_ conn qry 
+  dataFromDB <- query_ conn qry
   writingLineDebug dataFromDB
   close conn
   pure dataFromDB
@@ -84,11 +84,12 @@ runPostOrPutQuery qry = do
   writingLineDebug num
   pure num
 
-sendComment :: Int64 -> IO LC.ByteString
-sendComment num = pure $ LC.pack (show num) <> " position(s) done."
+-- A comment for the user about adding or editing objects in the database.
+comment :: Int64 -> IO LC.ByteString
+comment num = pure $ LC.pack (show num) <> " position(s) done."
 
-createAndEditHandler :: (W.Request -> IO Query) -> W.Request -> IO LC.ByteString
-createAndEditHandler func req = do
+createAndEditObjectsHandler :: (W.Request -> IO Query) -> W.Request -> IO LC.ByteString
+createAndEditObjectsHandler func req = do
   queryForDB <- func req
   num <- runPostOrPutQuery queryForDB
-  sendComment num
+  comment num

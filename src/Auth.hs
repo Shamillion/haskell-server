@@ -41,6 +41,7 @@ checkAuth req =
       | validatePassword password $ pass user = pure user
       | otherwise = throwIO NoSuchUserInDB
 
+-- Returns the value in case of failed authorization.
 noAuthorization :: a -> AuthError -> IO a
 noAuthorization val err = do
   writingLineDebug err
@@ -48,8 +49,9 @@ noAuthorization val err = do
 
 -- Returns the user ID.
 authorID :: W.Request -> IO Query
-authorID req =
-  catch (fromString . show . user_id <$> checkAuth req) . noAuthorization $ "Null"
+authorID req = do
+  let userId = fromString . show . user_id <$> checkAuth req
+  catch userId $ noAuthorization "Null"
 
 -- Checks the administrator rights of the user.
 isAdmin :: W.Request -> IO Bool
