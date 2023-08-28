@@ -1,6 +1,7 @@
 module Photo where
 
 import Config (connectDB)
+import Control.Exception (throwIO)
 import Data.ByteString.Base64.Lazy (decodeLenient)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
@@ -10,6 +11,8 @@ import Data.Text.Encoding (encodeUtf8)
 import Database.PostgreSQL.Simple (close, execute, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error (Error (CommonError, ParseError), ParseError (DecodeImageError))
+import Lib (runGetQuery)
+import qualified Network.Wai as W
 
 -- Creating a query to the database to get one photo.
 getPhoto :: [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
@@ -26,9 +29,11 @@ getPhoto (x : _) =
 -- Decoding photos from Base64.
 decodeImage :: [[T.Text]] -> Either Error LC.ByteString
 decodeImage [] = Left $ ParseError DecodeImageError
-decodeImage ([image] : _) = pure . decodeLenient . LC.fromStrict . encodeUtf8 $ clearedImage
+decodeImage ([txt] : _) = pure $ header <> ";" <> image
   where
-    clearedImage = T.drop 1 . T.dropWhile (/= ',') $ image
+    clearedTxt = T.drop 1 . T.dropWhile (/= ',') $ txt
+    image = decodeLenient . LC.fromStrict . encodeUtf8 $ clearedTxt
+    header = LC.fromStrict . encodeUtf8 . T.drop 1 . T.takeWhile (/= ';') . T.dropWhile (/= ':') $ txt
 decodeImage (_ : _) = Left $ ParseError DecodeImageError
 
 -- The function sends the photo to the database and returns its ID in the table.
@@ -39,3 +44,22 @@ sendPhotoToDB str = do
   [[val]] <- query_ conn "SELECT (max(photo_id) :: varchar) FROM photo;" :: IO [[BC.ByteString]]
   close conn
   pure val
+
+getPhotoHandler :: W.Request -> IO LC.ByteString
+getPhotoHandler req = do
+  queryPhoto <- mkGetPhotoQuery req
+  photoTxt <- runGetQuery queryPhoto
+  encodePhoto photoTxt
+
+mkGetPhotoQuery :: W.Request -> IO Query
+mkGetPhotoQuery req = do
+  let eitherQuery = getPhoto $ W.queryString req
+  case eitherQuery of
+    Left err -> throwIO err
+    Right qry -> pure qry
+
+encodePhoto :: [[T.Text]] -> IO LC.ByteString
+encodePhoto ls =
+  case decodeImage ls of
+    Left err -> throwIO err
+    Right photo -> pure photo

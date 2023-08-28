@@ -4,52 +4,47 @@
 module Category where
 
 import Config (connectDB, writingLineDebug)
-import Data.Aeson (ToJSON)
+import Control.Exception (throwIO)
+import Data.Aeson (ToJSON, encode)
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.List as LT (find)
 import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (close, query_)
+import Database.PostgreSQL.Simple (close, query_, FromRow)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error
   ( CategoryError (..),
     Error
       ( CategoryError,
-        CommonError,
-        ParseError
-      ),
-    ParseError (ParseCategoryError),
+        CommonError        
+      )    
   )
 import GHC.Generics (Generic)
-import Lib (readNum)
+import Lib (limitAndOffsetHandler, runGetQuery, setLimitAndOffset)
+import Network.HTTP.Types (queryToQueryText)
+import qualified Network.Wai as W
 
 -- Creating a database query to get a list of catygories.
-getCategory :: Query -> Either Error Query
-getCategory limitOffset =
-  Right $
-    "SELECT (category_id :: TEXT), parent_category, \
+getCategory :: IO Query -> IO Query
+getCategory limitOffset = do
+  limitOffset' <- limitOffset
+  pure $
+    "SELECT category_id, parent_category, \
     \ name_category FROM category "
-      <> limitOffset
+      <> limitOffset'
       <> ";"
 
 -- For getParentCategories.
-getCategory' :: Query
-getCategory' = "SELECT parent_category, name_category FROM category;"
+getCategoryForList :: Query
+getCategoryForList = "SELECT parent_category, name_category FROM category;"
 
 data Category = Category
   { category_id :: Int,
     parent_category :: T.Text,
     name_category :: T.Text
   }
-  deriving (Show, Generic, ToJSON)
-
-parseCategory :: [T.Text] -> Either Error Category
-parseCategory [categoryIdTxt, parentCategory, nameCategory] = do
-  let idCategory = readNum categoryIdTxt
-  if idCategory == 0
-    then Left $ ParseError ParseCategoryError
-    else pure $ Category idCategory parentCategory nameCategory
-parseCategory _ = Left $ ParseError ParseCategoryError
+  deriving (Show, Generic, FromRow, ToJSON)
 
 newtype CategoryHandle m = CategoryHandle
   {checkUniqCategoryH :: BC.ByteString -> m Bool}
@@ -60,7 +55,7 @@ categoryHandler = CategoryHandle {checkUniqCategoryH = checkUniqCategory}
 getParentCategories :: T.Text -> IO [T.Text]
 getParentCategories category = do
   conn <- connectDB
-  allCategoriesLs <- query_ conn getCategory' :: IO [[T.Text]]
+  allCategoriesLs <- query_ conn getCategoryForList :: IO [[T.Text]]
   close conn
   writingLineDebug allCategoriesLs
   let buildingList categoryLs = do
@@ -141,7 +136,7 @@ editCategory CategoryHandle {..} isAdmin ls = do
       map
         ( \x ->
             if length (snd x) /= 2
-              then ("404", ["", ""])
+              then ("", ["", ""])
               else x
         )
         categories
@@ -149,35 +144,36 @@ editCategory CategoryHandle {..} isAdmin ls = do
       | method == "change_parent" && name == new_name = Left $ CategoryError CategoryParentItself
       | method == "change_name" && not isUniq = Left $ CategoryError CategoryExists
       | method == "change_parent" && isUniq && new_name /= "Null" = Left $ CategoryError NoParentCategory
-      | otherwise = checkQuery $ map buildQuery methodAndNames
-    checkQuery lq = if "404" `elem` lq then Left CommonError else Right . Query $ mconcat lq
+      | otherwise = Query . mconcat <$> mapM buildQuery methodAndNames
     buildQuery (meth, [nameCategory, newNameCategory]) =
       case meth of
         "change_name" ->
-          "UPDATE category \
-          \ SET   parent_category = '"
-            <> newNameCategory
-            <> "' \
-               \ WHERE parent_category = '"
-            <> nameCategory
-            <> "'; \
-               \ UPDATE category \
-               \ SET   name_category = '"
-            <> newNameCategory
-            <> "' \
-               \ WHERE name_category = '"
-            <> nameCategory
-            <> "'; "
+          pure $
+            "UPDATE category \
+            \ SET   parent_category = '"
+              <> newNameCategory
+              <> "' \
+                 \ WHERE parent_category = '"
+              <> nameCategory
+              <> "'; \
+                 \ UPDATE category \
+                 \ SET   name_category = '"
+              <> newNameCategory
+              <> "' \
+                 \ WHERE name_category = '"
+              <> nameCategory
+              <> "'; "
         "change_parent" ->
-          "UPDATE category \
-          \ SET parent_category = '"
-            <> newNameCategory
-            <> "' \
-               \ WHERE name_category = '"
-            <> nameCategory
-            <> "'; "
-        _ -> "404"
-    buildQuery (_, _) = "404"
+          pure $
+            "UPDATE category \
+            \ SET parent_category = '"
+              <> newNameCategory
+              <> "' \
+                 \ WHERE name_category = '"
+              <> nameCategory
+              <> "'; "
+        _ -> Left CommonError
+    buildQuery (_, _) = Left CommonError
 
 -- Checking the uniqueness of the category name in the database.
 checkUniqCategory :: BC.ByteString -> IO Bool
@@ -194,3 +190,36 @@ checkUniqCategory str = do
   close conn
   writingLineDebug ls
   pure $ null ls
+
+getCategoryHandler :: W.Request -> IO LC.ByteString
+getCategoryHandler req = do
+  queryCategory <- mkGetCategoryQuery req
+  category <- runGetQuery queryCategory :: IO [Category]
+  pure $ encode category
+
+mkGetCategoryQuery :: W.Request -> IO Query
+mkGetCategoryQuery req = getCategory limitOffset
+  where
+    arr = W.queryString req
+    limitOffset = setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
+
+mkCreateOrEditCategoryQuery ::
+  ( CategoryHandle IO ->
+    IO Bool ->
+    [(BC.ByteString, Maybe BC.ByteString)] ->
+    IO (Either Error Query)
+  ) ->
+  IO Bool ->
+  W.Request ->
+  IO Query
+mkCreateOrEditCategoryQuery func isAdmin req = do
+  eitherQuery <- func categoryHandler isAdmin $ W.queryString req
+  case eitherQuery of
+    Left err -> throwIO err
+    Right qry -> pure qry
+
+mkCreateCategoryQuery :: IO Bool -> W.Request -> IO Query
+mkCreateCategoryQuery = mkCreateOrEditCategoryQuery createCategory
+
+mkEditCategoryQuery :: IO Bool -> W.Request -> IO Query
+mkEditCategoryQuery = mkCreateOrEditCategoryQuery editCategory
