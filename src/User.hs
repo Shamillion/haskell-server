@@ -21,8 +21,8 @@ import Network.HTTP.Types (queryToQueryText)
 import qualified Network.Wai as W
 
 -- Creating a database query to get a list of users
-getUser :: Query -> Query
-getUser str =
+mkGetUserQuery :: Query -> Query
+mkGetUserQuery str =
   "SELECT  user_id, name_user, (creation_date :: TEXT), is_admin, is_author, \
   \ pass FROM users "
     <> str
@@ -60,10 +60,9 @@ parseUser _ = Left $ ParseError ParseUserError
 
 -- Request example (strict order):
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
-createUser :: IO Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
-createUser isAdmn ls = do
-  admin <- isAdmn
-  if not admin || null ls || map fst ls /= checkList || searchNothing
+buildCreateUserQuery :: Bool -> W.Request -> IO Query
+buildCreateUserQuery isAdmn req = do
+  if not isAdmn || null ls || map fst ls /= checkList || searchNothing
     then throwIO CommonError
     else do
       uniq <- checkUniqLogin login
@@ -86,15 +85,16 @@ createUser isAdmn ls = do
               <> "');"
         else throwIO LoginOccupied
   where
+    ls = W.queryString req
     checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
     searchNothing = elem Nothing $ map snd ls
     [nameUser, login, pass, isAdmin, isAuthor] = map (fromMaybe "" . snd) ls
 
 -- Disables the administrator rights of an automatically created user.
 -- Request example '../user?block_admin=Adam'
-blockAdminRights :: Bool -> Either Error Query
-blockAdminRights False = Left CommonError
-blockAdminRights _ =
+mkBlockAdminRightsQuery :: Bool -> Either Error Query
+mkBlockAdminRightsQuery False = Left CommonError
+mkBlockAdminRightsQuery _ =
   Right
     "UPDATE users SET is_admin = FALSE WHERE user_id = 99 AND login = 'Adam';"
 
@@ -120,22 +120,18 @@ checkUniqLogin str = do
 
 getUserHandler :: W.Request -> IO LC.ByteString
 getUserHandler req = do
-  queryUser <- mkGetUserQuery req
+  queryUser <- buildGetUserQuery req
   user <- runGetQuery queryUser :: IO [User]
   pure $ encode user
 
-mkGetUserQuery :: W.Request -> IO Query
-mkGetUserQuery req = getUser <$> limitOffset
+buildGetUserQuery :: W.Request -> IO Query
+buildGetUserQuery req = mkGetUserQuery <$> limitOffset
   where
     arr = W.queryString req
     limitOffset = setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
 
-mkCreateUserQuery :: IO Bool -> W.Request -> IO Query
-mkCreateUserQuery isAdmin req = createUser isAdmin $ W.queryString req
-
-mkEditUserQuery :: IO Bool -> W.Request -> IO Query
-mkEditUserQuery isAdmin _ = do
-  eitherQuery <- blockAdminRights <$> isAdmin
-  case eitherQuery of
+buildEditUserQuery :: Bool -> W.Request -> IO Query
+buildEditUserQuery isAdmin _ =
+  case mkBlockAdminRightsQuery isAdmin of
     Left err -> throwIO err
     Right qry -> pure qry

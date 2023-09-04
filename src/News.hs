@@ -36,10 +36,9 @@ import Photo (sendPhotoToDB)
 import User (User, parseUser)
 
 -- Creating a database query to get a list of news.
-getNews :: W.Request -> Maybe (Query, Query) -> IO Query
-getNews _ Nothing = throwIO CommonError
-getNews req parametersForNews = do
-  author <- authorID req
+mkGetNewsQuery :: Query -> Maybe (Query, Query) -> Maybe Query
+mkGetNewsQuery _ Nothing = Nothing
+mkGetNewsQuery author parametersForNews =
   pure $
     "SELECT (news_id :: TEXT), title, (news.creation_date :: TEXT), \
     \ (author :: TEXT), name_category, content, (photo :: TEXT), \
@@ -148,14 +147,11 @@ setFiltersNews ((field, param) : xs)
 -- '.../news?title=Text&category_id=3&content=Text&
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-createNews :: IO Bool -> IO Query -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
-createNews isAuth authID ls = do
-  isAuth' <- isAuth
-  if not isAuth' || null ls || nothingInLs
-    then throwIO CommonError
+mkCreateNewsQuery :: Bool -> Query -> BC.ByteString -> [(BC.ByteString, Maybe BC.ByteString)] -> Maybe Query
+mkCreateNewsQuery isAuth authID photoIdList ls = do
+  if not isAuth || null ls || nothingInLs
+    then Nothing
     else do
-      authID' <- authID
-      photoIdList <- photoIDLs ls
       let maybeStr =
             foldr
               (liftA2 (<>))
@@ -166,7 +162,7 @@ createNews isAuth authID ls = do
                   \ VALUES ('",
                 titleNws,
                 pure "', NOW(), ",
-                pure $ fromQuery authID',
+                pure $ fromQuery authID,
                 pure ", ",
                 categoryId,
                 pure ", ",
@@ -179,7 +175,7 @@ createNews isAuth authID ls = do
               ]
       case maybeStr of
         Just str -> pure $ Query str
-        Nothing -> throwIO CommonError
+        Nothing -> Nothing
   where
     nothingInLs = any (\(_, y) -> isNothing y) ls
     titleNws = getValue "title"
@@ -190,15 +186,15 @@ createNews isAuth authID ls = do
 
 -- Puts the photos from the query into the database and
 --  returns a list from the ID.
-photoIDLs :: [(BC.ByteString, Maybe BC.ByteString)] -> IO BC.ByteString
-photoIDLs ls = idLs <&> (\x -> "'{" <> buildPhotoIdString x <> "}'")
+buildPhotoIDLs :: [(BC.ByteString, Maybe BC.ByteString)] -> IO BC.ByteString
+buildPhotoIDLs ls = idLs <&> (\x -> "'{" <> mkPhotoIdString x <> "}'")
   where
     idLs = mapM (sendPhotoToDB . fromMaybe "" . snd) . filter ((== "photo") . fst) $ ls
 
-buildPhotoIdString :: [BC.ByteString] -> BC.ByteString
-buildPhotoIdString [] = ""
-buildPhotoIdString [x] = x
-buildPhotoIdString (x : xs) = x <> ", " <> buildPhotoIdString xs
+mkPhotoIdString :: [BC.ByteString] -> BC.ByteString
+mkPhotoIdString [] = ""
+mkPhotoIdString [x] = x
+mkPhotoIdString (x : xs) = x <> ", " <> mkPhotoIdString xs
 
 -- Request example:
 --    news?news_id=(id news needed to edit)&title=Text&category_id=3&
@@ -213,7 +209,7 @@ editNews req ls = do
     else do
       photoIdStr <- photoIdList
       let maybeStr =
-            buildChanges filteredLs >>= \str ->
+            mkChanges filteredLs >>= \str ->
               pure $
                 "UPDATE news SET " <> photoIdStr <> str
                   <> " WHERE news_id = "
@@ -231,7 +227,7 @@ editNews req ls = do
     photoIdList =
       if "photo" `elem` map fst ls
         then do
-          str <- photoIDLs ls
+          str <- buildPhotoIDLs ls
           pure $ "photo = " <> str <> ", "
         else pure ""
 
@@ -251,34 +247,43 @@ authorNews authId newsId = do
   pure $ ls /= []
 
 -- Creates a row with updated news fields.
-buildChanges :: [(BC.ByteString, Maybe BC.ByteString)] -> Maybe BC.ByteString
-buildChanges [] = Nothing
-buildChanges [(field, maybeParam)] = maybeParam >>= \param -> pure $ field <> " = " <> q <> param <> q
+mkChanges :: [(BC.ByteString, Maybe BC.ByteString)] -> Maybe BC.ByteString
+mkChanges [] = Nothing
+mkChanges [(field, maybeParam)] = maybeParam >>= \param -> pure $ field <> " = " <> q <> param <> q
   where
     q = if field `elem` fields then "'" else ""
     fields = ["title", "content"]
-buildChanges ((field, maybeParam) : xs) = buildChanges [(field, maybeParam)] <> pure ", " <> buildChanges xs
+mkChanges ((field, maybeParam) : xs) = mkChanges [(field, maybeParam)] <> pure ", " <> mkChanges xs
 
 getNewsHandler :: W.Request -> IO LC.ByteString
 getNewsHandler req = do
-  queryNews <- mkGetNewsQuery req 
+  queryNews <- buildGetNewsQuery req
   newsTxt <- runGetQuery queryNews :: IO [[T.Text]]
-  encodeNews newsTxt 
+  encodeNews newsTxt
 
-mkGetNewsQuery :: W.Request -> IO Query
-mkGetNewsQuery req = method >>= getNews req
-  where
-    method = setMethodNews limitAndOffsetHandler . queryToQueryText $ W.queryString req
+buildGetNewsQuery :: W.Request -> IO Query
+buildGetNewsQuery req = do
+  author <- authorID req
+  method <- setMethodNews limitAndOffsetHandler . queryToQueryText $ W.queryString req
+  let maybeQuery = mkGetNewsQuery author method
+  case maybeQuery of
+    Just qry -> pure qry
+    Nothing -> throwIO CommonError
 
 encodeNews :: [[T.Text]] -> IO LC.ByteString
 encodeNews = fmap encode . mapM parseNews
 
-mkCreateNewsQuery :: W.Request -> IO Query
-mkCreateNewsQuery req = createNews athr authId arr
+buildCreateNewsQuery :: W.Request -> IO Query
+buildCreateNewsQuery req = do
+  athr <- isAuthor req
+  authId <- authorID req
+  photoIdList <- buildPhotoIDLs arr
+  let maybeQuery = mkCreateNewsQuery athr authId photoIdList arr
+  case maybeQuery of
+    Just qry -> pure qry
+    Nothing -> throwIO CommonError
   where
-    athr = isAuthor req
-    authId = authorID req
     arr = W.queryString req
 
-mkEditNewsQuery :: W.Request -> IO Query
-mkEditNewsQuery req = editNews req $ W.queryString req
+buildEditNewsQuery :: W.Request -> IO Query
+buildEditNewsQuery req = editNews req $ W.queryString req

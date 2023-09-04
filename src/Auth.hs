@@ -10,7 +10,7 @@ import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error (AuthError (..))
 import qualified Network.Wai as W
-import User (User (..), getUser)
+import User (User (..), mkGetUserQuery)
 
 -- Returns the user with the username and password from the request.
 checkAuth :: W.Request -> IO User
@@ -23,7 +23,7 @@ checkAuth req =
         throwIO DecodeLoginAndPassError
       Right [login, password] -> do
         conn <- connectDB
-        let qry = getUser $ Query $ "WHERE login = '" <> login <> "'"
+        let qry = mkGetUserQuery $ Query $ "WHERE login = '" <> login <> "'"
         writingLineDebug qry
         userList <- query_ conn qry :: IO [User]
         close conn
