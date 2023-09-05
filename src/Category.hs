@@ -11,14 +11,14 @@ import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.List as LT (find)
 import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (close, query_, FromRow)
+import Database.PostgreSQL.Simple (FromRow, close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error
   ( CategoryError (..),
     Error
       ( CategoryError,
-        CommonError        
-      )    
+        CommonError
+      ),
   )
 import GHC.Generics (Generic)
 import Lib (limitAndOffsetHandler, runGetQuery, setLimitAndOffset)
@@ -26,14 +26,12 @@ import Network.HTTP.Types (queryToQueryText)
 import qualified Network.Wai as W
 
 -- Creating a database query to get a list of catygories.
-getCategory :: IO Query -> IO Query
-getCategory limitOffset = do
-  limitOffset' <- limitOffset
-  pure $
-    "SELECT category_id, parent_category, \
-    \ name_category FROM category "
-      <> limitOffset'
-      <> ";"
+mkGetCategoryQuery :: Query -> Query
+mkGetCategoryQuery limitOffset =
+  "SELECT category_id, parent_category, \
+  \ name_category FROM category "
+    <> limitOffset
+    <> ";"
 
 -- For getParentCategories.
 getCategoryForList :: Query
@@ -75,12 +73,11 @@ getParentCategories category = do
 createCategory ::
   Monad m =>
   CategoryHandle m ->
-  m Bool ->
+  Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
 createCategory CategoryHandle {..} isAdmin ls = do
-  isAdm <- isAdmin
-  if not isAdm || null ls || null categorys
+  if not isAdmin || null ls || null categorys
     then pure $ Left CommonError
     else do
       isUniqName <- checkUniqCategoryH nameCategory
@@ -114,12 +111,11 @@ createCategory CategoryHandle {..} isAdmin ls = do
 editCategory ::
   Monad m =>
   CategoryHandle m ->
-  m Bool ->
+  Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
 editCategory CategoryHandle {..} isAdmin ls = do
-  isAdm <- isAdmin
-  if not isAdm || null ls || null filteredLs || "" `elem` [name, new_name]
+  if not isAdmin || null ls || null filteredLs || "" `elem` [name, new_name]
     then pure $ Left CommonError
     else do
       isUniqName <- checkUniqCategoryH name
@@ -193,33 +189,34 @@ checkUniqCategory str = do
 
 getCategoryHandler :: W.Request -> IO LC.ByteString
 getCategoryHandler req = do
-  queryCategory <- mkGetCategoryQuery req
+  queryCategory <- buildGetCategoryQuery req
   category <- runGetQuery queryCategory :: IO [Category]
   pure $ encode category
 
-mkGetCategoryQuery :: W.Request -> IO Query
-mkGetCategoryQuery req = getCategory limitOffset
+buildGetCategoryQuery :: W.Request -> IO Query
+buildGetCategoryQuery req = do
+  limitOffset <- setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
+  pure $ mkGetCategoryQuery limitOffset
   where
     arr = W.queryString req
-    limitOffset = setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
 
-mkCreateOrEditCategoryQuery ::
+buildCreateOrEditCategoryQuery ::
   ( CategoryHandle IO ->
-    IO Bool ->
+    Bool ->
     [(BC.ByteString, Maybe BC.ByteString)] ->
     IO (Either Error Query)
   ) ->
-  IO Bool ->
+  Bool ->
   W.Request ->
   IO Query
-mkCreateOrEditCategoryQuery func isAdmin req = do
+buildCreateOrEditCategoryQuery func isAdmin req = do
   eitherQuery <- func categoryHandler isAdmin $ W.queryString req
   case eitherQuery of
     Left err -> throwIO err
     Right qry -> pure qry
 
-mkCreateCategoryQuery :: IO Bool -> W.Request -> IO Query
-mkCreateCategoryQuery = mkCreateOrEditCategoryQuery createCategory
+buildCreateCategoryQuery :: Bool -> W.Request -> IO Query
+buildCreateCategoryQuery = buildCreateOrEditCategoryQuery createCategory
 
-mkEditCategoryQuery :: IO Bool -> W.Request -> IO Query
-mkEditCategoryQuery = mkCreateOrEditCategoryQuery editCategory
+buildEditCategoryQuery :: Bool -> W.Request -> IO Query
+buildEditCategoryQuery = buildCreateOrEditCategoryQuery editCategory

@@ -6,7 +6,6 @@ import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.Functor ((<&>))
 import Data.Int (Int64)
 import qualified Data.List as LT
-import Data.String (IsString)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (FromRow, Query, close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (Query))
@@ -30,13 +29,6 @@ tailTxt txt = T.tail txt
 splitOnTxt :: T.Text -> T.Text -> [T.Text]
 splitOnTxt _ "" = []
 splitOnTxt c txt = T.splitOn c txt
-
--- Pulls a value from a list of lists.
-drawOut :: Data.String.IsString a => [[a]] -> a
-drawOut [] = ""
-drawOut ([] : _) = ""
-drawOut ([x] : _) = x
-drawOut (_ : _) = ""
 
 newtype LimitAndOffsetHandle m = LimitAndOffsetHandle
   { limitElemH :: m Int
@@ -85,11 +77,11 @@ runPostOrPutQuery qry = do
   pure num
 
 -- A comment for the user about adding or editing objects in the database.
-comment :: Int64 -> IO LC.ByteString
-comment num = pure $ LC.pack (show num) <> " position(s) done."
+buildComment :: Int64 -> IO LC.ByteString
+buildComment num = pure $ LC.pack (show num) <> " position(s) done."
 
 createAndEditObjectsHandler :: (W.Request -> IO Query) -> W.Request -> IO LC.ByteString
 createAndEditObjectsHandler func req = do
   queryForDB <- func req
   num <- runPostOrPutQuery queryForDB
-  comment num
+  buildComment num
