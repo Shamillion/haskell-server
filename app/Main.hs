@@ -2,7 +2,7 @@ module Main where
 
 import Auth (isAdmin)
 import Category (buildCreateCategoryQuery, buildEditCategoryQuery, getCategoryHandler)
-import Config (Priority (..), port, writingLine, writingLineDebug)
+import Config (Priority (..), writingLine, writingLineDebug, Configuration (serverPort))
 import Control.Exception (catch, throwIO)
 import qualified Data.ByteString.Lazy.Char8 as LC
 import Error (CategoryError (..), Error (..))
@@ -14,27 +14,30 @@ import Network.Wai.Handler.Warp (run)
 import News (buildCreateNewsQuery, buildEditNewsQuery, getNewsHandler)
 import Photo (getPhotoHandler, headerAndImage)
 import User (buildCreateUserQuery, buildEditUserQuery, getUserHandler)
+import Environment (environment, Environment (configuration))
+import Control.Monad.Reader (ReaderT (runReaderT), liftIO)
 
-handler :: W.Request -> IO LC.ByteString
+handler :: W.Request -> ReaderT Environment IO LC.ByteString
 handler req = do
-  admin <- isAdmin req
+  admin <- liftIO $ isAdmin req
   let reqMethod = W.requestMethod req
       [entity] = W.pathInfo req
   case (reqMethod, entity) of
     ("GET", "news") -> getNewsHandler req
     ("POST", "news") -> createAndEditObjectsHandler buildCreateNewsQuery req
     ("PUT", "news") -> createAndEditObjectsHandler buildEditNewsQuery req
-    ("GET", "user") -> getUserHandler req
+    ("GET", "user") -> liftIO $ getUserHandler req
     ("POST", "user") -> createAndEditObjectsHandler (buildCreateUserQuery admin) req
     ("PUT", "user") -> createAndEditObjectsHandler (buildEditUserQuery admin) req
-    ("GET", "category") -> getCategoryHandler req
+    ("GET", "category") -> liftIO $ getCategoryHandler req
     ("POST", "category") -> createAndEditObjectsHandler (buildCreateCategoryQuery admin) req
     ("PUT", "category") -> createAndEditObjectsHandler (buildEditCategoryQuery admin) req
     ("GET", "photo") -> getPhotoHandler req
-    _ -> throwIO CommonError
+    _ -> liftIO $ throwIO CommonError 
 
-app :: W.Application
-app req respond = do
+app :: Environment -> W.Application
+app env req respond = do
+  writingLineDebug env
   writingLine INFO "Received a request."
   writingLineDebug $ W.requestMethod req
   writingLineDebug $ W.requestHeaders req
@@ -42,7 +45,7 @@ app req respond = do
   writingLineDebug $ W.queryString req
   ans <-
     catch
-      (handler req)
+      (runReaderT (handler req) env)
       ( \err ->
           "" <$ case err of
             LoginOccupied ->
@@ -68,11 +71,12 @@ app req respond = do
 
 main :: IO ()
 main = do
-  num <- checkDB 1
+  env <- environment
+  num <- checkDB (configuration env) 1
   writingLine DEBUG $ "checkDB was runing " <> show num <> " times."
   if num > 2
     then putStrLn "Error Database! Server can not be started!"
     else do
-      port' <- port
+      let port = serverPort . configuration $ env
       mapM_ (\func -> func "Server is started.") [putStrLn, writingLine INFO]
-      run port' app
+      run port $ app env

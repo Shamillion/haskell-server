@@ -11,6 +11,8 @@ import Database.PostgreSQL.Simple (FromRow, Query, close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (Query))
 import qualified Network.Wai as W
 import Text.Read (readMaybe)
+import Environment (Environment (connectInfo))
+import Control.Monad.Reader (ReaderT, liftIO, asks)
 
 readNum :: T.Text -> Int
 readNum n =
@@ -60,28 +62,32 @@ setLimitAndOffset LimitAndOffsetHandle {..} ls = do
         _ -> defaultVal
     toByteString = BC.pack . show
 
-runGetQuery :: (Show r, FromRow r) => Query -> IO [r]
+runGetQuery :: (Show r, FromRow r) => Query -> ReaderT Environment IO [r]
 runGetQuery qry = do
-  conn <- connectDB
-  dataFromDB <- query_ conn qry
-  writingLineDebug dataFromDB
-  close conn
-  pure dataFromDB
+  connectInf <- asks connectInfo
+  liftIO $ do
+    conn <- connectDB connectInf
+    dataFromDB <- query_ conn qry
+    writingLineDebug dataFromDB
+    close conn
+    pure dataFromDB
 
-runPostOrPutQuery :: Query -> IO Int64
+runPostOrPutQuery :: Query -> ReaderT Environment IO Int64
 runPostOrPutQuery qry = do
-  conn <- connectDB
-  num <- execute_ conn qry
-  close conn
-  writingLineDebug num
-  pure num
+  connectInf <- asks connectInfo
+  liftIO $ do
+    conn <- connectDB connectInf
+    num <- execute_ conn qry
+    close conn
+    writingLineDebug num
+    pure num
 
 -- A comment for the user about adding or editing objects in the database.
-buildComment :: Int64 -> IO LC.ByteString
-buildComment num = pure $ LC.pack (show num) <> " position(s) done."
+mkComment :: Int64 -> LC.ByteString
+mkComment num = LC.pack (show num) <> " position(s) done."
 
-createAndEditObjectsHandler :: (W.Request -> IO Query) -> W.Request -> IO LC.ByteString
+createAndEditObjectsHandler :: (W.Request -> IO Query) -> W.Request -> ReaderT Environment IO LC.ByteString
 createAndEditObjectsHandler func req = do
-  queryForDB <- func req
+  queryForDB <- liftIO $ func req
   num <- runPostOrPutQuery queryForDB
-  buildComment num
+  pure $ mkComment num

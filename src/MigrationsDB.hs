@@ -1,6 +1,6 @@
 module MigrationsDB where
 
-import Config (Priority (..), connectDB, writingLine, writingLineDebug)
+import Config (Priority (..), connectDB, writingLine, writingLineDebug, Configuration)
 import qualified Data.ByteString.Char8 as BC
 import Data.Char (ord)
 import qualified Data.Text as T
@@ -9,12 +9,12 @@ import Database.PostgreSQL.Simple.Types (Query (..))
 import User (cryptoPass)
 
 -- Checking the availability of the necessary tables in the database.
-checkDB :: Int -> IO Int
-checkDB num
+checkDB :: Configuration -> Int -> IO Int
+checkDB conf num
   | num > 2 = writingLine ERROR "Error Database!" >> pure num
   | otherwise = do
     writingLine INFO "Checking Database..."
-    conn <- connectDB
+    conn <- connectDB conf
     writingLineDebug qry
     db <- query_ conn qry :: IO [[T.Text]]
     writingLineDebug db
@@ -37,7 +37,7 @@ checkDB num
             ]
           writingLine INFO "Database has been created."
           close conn
-          checkDB (num + 1)
+          checkDB conf (num + 1)
     writingLine DEBUG "Checking database has been successfully."
     pure num
   where

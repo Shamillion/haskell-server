@@ -14,6 +14,8 @@ import Database.PostgreSQL.Simple.Types (Query (..))
 import Error (Error (CommonError, ParseError), ParseError (DecodeImageError))
 import Lib (runGetQuery)
 import qualified Network.Wai as W
+import Control.Monad.Reader (ReaderT, liftIO, asks)
+import Environment (Environment (connectInfo))
 
 -- Creating a query to the database to get one photo.
 mkGetPhotoQuery :: [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
@@ -38,19 +40,21 @@ decodeImage ([txt] : _) = pure $ header <> ";" <> image
 decodeImage (_ : _) = Left $ ParseError DecodeImageError
 
 -- The function sends the photo to the database and returns its ID in the table.
-sendPhotoToDB :: BC.ByteString -> IO BC.ByteString
+sendPhotoToDB :: BC.ByteString -> ReaderT Environment IO BC.ByteString
 sendPhotoToDB str = do
-  conn <- connectDB
-  _ <- execute conn "INSERT INTO photo (image) VALUES (?);" [str]
-  [[val]] <- query_ conn "SELECT (max(photo_id) :: varchar) FROM photo;" :: IO [[BC.ByteString]]
-  close conn
-  pure val
+  connectInf <- asks connectInfo
+  liftIO $ do
+    conn <- connectDB connectInf
+    _ <- execute conn "INSERT INTO photo (image) VALUES (?);" [str]
+    [[val]] <- query_ conn "SELECT (max(photo_id) :: varchar) FROM photo;" :: IO [[BC.ByteString]]
+    close conn
+    pure val
 
-getPhotoHandler :: W.Request -> IO LC.ByteString
+getPhotoHandler :: W.Request -> ReaderT Environment IO LC.ByteString
 getPhotoHandler req = do
-  queryPhoto <- buildGetPhotoQuery req
+  queryPhoto <- liftIO $ buildGetPhotoQuery req
   photoTxt <- runGetQuery queryPhoto
-  encodePhoto photoTxt
+  liftIO $ encodePhoto photoTxt
 
 buildGetPhotoQuery :: W.Request -> IO Query
 buildGetPhotoQuery req = do

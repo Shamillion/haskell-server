@@ -34,6 +34,8 @@ import Network.HTTP.Types (queryToQueryText)
 import qualified Network.Wai as W
 import Photo (sendPhotoToDB)
 import User (User, parseUser)
+import Environment (Environment (connectInfo))
+import Control.Monad.Reader (ReaderT, asks, liftIO)
 
 -- Creating a database query to get a list of news.
 mkGetNewsQuery :: Query -> Maybe (Query, Query) -> Maybe Query
@@ -200,16 +202,16 @@ mkPhotoIdString (x : xs) = x <> ", " <> mkPhotoIdString xs
 --    news?news_id=(id news needed to edit)&title=Text&category_id=3&
 --       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-editNews :: W.Request -> [(BC.ByteString, Maybe BC.ByteString)] -> IO Query
+editNews :: W.Request -> [(BC.ByteString, Maybe BC.ByteString)] -> ReaderT Environment IO Query
 editNews req ls = do
-  authId <- authorID req
+  authId <- liftIO $ authorID req
   isAuth <- authorNews (fromQuery authId) newsId
   if null ls || not isAuth
-    then throwIO CommonError
-    else do
+    then liftIO $ throwIO CommonError
+    else liftIO $ do
       photoIdStr <- photoIdList
       let maybeStr =
-            mkChanges filteredLs >>= \str ->
+            mkUpdatedNewsFields filteredLs >>= \str ->
               pure $
                 "UPDATE news SET " <> photoIdStr <> str
                   <> " WHERE news_id = "
@@ -232,34 +234,36 @@ editNews req ls = do
         else pure ""
 
 -- Checks whether this user is the author of this news.
-authorNews :: BC.ByteString -> BC.ByteString -> IO Bool
+authorNews :: BC.ByteString -> BC.ByteString -> ReaderT Environment IO Bool
 authorNews "Null" _ = pure False
 authorNews authId newsId = do
-  conn <- connectDB
-  ls <-
-    query
-      conn
-      "SELECT news_id FROM news WHERE user_id = ? AND \
-      \ news_id = ?;"
-      (authId, newsId) ::
-      IO [[Int]]
-  close conn
-  pure $ ls /= []
+  connectInf <- asks connectInfo
+  liftIO $ do
+    conn <- connectDB connectInf
+    ls <-
+      query
+        conn
+        "SELECT news_id FROM news WHERE user_id = ? AND \
+        \ news_id = ?;"
+        (authId, newsId) ::
+        IO [[Int]]
+    close conn
+    pure $ ls /= []
 
 -- Creates a row with updated news fields.
-mkChanges :: [(BC.ByteString, Maybe BC.ByteString)] -> Maybe BC.ByteString
-mkChanges [] = Nothing
-mkChanges [(field, maybeParam)] = maybeParam >>= \param -> pure $ field <> " = " <> q <> param <> q
+mkUpdatedNewsFields :: [(BC.ByteString, Maybe BC.ByteString)] -> Maybe BC.ByteString
+mkUpdatedNewsFields [] = Nothing
+mkUpdatedNewsFields [(field, maybeParam)] = maybeParam >>= \param -> pure $ field <> " = " <> q <> param <> q
   where
     q = if field `elem` fields then "'" else ""
     fields = ["title", "content"]
-mkChanges ((field, maybeParam) : xs) = mkChanges [(field, maybeParam)] <> pure ", " <> mkChanges xs
+mkUpdatedNewsFields ((field, maybeParam) : xs) = mkUpdatedNewsFields [(field, maybeParam)] <> pure ", " <> mkUpdatedNewsFields xs
 
-getNewsHandler :: W.Request -> IO LC.ByteString
+getNewsHandler :: W.Request -> ReaderT Environment IO LC.ByteString
 getNewsHandler req = do
-  queryNews <- buildGetNewsQuery req
-  newsTxt <- runGetQuery queryNews :: IO [[T.Text]]
-  encodeNews newsTxt
+  queryNews <- liftIO $ buildGetNewsQuery req
+  newsTxt <- runGetQuery queryNews :: ReaderT Environment IO [[T.Text]]
+  liftIO $ encodeNews newsTxt
 
 buildGetNewsQuery :: W.Request -> IO Query
 buildGetNewsQuery req = do
@@ -285,5 +289,5 @@ buildCreateNewsQuery req = do
   where
     arr = W.queryString req
 
-buildEditNewsQuery :: W.Request -> IO Query
+buildEditNewsQuery :: W.Request -> ReaderT Environment IO Query
 buildEditNewsQuery req = editNews req $ W.queryString req
