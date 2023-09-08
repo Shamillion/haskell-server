@@ -7,7 +7,6 @@ import Data.Aeson (FromJSON, eitherDecode)
 import qualified Data.ByteString.Lazy as L
 import Data.Time (getCurrentTime)
 import Data.Word (Word16)
-import qualified Database.PostgreSQL.Simple as PS
 import GHC.Generics (Generic)
 import System.Exit (die)
 
@@ -42,27 +41,9 @@ readConfigFile = do
 time :: IO String
 time = take 19 . show <$> getCurrentTime
 
--- Parameters for connecting to the database.
-connectingParameters :: Configuration -> PS.ConnectInfo
-connectingParameters conf = do
-  PS.ConnectInfo
-    { PS.connectHost = dbHost conf,
-      PS.connectPort = dbPort conf,
-      PS.connectDatabase = dbname conf,
-      PS.connectUser = dbUser conf,
-      PS.connectPassword = dbPassword conf
-    }
-
 -- Maximum number of items returned by the database in response to a request.
 limitElem :: IO Int
 limitElem = maxElem <$> readConfigFile
-
--- Establishing a connection to the database.
-connectDB :: PS.ConnectInfo -> IO PS.Connection
-connectDB connectInf = do
-  writingLine INFO "Sent a request to the database."
-  writingLineDebug connectInf 
-  PS.connect connectInf 
 
 -- Data type for the logger.
 data Priority = DEBUG | INFO | WARNING | ERROR
@@ -98,4 +79,3 @@ writingLineDebug s = writingLine DEBUG $ show s
 -- Logging level.
 logLevel :: IO Priority
 logLevel = priorityLevel <$> readConfigFile
-

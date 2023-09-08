@@ -5,9 +5,10 @@ module News where
 
 import Auth (authorID, isAuthor)
 import Category (getParentCategories)
-import Config (connectDB)
+import ConnectDB (connectDB)
 import Control.Applicative (liftA2)
 import Control.Exception (throwIO)
+import Control.Monad.Reader (ReaderT, liftIO)
 import Data.Aeson (ToJSON, encode)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
@@ -18,6 +19,7 @@ import Data.String (fromString)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Environment (Environment)
 import Error (Error (CommonError, ParseError), ParseError (ParseNewsError))
 import GHC.Generics (Generic)
 import Lib
@@ -34,8 +36,6 @@ import Network.HTTP.Types (queryToQueryText)
 import qualified Network.Wai as W
 import Photo (sendPhotoToDB)
 import User (User, parseUser)
-import Environment (Environment (connectInfo))
-import Control.Monad.Reader (ReaderT, asks, liftIO)
 
 -- Creating a database query to get a list of news.
 mkGetNewsQuery :: Query -> Maybe (Query, Query) -> Maybe Query
@@ -188,7 +188,7 @@ mkCreateNewsQuery isAuth authID photoIdList ls = do
 
 -- Puts the photos from the query into the database and
 --  returns a list from the ID.
-buildPhotoIDLs :: [(BC.ByteString, Maybe BC.ByteString)] -> IO BC.ByteString
+buildPhotoIDLs :: [(BC.ByteString, Maybe BC.ByteString)] -> ReaderT Environment IO BC.ByteString
 buildPhotoIDLs ls = idLs <&> (\x -> "'{" <> mkPhotoIdString x <> "}'")
   where
     idLs = mapM (sendPhotoToDB . fromMaybe "" . snd) . filter ((== "photo") . fst) $ ls
@@ -202,13 +202,13 @@ mkPhotoIdString (x : xs) = x <> ", " <> mkPhotoIdString xs
 --    news?news_id=(id news needed to edit)&title=Text&category_id=3&
 --       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-editNews :: W.Request -> [(BC.ByteString, Maybe BC.ByteString)] -> ReaderT Environment IO Query
-editNews req ls = do
-  authId <- liftIO $ authorID req
+buildEditNewsQuery :: W.Request -> ReaderT Environment IO Query
+buildEditNewsQuery req = do
+  authId <- authorID req
   isAuth <- authorNews (fromQuery authId) newsId
   if null ls || not isAuth
     then liftIO $ throwIO CommonError
-    else liftIO $ do
+    else do
       photoIdStr <- photoIdList
       let maybeStr =
             mkUpdatedNewsFields filteredLs >>= \str ->
@@ -219,8 +219,9 @@ editNews req ls = do
                   <> ";"
       case maybeStr of
         Just str -> pure $ Query str
-        Nothing -> throwIO CommonError
+        Nothing -> liftIO $ throwIO CommonError
   where
+    ls = W.queryString req
     newsId = case LT.find (\(x, _) -> x == "news_id") ls of
       Just (_, Just n) -> n
       _ -> "0"
@@ -237,9 +238,8 @@ editNews req ls = do
 authorNews :: BC.ByteString -> BC.ByteString -> ReaderT Environment IO Bool
 authorNews "Null" _ = pure False
 authorNews authId newsId = do
-  connectInf <- asks connectInfo
+  conn <- connectDB
   liftIO $ do
-    conn <- connectDB connectInf
     ls <-
       query
         conn
@@ -261,23 +261,23 @@ mkUpdatedNewsFields ((field, maybeParam) : xs) = mkUpdatedNewsFields [(field, ma
 
 getNewsHandler :: W.Request -> ReaderT Environment IO LC.ByteString
 getNewsHandler req = do
-  queryNews <- liftIO $ buildGetNewsQuery req
+  queryNews <- buildGetNewsQuery req
   newsTxt <- runGetQuery queryNews :: ReaderT Environment IO [[T.Text]]
   liftIO $ encodeNews newsTxt
 
-buildGetNewsQuery :: W.Request -> IO Query
+buildGetNewsQuery :: W.Request -> ReaderT Environment IO Query
 buildGetNewsQuery req = do
   author <- authorID req
-  method <- setMethodNews limitAndOffsetHandler . queryToQueryText $ W.queryString req
+  method <- liftIO $ setMethodNews limitAndOffsetHandler . queryToQueryText $ W.queryString req
   let maybeQuery = mkGetNewsQuery author method
   case maybeQuery of
     Just qry -> pure qry
-    Nothing -> throwIO CommonError
+    Nothing -> liftIO $ throwIO CommonError
 
 encodeNews :: [[T.Text]] -> IO LC.ByteString
 encodeNews = fmap encode . mapM parseNews
 
-buildCreateNewsQuery :: W.Request -> IO Query
+buildCreateNewsQuery :: W.Request -> ReaderT Environment IO Query
 buildCreateNewsQuery req = do
   athr <- isAuthor req
   authId <- authorID req
@@ -285,9 +285,6 @@ buildCreateNewsQuery req = do
   let maybeQuery = mkCreateNewsQuery athr authId photoIdList arr
   case maybeQuery of
     Just qry -> pure qry
-    Nothing -> throwIO CommonError
+    Nothing -> liftIO $ throwIO CommonError
   where
     arr = W.queryString req
-
-buildEditNewsQuery :: W.Request -> ReaderT Environment IO Query
-buildEditNewsQuery req = editNews req $ W.queryString req

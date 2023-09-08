@@ -28,6 +28,7 @@ library
       Auth
       Category
       Config
+      ConnectDB
       Environment
       Error
       Lib

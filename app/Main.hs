@@ -2,9 +2,11 @@ module Main where
 
 import Auth (isAdmin)
 import Category (buildCreateCategoryQuery, buildEditCategoryQuery, getCategoryHandler)
-import Config (Priority (..), writingLine, writingLineDebug, Configuration (serverPort))
+import Config (Configuration (serverPort), Priority (..), writingLine, writingLineDebug)
 import Control.Exception (catch, throwIO)
+import Control.Monad.Reader (ReaderT (runReaderT), liftIO)
 import qualified Data.ByteString.Lazy.Char8 as LC
+import Environment (Environment (configuration), environment)
 import Error (CategoryError (..), Error (..))
 import Lib (createAndEditObjectsHandler)
 import MigrationsDB (checkDB)
@@ -14,26 +16,24 @@ import Network.Wai.Handler.Warp (run)
 import News (buildCreateNewsQuery, buildEditNewsQuery, getNewsHandler)
 import Photo (getPhotoHandler, headerAndImage)
 import User (buildCreateUserQuery, buildEditUserQuery, getUserHandler)
-import Environment (environment, Environment (configuration))
-import Control.Monad.Reader (ReaderT (runReaderT), liftIO)
 
 handler :: W.Request -> ReaderT Environment IO LC.ByteString
 handler req = do
-  admin <- liftIO $ isAdmin req
+  admin <- isAdmin req
   let reqMethod = W.requestMethod req
       [entity] = W.pathInfo req
   case (reqMethod, entity) of
     ("GET", "news") -> getNewsHandler req
     ("POST", "news") -> createAndEditObjectsHandler buildCreateNewsQuery req
     ("PUT", "news") -> createAndEditObjectsHandler buildEditNewsQuery req
-    ("GET", "user") -> liftIO $ getUserHandler req
+    ("GET", "user") -> getUserHandler req
     ("POST", "user") -> createAndEditObjectsHandler (buildCreateUserQuery admin) req
     ("PUT", "user") -> createAndEditObjectsHandler (buildEditUserQuery admin) req
     ("GET", "category") -> liftIO $ getCategoryHandler req
     ("POST", "category") -> createAndEditObjectsHandler (buildCreateCategoryQuery admin) req
     ("PUT", "category") -> createAndEditObjectsHandler (buildEditCategoryQuery admin) req
     ("GET", "photo") -> getPhotoHandler req
-    _ -> liftIO $ throwIO CommonError 
+    _ -> liftIO $ throwIO CommonError
 
 app :: Environment -> W.Application
 app env req respond = do
@@ -72,7 +72,7 @@ app env req respond = do
 main :: IO ()
 main = do
   env <- environment
-  num <- checkDB (configuration env) 1
+  num <- checkDB env 1
   writingLine DEBUG $ "checkDB was runing " <> show num <> " times."
   if num > 2
     then putStrLn "Error Database! Server can not be started!"

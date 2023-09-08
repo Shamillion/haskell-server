@@ -3,7 +3,7 @@
 
 module Category where
 
-import Config (connectDB, writingLineDebug)
+import Config (writingLineDebug)
 import Control.Exception (throwIO)
 import Data.Aeson (ToJSON, encode)
 import qualified Data.ByteString.Char8 as BC
@@ -24,6 +24,7 @@ import GHC.Generics (Generic)
 import Lib (limitAndOffsetHandler, runGetQuery, setLimitAndOffset)
 import Network.HTTP.Types (queryToQueryText)
 import qualified Network.Wai as W
+import ConnectDB (connectDB)
 
 -- Creating a database query to get a list of catygories.
 mkGetCategoryQuery :: Query -> Query

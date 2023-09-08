@@ -3,8 +3,10 @@
 
 module User where
 
-import Config (connectDB, writingLineDebug)
+import Config (writingLineDebug)
+import ConnectDB (connectDB)
 import Control.Exception (throwIO)
+import Control.Monad.Reader (ReaderT, liftIO)
 import Crypto.KDF.BCrypt (hashPassword)
 import Data.Aeson (ToJSON, encode, object, toJSON, (.=))
 import qualified Data.ByteString.Char8 as BC
@@ -14,6 +16,7 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (FromRow, close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Environment (Environment)
 import Error (Error (CommonError, LoginOccupied, ParseError), ParseError (ParseUserError))
 import GHC.Generics (Generic)
 import Lib (limitAndOffsetHandler, readNum, runGetQuery, setLimitAndOffset)
@@ -60,15 +63,15 @@ parseUser _ = Left $ ParseError ParseUserError
 
 -- Request example (strict order):
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
-buildCreateUserQuery :: Bool -> W.Request -> IO Query
+buildCreateUserQuery :: Bool -> W.Request -> ReaderT Environment IO Query
 buildCreateUserQuery isAdmn req = do
   if not isAdmn || null ls || map fst ls /= checkList || searchNothing
-    then throwIO CommonError
+    then liftIO $ throwIO CommonError
     else do
       uniq <- checkUniqLogin login
       if uniq
         then do
-          password <- cryptoPass (sum . map ord . BC.unpack $ nameUser) pass
+          password <- liftIO $ cryptoPass (sum . map ord . BC.unpack $ nameUser) pass
           pure . Query $
             "INSERT INTO users (name_user, login, pass, \
             \       creation_date, is_admin, is_author) \
@@ -83,7 +86,7 @@ buildCreateUserQuery isAdmn req = do
               <> "', '"
               <> isAuthor
               <> "');"
-        else throwIO LoginOccupied
+        else liftIO $ throwIO LoginOccupied
   where
     ls = W.queryString req
     checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
@@ -103,25 +106,25 @@ cryptoPass :: Int -> BC.ByteString -> IO BC.ByteString
 cryptoPass num = hashPassword (mod num 7 + 4)
 
 -- Checking the uniqueness of the login in the database.
-checkUniqLogin :: BC.ByteString -> IO Bool
+checkUniqLogin :: BC.ByteString -> ReaderT Environment IO Bool
 checkUniqLogin str = do
   conn <- connectDB
   ls <-
-    query_ conn $
-      Query $
-        "SELECT name_user FROM users \
-        \ WHERE login = '"
-          <> str
-          <> "';" ::
-      IO [[BC.ByteString]]
-  close conn
-  writingLineDebug ls
+    liftIO $
+      query_ conn $
+        Query $
+          "SELECT name_user FROM users \
+          \ WHERE login = '"
+            <> str
+            <> "';" ::
+      ReaderT Environment IO [[BC.ByteString]]
+  liftIO $ close conn >> writingLineDebug ls
   pure $ null ls
 
-getUserHandler :: W.Request -> IO LC.ByteString
+getUserHandler :: W.Request -> ReaderT Environment IO LC.ByteString
 getUserHandler req = do
-  queryUser <- buildGetUserQuery req
-  user <- runGetQuery queryUser :: IO [User]
+  queryUser <- liftIO $ buildGetUserQuery req
+  user <- runGetQuery queryUser :: ReaderT Environment IO [User]
   pure $ encode user
 
 buildGetUserQuery :: W.Request -> IO Query
@@ -130,8 +133,8 @@ buildGetUserQuery req = mkGetUserQuery <$> limitOffset
     arr = W.queryString req
     limitOffset = setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
 
-buildEditUserQuery :: Bool -> W.Request -> IO Query
+buildEditUserQuery :: Bool -> W.Request -> ReaderT Environment IO Query
 buildEditUserQuery isAdmin _ =
   case mkBlockAdminRightsQuery isAdmin of
-    Left err -> throwIO err
+    Left err -> liftIO $ throwIO err
     Right qry -> pure qry

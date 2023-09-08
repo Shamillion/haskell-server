@@ -1,6 +1,8 @@
 module Lib where
 
-import Config (connectDB, limitElem, writingLineDebug)
+import Config (limitElem, writingLineDebug)
+import ConnectDB (connectDB)
+import Control.Monad.Reader (ReaderT, liftIO)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.Functor ((<&>))
@@ -9,10 +11,9 @@ import qualified Data.List as LT
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (FromRow, Query, close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (Query))
+import Environment (Environment)
 import qualified Network.Wai as W
 import Text.Read (readMaybe)
-import Environment (Environment (connectInfo))
-import Control.Monad.Reader (ReaderT, liftIO, asks)
 
 readNum :: T.Text -> Int
 readNum n =
@@ -64,9 +65,8 @@ setLimitAndOffset LimitAndOffsetHandle {..} ls = do
 
 runGetQuery :: (Show r, FromRow r) => Query -> ReaderT Environment IO [r]
 runGetQuery qry = do
-  connectInf <- asks connectInfo
+  conn <- connectDB
   liftIO $ do
-    conn <- connectDB connectInf
     dataFromDB <- query_ conn qry
     writingLineDebug dataFromDB
     close conn
@@ -74,9 +74,8 @@ runGetQuery qry = do
 
 runPostOrPutQuery :: Query -> ReaderT Environment IO Int64
 runPostOrPutQuery qry = do
-  connectInf <- asks connectInfo
+  conn <- connectDB
   liftIO $ do
-    conn <- connectDB connectInf
     num <- execute_ conn qry
     close conn
     writingLineDebug num
@@ -86,8 +85,8 @@ runPostOrPutQuery qry = do
 mkComment :: Int64 -> LC.ByteString
 mkComment num = LC.pack (show num) <> " position(s) done."
 
-createAndEditObjectsHandler :: (W.Request -> IO Query) -> W.Request -> ReaderT Environment IO LC.ByteString
+createAndEditObjectsHandler :: (W.Request -> ReaderT Environment IO Query) -> W.Request -> ReaderT Environment IO LC.ByteString
 createAndEditObjectsHandler func req = do
-  queryForDB <- liftIO $ func req
+  queryForDB <- func req
   num <- runPostOrPutQuery queryForDB
   pure $ mkComment num
