@@ -74,7 +74,7 @@ data News = News
   }
   deriving (Show, Generic, ToJSON)
 
-parseNews :: [T.Text] -> IO News
+parseNews :: [T.Text] -> ReaderT Environment IO News
 parseNews [newsIdTxt, title, creation_date, authorTxt, categoryTxt, content, photoTxt, isPublishedTxt] = do
   let news_id = readNum newsIdTxt
       splitText = splitOnTxt "," . tailTxt . initTxt
@@ -82,14 +82,14 @@ parseNews [newsIdTxt, title, creation_date, authorTxt, categoryTxt, content, pho
       photo = map ("/photo?get_photo=" <>) $ splitText photoTxt
       is_published = isPublishedTxt == "true" || isPublishedTxt == "t"
   if news_id == 0
-    then throwIO $ ParseError ParseNewsError
+    then liftIO . throwIO $ ParseError ParseNewsError
     else do
       case eitherAuthor of
-        Left err -> throwIO err
+        Left err -> liftIO $ throwIO err
         Right author -> do
           categories <- getParentCategories categoryTxt
           pure $ News news_id title creation_date author categories content photo is_published
-parseNews _ = throwIO $ ParseError ParseNewsError
+parseNews _ = liftIO . throwIO $ ParseError ParseNewsError
 
 setMethodNews ::
   Monad m =>
@@ -263,7 +263,7 @@ getNewsHandler :: W.Request -> ReaderT Environment IO LC.ByteString
 getNewsHandler req = do
   queryNews <- buildGetNewsQuery req
   newsTxt <- runGetQuery queryNews :: ReaderT Environment IO [[T.Text]]
-  liftIO $ encodeNews newsTxt
+  encodeNews newsTxt
 
 buildGetNewsQuery :: W.Request -> ReaderT Environment IO Query
 buildGetNewsQuery req = do
@@ -274,7 +274,7 @@ buildGetNewsQuery req = do
     Just qry -> pure qry
     Nothing -> liftIO $ throwIO CommonError
 
-encodeNews :: [[T.Text]] -> IO LC.ByteString
+encodeNews :: [[T.Text]] -> ReaderT Environment IO LC.ByteString
 encodeNews = fmap encode . mapM parseNews
 
 buildCreateNewsQuery :: W.Request -> ReaderT Environment IO Query

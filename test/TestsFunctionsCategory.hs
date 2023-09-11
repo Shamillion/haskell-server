@@ -12,14 +12,14 @@ import Database.PostgreSQL.Simple.Types (Query (..))
 import Error (CategoryError (..), Error (..))
 import Test.Hspec (SpecWith, it, shouldBe)
 
-categoryTestHandler :: CategoryHandle Identity
+categoryTestHandler :: CategoryHandle () Identity
 categoryTestHandler = CategoryHandle {checkUniqCategoryH = testUniqCategory}
 
-testUniqCategory :: (Eq a, Data.String.IsString a) => a -> Identity Bool
-testUniqCategory val = pure $ val `notElem` ["parentCategory", "Null", "existCategory"]
+testUniqCategory :: (Eq a, Data.String.IsString a) => () -> a -> Identity Bool
+testUniqCategory _ val = pure $ val `notElem` ["parentCategory", "Null", "existCategory"]
 
 createCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
-createCategory' bool ls = runIdentity $ createCategory categoryTestHandler bool ls
+createCategory' bool ls = runIdentity $ createCategory categoryTestHandler () bool ls
 
 testsFunctionCreateCategory :: SpecWith ()
 testsFunctionCreateCategory = do
@@ -117,7 +117,7 @@ testsFunctionCreateCategory = do
       `shouldBe` Left CommonError
 
 editCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
-editCategory' bool ls = runIdentity $ editCategory categoryTestHandler bool ls
+editCategory' bool ls = runIdentity $ editCategory categoryTestHandler () bool ls
 
 testsFunctionEditCategory :: SpecWith ()
 testsFunctionEditCategory = do

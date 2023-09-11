@@ -11,7 +11,7 @@ import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.List as LT (find)
 import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (FromRow, close, query_)
+import Database.PostgreSQL.Simple (FromRow, close, query_, Connection)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Error
   ( CategoryError (..),
@@ -25,6 +25,8 @@ import Lib (limitAndOffsetHandler, runGetQuery, setLimitAndOffset)
 import Network.HTTP.Types (queryToQueryText)
 import qualified Network.Wai as W
 import ConnectDB (connectDB)
+import Environment (Environment)
+import Control.Monad.Reader (ReaderT, liftIO)
 
 -- Creating a database query to get a list of catygories.
 mkGetCategoryQuery :: Query -> Query
@@ -45,27 +47,28 @@ data Category = Category
   }
   deriving (Show, Generic, FromRow, ToJSON)
 
-newtype CategoryHandle m = CategoryHandle
-  {checkUniqCategoryH :: BC.ByteString -> m Bool}
+newtype CategoryHandle a m = CategoryHandle
+  {checkUniqCategoryH :: a -> BC.ByteString -> m Bool}
 
-categoryHandler :: CategoryHandle IO
+categoryHandler :: CategoryHandle Connection IO
 categoryHandler = CategoryHandle {checkUniqCategoryH = checkUniqCategory}
 
-getParentCategories :: T.Text -> IO [T.Text]
+getParentCategories :: T.Text -> ReaderT Environment IO [T.Text]
 getParentCategories category = do
   conn <- connectDB
-  allCategoriesLs <- query_ conn getCategoryForList :: IO [[T.Text]]
-  close conn
-  writingLineDebug allCategoriesLs
-  let buildingList categoryLs = do
-        let val =
-              LT.find
-                (\(_ : nameCategory : _) -> pure nameCategory == listToMaybe categoryLs)
-                allCategoriesLs
-        case val of
-          Just (parentCategory : _) -> buildingList (parentCategory : categoryLs)
-          _ -> categoryLs
-  pure $ filter (/= "Null") $ buildingList [category]
+  liftIO $ do
+    allCategoriesLs <- query_ conn getCategoryForList :: IO [[T.Text]]
+    close conn
+    writingLineDebug allCategoriesLs
+    let buildingList categoryLs = do
+          let val =
+                LT.find
+                  (\(_ : nameCategory : _) -> pure nameCategory == listToMaybe categoryLs)
+                  allCategoriesLs
+          case val of
+            Just (parentCategory : _) -> buildingList (parentCategory : categoryLs)
+            _ -> categoryLs
+    pure $ filter (/= "Null") $ buildingList [category]
 
 -- Request example:
 --  '.../category?aaa>bbb'
@@ -73,16 +76,17 @@ getParentCategories category = do
 --      bbb - category's name.
 createCategory ::
   Monad m =>
-  CategoryHandle m ->
+  CategoryHandle a m ->
+  a ->  
   Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
-createCategory CategoryHandle {..} isAdmin ls = do
+createCategory CategoryHandle {..} conn isAdmin ls = do
   if not isAdmin || null ls || null categorys
     then pure $ Left CommonError
     else do
-      isUniqName <- checkUniqCategoryH nameCategory
-      isUniqParent <- checkUniqCategoryH parentCategory
+      isUniqName <- checkUniqCategoryH conn nameCategory
+      isUniqParent <- checkUniqCategoryH conn parentCategory
       pure $ checkAndResponse isUniqName isUniqParent
   where
     (x : _) = map (BC.split '>' . fst) ls
@@ -111,19 +115,20 @@ createCategory CategoryHandle {..} isAdmin ls = do
 --      bbb - new parent category's name.
 editCategory ::
   Monad m =>
-  CategoryHandle m ->
+  CategoryHandle a m ->
+  a ->  
   Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
-editCategory CategoryHandle {..} isAdmin ls = do
+editCategory CategoryHandle {..} conn isAdmin ls = do
   if not isAdmin || null ls || null filteredLs || "" `elem` [name, new_name]
     then pure $ Left CommonError
     else do
-      isUniqName <- checkUniqCategoryH name
+      isUniqName <- checkUniqCategoryH conn name
       if isUniqName
         then pure $ Left $ CategoryError NoCategory
         else do
-          isUniqNew_name <- checkUniqCategoryH new_name
+          isUniqNew_name <- checkUniqCategoryH conn new_name
           pure $ checkAndResponse isUniqNew_name
   where
     filteredLs = filter ((/= "") . snd) $ map (fmap (fromMaybe "")) $ take 1 ls
@@ -173,9 +178,8 @@ editCategory CategoryHandle {..} isAdmin ls = do
     buildQuery (_, _) = Left CommonError
 
 -- Checking the uniqueness of the category name in the database.
-checkUniqCategory :: BC.ByteString -> IO Bool
-checkUniqCategory str = do
-  conn <- connectDB
+checkUniqCategory :: Connection -> BC.ByteString -> IO Bool
+checkUniqCategory conn str = do
   ls <-
     query_ conn $
       Query $
@@ -183,15 +187,14 @@ checkUniqCategory str = do
         \ name_category = '"
           <> str
           <> "';" ::
-      IO [[BC.ByteString]]
-  close conn
+      IO [[BC.ByteString]]  
   writingLineDebug ls
   pure $ null ls
 
-getCategoryHandler :: W.Request -> IO LC.ByteString
+getCategoryHandler :: W.Request -> ReaderT Environment IO LC.ByteString
 getCategoryHandler req = do
-  queryCategory <- buildGetCategoryQuery req
-  category <- runGetQuery queryCategory :: IO [Category]
+  queryCategory <- liftIO $ buildGetCategoryQuery req
+  category <- runGetQuery queryCategory :: ReaderT Environment IO [Category]
   pure $ encode category
 
 buildGetCategoryQuery :: W.Request -> IO Query
@@ -202,22 +205,26 @@ buildGetCategoryQuery req = do
     arr = W.queryString req
 
 buildCreateOrEditCategoryQuery ::
-  ( CategoryHandle IO ->
+  ( CategoryHandle Connection IO ->
+    Connection -> 
     Bool ->
     [(BC.ByteString, Maybe BC.ByteString)] ->
     IO (Either Error Query)
   ) ->
   Bool ->
   W.Request ->
-  IO Query
+  ReaderT Environment IO Query
 buildCreateOrEditCategoryQuery func isAdmin req = do
-  eitherQuery <- func categoryHandler isAdmin $ W.queryString req
-  case eitherQuery of
-    Left err -> throwIO err
-    Right qry -> pure qry
+  conn <- connectDB
+  liftIO $ do
+    eitherQuery <- func categoryHandler conn isAdmin $ W.queryString req
+    close conn
+    case eitherQuery of
+      Left err -> throwIO err
+      Right qry -> pure qry
 
-buildCreateCategoryQuery :: Bool -> W.Request -> IO Query
+buildCreateCategoryQuery :: Bool -> W.Request -> ReaderT Environment IO Query
 buildCreateCategoryQuery = buildCreateOrEditCategoryQuery createCategory
 
-buildEditCategoryQuery :: Bool -> W.Request -> IO Query
+buildEditCategoryQuery :: Bool -> W.Request -> ReaderT Environment IO Query
 buildEditCategoryQuery = buildCreateOrEditCategoryQuery editCategory

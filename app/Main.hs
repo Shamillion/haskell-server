@@ -29,7 +29,7 @@ handler req = do
     ("GET", "user") -> getUserHandler req
     ("POST", "user") -> createAndEditObjectsHandler (buildCreateUserQuery admin) req
     ("PUT", "user") -> createAndEditObjectsHandler (buildEditUserQuery admin) req
-    ("GET", "category") -> liftIO $ getCategoryHandler req
+    ("GET", "category") -> getCategoryHandler req
     ("POST", "category") -> createAndEditObjectsHandler (buildCreateCategoryQuery admin) req
     ("PUT", "category") -> createAndEditObjectsHandler (buildEditCategoryQuery admin) req
     ("GET", "photo") -> getPhotoHandler req
