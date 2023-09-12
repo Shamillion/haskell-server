@@ -1,8 +1,8 @@
 module MigrationsDB where
 
-import Config (Priority (..), writingLine, writingLineDebug)
+import Config (Priority (..))
 import ConnectDB (connectDB)
-import Control.Monad.Reader (ReaderT (runReaderT))
+import Control.Monad.Reader (ReaderT, liftIO)
 import qualified Data.ByteString.Char8 as BC
 import Data.Char (ord)
 import qualified Data.Text as T
@@ -10,37 +10,39 @@ import Database.PostgreSQL.Simple (close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Environment (Environment)
 import User (cryptoPass)
+import Logger ( writingLine, writingLineDebug )
 
 -- Checking the availability of the necessary tables in the database.
-checkDB :: Environment -> Int -> IO Int
-checkDB env num
+checkDB :: Int -> ReaderT Environment IO Int
+checkDB num
   | num > 2 = writingLine ERROR "Error Database!" >> pure num
   | otherwise = do
     writingLine INFO "Checking Database..."
-    conn <- runReaderT connectDB env
+    conn <- connectDB
     writingLineDebug qry
-    db <- query_ conn qry :: IO [[T.Text]]
+    db <- liftIO $ query_ conn qry :: ReaderT Environment IO [[T.Text]]
     writingLineDebug db
     let k = all (`elem` concat db) ["users", "news", "category", "photo"]
     _ <-
       if k
         then do
-          close conn
+          liftIO $ close conn
           writingLine INFO "Database is OK."
           pure num
         else do
-          addAdmin' <- addAdmin
-          mapM_
-            (execute_ conn)
-            [ createTableUsers,
-              addAdmin',
-              createTableCategory,
-              createTableNews,
-              createTablePhoto
-            ]
-          writingLine INFO "Database has been created."
-          close conn
-          checkDB env (num + 1)
+          liftIO $ do
+            addAdmin' <- addAdmin
+            mapM_
+              (execute_ conn)
+              [ createTableUsers,
+                addAdmin',
+                createTableCategory,
+                createTableNews,
+                createTablePhoto
+              ]
+            close conn  
+          writingLine INFO "Database has been created."          
+          checkDB (num + 1)
     writingLine DEBUG "Checking database has been successfully."
     pure num
   where

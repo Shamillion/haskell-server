@@ -1,12 +1,11 @@
 module Environment where
 
-import Config (Configuration (dbHost, dbPassword, dbPort, dbUser, dbname, maxElem), readConfigFile)
+import Config (Configuration (dbHost, dbPassword, dbPort, dbUser, dbname), readConfigFile)
 import qualified Database.PostgreSQL.Simple as PS
 
 data Environment = Environment
-  { limitElem :: Int,
-    connectInfo :: PS.ConnectInfo,
-    configuration :: Configuration
+  { configuration :: Configuration,
+    connectInfo :: PS.ConnectInfo
   }
   deriving (Show)
 
@@ -15,9 +14,8 @@ environment = do
   conf <- readConfigFile
   pure $
     Environment
-      { limitElem = maxElem conf,
-        connectInfo = connectingParameters conf,
-        configuration = conf
+      { configuration = conf,
+        connectInfo = connectingParameters conf
       }
 
 -- Parameters for connecting to the database.

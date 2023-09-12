@@ -1,8 +1,7 @@
 module Lib where
 
-import Config (limitElem, writingLineDebug)
 import ConnectDB (connectDB)
-import Control.Monad.Reader (ReaderT, liftIO)
+import Control.Monad.Reader (ReaderT, asks, liftIO)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.Functor ((<&>))
@@ -11,9 +10,11 @@ import qualified Data.List as LT
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (FromRow, Query, close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (Query))
-import Environment (Environment)
+import Environment (Environment, configuration)
+import Logger (writingLineDebug)
 import qualified Network.Wai as W
 import Text.Read (readMaybe)
+import Config (Configuration(maxElem))
 
 readNum :: T.Text -> Int
 readNum n =
@@ -33,25 +34,14 @@ splitOnTxt :: T.Text -> T.Text -> [T.Text]
 splitOnTxt _ "" = []
 splitOnTxt c txt = T.splitOn c txt
 
-newtype LimitAndOffsetHandle m = LimitAndOffsetHandle
-  { limitElemH :: m Int
-  }
-
-limitAndOffsetHandler :: LimitAndOffsetHandle IO
-limitAndOffsetHandler =
-  LimitAndOffsetHandle
-    { limitElemH = limitElem
-    }
-
 setLimitAndOffset ::
   Monad m =>
-  LimitAndOffsetHandle m ->
   [(T.Text, Maybe T.Text)] ->
-  m Query
-setLimitAndOffset LimitAndOffsetHandle {..} ls = do
-  limitInFile <- limitElemH
-  let limit = listToValue "limit" setLimit limitInFile
-      setLimit val = if val > 0 && val < limitInFile then val else limitInFile
+  ReaderT Environment m Query
+setLimitAndOffset ls = do
+  limitInConfig <- asks (maxElem . configuration)
+  let limit = listToValue "limit" setLimit limitInConfig
+      setLimit val = if val > 0 && val < limitInConfig then val else limitInConfig
   pure . Query $ " LIMIT " <> limit <> " OFFSET " <> offset
   where
     offset = listToValue "offset" (max 0) 0
@@ -66,20 +56,18 @@ setLimitAndOffset LimitAndOffsetHandle {..} ls = do
 runGetQuery :: (Show r, FromRow r) => Query -> ReaderT Environment IO [r]
 runGetQuery qry = do
   conn <- connectDB
-  liftIO $ do
-    dataFromDB <- query_ conn qry
-    writingLineDebug dataFromDB
-    close conn
-    pure dataFromDB
+  dataFromDB <- liftIO $ query_ conn qry
+  writingLineDebug dataFromDB
+  liftIO $ close conn
+  pure dataFromDB
 
 runPostOrPutQuery :: Query -> ReaderT Environment IO Int64
 runPostOrPutQuery qry = do
   conn <- connectDB
-  liftIO $ do
-    num <- execute_ conn qry
-    close conn
-    writingLineDebug num
-    pure num
+  num <- liftIO $ execute_ conn qry
+  liftIO $ close conn
+  writingLineDebug num
+  pure num
 
 -- A comment for the user about adding or editing objects in the database.
 mkComment :: Int64 -> LC.ByteString

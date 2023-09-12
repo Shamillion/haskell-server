@@ -1,6 +1,6 @@
 module Auth where
 
-import Config (Priority (ERROR), writingLine, writingLineDebug)
+import Config (Priority (ERROR))
 import ConnectDB (connectDB)
 import Control.Exception (catch, throwIO)
 import Control.Monad.Reader (ReaderT, ask, liftIO, runReaderT)
@@ -12,6 +12,7 @@ import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Environment (Environment)
 import Error (AuthError (..))
+import Logger (writingLine, writingLineDebug)
 import qualified Network.Wai as W
 import User (User (..), mkGetUserQuery)
 
@@ -21,18 +22,17 @@ checkAuth req =
   if null filteredLs
     then liftIO $ throwIO NoAuthorization
     else case decodeLogAndPass of
-      Left err -> liftIO $ do
+      Left err -> do
         writingLine ERROR err
-        throwIO DecodeLoginAndPassError
+        liftIO $ throwIO DecodeLoginAndPassError
       Right [login, password] -> do
         conn <- connectDB
         let qry = mkGetUserQuery $ Query $ "WHERE login = '" <> login <> "'"
-        liftIO $ do
-          writingLineDebug qry
-          userList <- query_ conn qry :: IO [User]
-          close conn
-          writingLineDebug userList
-          checkPassword password userList
+        writingLineDebug qry
+        userList <- liftIO $ query_ conn qry :: ReaderT Environment IO [User]
+        liftIO $ close conn
+        writingLineDebug userList
+        liftIO $ checkPassword password userList
       _ -> liftIO $ throwIO NoAuthorization
   where
     filteredLs = filter ((== "Authorization") . fst) $ W.requestHeaders req
@@ -47,9 +47,7 @@ checkAuth req =
 
 -- Returns the value in case of failed authorization.
 noAuthorization :: a -> AuthError -> IO a
-noAuthorization val err = do
-  writingLineDebug err
-  pure val
+noAuthorization val _ = pure val
 
 -- Returns the user ID.
 authorID :: W.Request -> ReaderT Environment IO Query

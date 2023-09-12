@@ -2,13 +2,14 @@ module Main where
 
 import Auth (isAdmin)
 import Category (buildCreateCategoryQuery, buildEditCategoryQuery, getCategoryHandler)
-import Config (Configuration (serverPort), Priority (..), writingLine, writingLineDebug)
+import Config (Configuration (serverPort), Priority (..))
 import Control.Exception (catch, throwIO)
 import Control.Monad.Reader (ReaderT (runReaderT), liftIO)
 import qualified Data.ByteString.Lazy.Char8 as LC
 import Environment (Environment (configuration), environment)
 import Error (CategoryError (..), Error (..))
 import Lib (createAndEditObjectsHandler)
+import Logger (writingLine, writingLineDebug)
 import MigrationsDB (checkDB)
 import Network.HTTP.Types (status200, status404, status406)
 import qualified Network.Wai as W
@@ -37,12 +38,14 @@ handler req = do
 
 app :: Environment -> W.Application
 app env req respond = do
-  writingLineDebug env
-  writingLine INFO "Received a request."
-  writingLineDebug $ W.requestMethod req
-  writingLineDebug $ W.requestHeaders req
-  writingLineDebug $ W.pathInfo req
-  writingLineDebug $ W.queryString req
+  mapM_
+    (`runReaderT` env)
+    [ writingLine INFO "Received a request.",
+      writingLineDebug $ W.requestMethod req,
+      writingLineDebug $ W.requestHeaders req,
+      writingLineDebug $ W.pathInfo req,
+      writingLineDebug $ W.queryString req
+    ]
   ans <-
     catch
       (runReaderT (handler req) env)
@@ -72,11 +75,13 @@ app env req respond = do
 main :: IO ()
 main = do
   env <- environment
-  num <- checkDB env 1
-  writingLine DEBUG $ "checkDB was runing " <> show num <> " times."
+  num <- runReaderT (checkDB 1) env
+  runReaderT (writingLine DEBUG $ "checkDB was runing " <> show num <> " times.") env
   if num > 2
     then putStrLn "Error Database! Server can not be started!"
     else do
       let port = serverPort . configuration $ env
-      mapM_ (\func -> func "Server is started.") [putStrLn, writingLine INFO]
+          msg = "Server is started."
+      putStrLn msg
+      runReaderT (writingLine INFO msg) env
       run port $ app env

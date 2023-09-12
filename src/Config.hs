@@ -41,10 +41,6 @@ readConfigFile = do
 time :: IO String
 time = take 19 . show <$> getCurrentTime
 
--- Maximum number of items returned by the database in response to a request.
-limitElem :: IO Int
-limitElem = maxElem <$> readConfigFile
-
 -- Data type for the logger.
 data Priority = DEBUG | INFO | WARNING | ERROR
   deriving (Show, Eq, Ord, Generic, FromJSON)
@@ -52,30 +48,3 @@ data Priority = DEBUG | INFO | WARNING | ERROR
 -- Name of the logfile.
 logFile :: String
 logFile = "log.log"
-
--- Function writes log information down.
-writingLine :: Priority -> String -> IO ()
-writingLine level str = do
-  logLevel' <- logLevel
-  if level >= logLevel'
-    then do
-      t <- time
-      let string = t <> " UTC   " <> showLevel level <> " - " <> str
-      out <- logOutput <$> readConfigFile
-      case out of
-        "file" -> appendFile logFile $ string <> "\n"
-        _ -> putStrLn string
-    else pure ()
-  where
-    showLevel priority = case priority of
-      DEBUG -> "DEBUG  "
-      INFO -> "INFO   "
-      WARNING -> "WARNING"
-      ERROR -> "ERROR  "
-
-writingLineDebug :: (Show a) => a -> IO ()
-writingLineDebug s = writingLine DEBUG $ show s
-
--- Logging level.
-logLevel :: IO Priority
-logLevel = priorityLevel <$> readConfigFile

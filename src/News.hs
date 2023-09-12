@@ -23,9 +23,7 @@ import Environment (Environment)
 import Error (Error (CommonError, ParseError), ParseError (ParseNewsError))
 import GHC.Generics (Generic)
 import Lib
-  ( LimitAndOffsetHandle (..),
-    initTxt,
-    limitAndOffsetHandler,
+  ( initTxt,
     readNum,
     runGetQuery,
     setLimitAndOffset,
@@ -93,11 +91,10 @@ parseNews _ = liftIO . throwIO $ ParseError ParseNewsError
 
 setMethodNews ::
   Monad m =>
-  LimitAndOffsetHandle m ->
   [(T.Text, Maybe T.Text)] ->
-  m (Maybe (Query, Query))
-setMethodNews LimitAndOffsetHandle {..} ls = do
-  setLimOffs <- setLimitAndOffset LimitAndOffsetHandle {..} ls
+  ReaderT Environment m (Maybe (Query, Query))
+setMethodNews ls = do
+  setLimOffs <- setLimitAndOffset ls
   let sortNewsLimitOffset = fmap (<> setLimOffs) sortNews
   pure $ do
     filterForNews <- filterNews
@@ -268,7 +265,7 @@ getNewsHandler req = do
 buildGetNewsQuery :: W.Request -> ReaderT Environment IO Query
 buildGetNewsQuery req = do
   author <- authorID req
-  method <- liftIO $ setMethodNews limitAndOffsetHandler . queryToQueryText $ W.queryString req
+  method <- setMethodNews $ queryToQueryText $ W.queryString req
   let maybeQuery = mkGetNewsQuery author method
   case maybeQuery of
     Just qry -> pure qry

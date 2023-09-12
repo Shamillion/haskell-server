@@ -3,7 +3,6 @@
 
 module User where
 
-import Config (writingLineDebug)
 import ConnectDB (connectDB)
 import Control.Exception (throwIO)
 import Control.Monad.Reader (ReaderT, liftIO)
@@ -19,7 +18,8 @@ import Database.PostgreSQL.Simple.Types (Query (..))
 import Environment (Environment)
 import Error (Error (CommonError, LoginOccupied, ParseError), ParseError (ParseUserError))
 import GHC.Generics (Generic)
-import Lib (limitAndOffsetHandler, readNum, runGetQuery, setLimitAndOffset)
+import Lib (readNum, runGetQuery, setLimitAndOffset)
+import Logger (writingLineDebug)
 import Network.HTTP.Types (queryToQueryText)
 import qualified Network.Wai as W
 
@@ -118,20 +118,21 @@ checkUniqLogin str = do
             <> str
             <> "';" ::
       ReaderT Environment IO [[BC.ByteString]]
-  liftIO $ close conn >> writingLineDebug ls
+  liftIO $ close conn
+  writingLineDebug ls
   pure $ null ls
 
 getUserHandler :: W.Request -> ReaderT Environment IO LC.ByteString
 getUserHandler req = do
-  queryUser <- liftIO $ buildGetUserQuery req
+  queryUser <- buildGetUserQuery req
   user <- runGetQuery queryUser :: ReaderT Environment IO [User]
   pure $ encode user
 
-buildGetUserQuery :: W.Request -> IO Query
+buildGetUserQuery :: W.Request -> ReaderT Environment IO Query
 buildGetUserQuery req = mkGetUserQuery <$> limitOffset
   where
     arr = W.queryString req
-    limitOffset = setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
+    limitOffset = setLimitAndOffset $ queryToQueryText arr
 
 buildEditUserQuery :: Bool -> W.Request -> ReaderT Environment IO Query
 buildEditUserQuery isAdmin _ =
