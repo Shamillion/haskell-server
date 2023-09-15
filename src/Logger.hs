@@ -9,14 +9,13 @@ writingLine :: Priority -> String -> ReaderT Environment IO ()
 writingLine level str = do
   conf <- asks configuration
   if level >= priorityLevel conf
-    then do
-      t <- liftIO time
+    then liftIO $ do
+      t <- time
       let string = t <> " UTC   " <> showLevel level <> " - " <> str
           out = logOutput conf
-      liftIO $
-        case out of
-          "file" -> appendFile logFile $ string <> "\n"
-          _ -> putStrLn string
+      case out of
+        "file" -> appendFile logFile $ string <> "\n"
+        _ -> putStrLn string
     else pure ()
   where
     showLevel priority = case priority of

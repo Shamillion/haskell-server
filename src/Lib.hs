@@ -1,5 +1,6 @@
 module Lib where
 
+import Config (Configuration (maxElem))
 import ConnectDB (connectDB)
 import Control.Monad.Reader (ReaderT, asks, liftIO)
 import qualified Data.ByteString.Char8 as BC
@@ -14,7 +15,6 @@ import Environment (Environment, configuration)
 import Logger (writingLineDebug)
 import qualified Network.Wai as W
 import Text.Read (readMaybe)
-import Config (Configuration(maxElem))
 
 readNum :: T.Text -> Int
 readNum n =

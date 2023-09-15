@@ -46,26 +46,28 @@ checkAuth req =
       | otherwise = throwIO NoSuchUserInDB
 
 -- Returns the value in case of failed authorization.
-noAuthorization :: a -> AuthError -> IO a
-noAuthorization val _ = pure val
+noAuthorization :: Environment -> a -> AuthError -> IO a
+noAuthorization env val err = do
+  runReaderT (writingLineDebug err) env
+  pure val
 
 -- Returns the user ID.
 authorID :: W.Request -> ReaderT Environment IO Query
 authorID req = do
   env <- ask
   let userId = fromString . show . user_id <$> runReaderT (checkAuth req) env
-  liftIO . catch userId . noAuthorization $ "Null"
+  liftIO . catch userId . noAuthorization env $ "Null"
 
 -- Checks the administrator rights of the user.
 isAdmin :: W.Request -> ReaderT Environment IO Bool
 isAdmin req = do
   env <- ask
   let admin = is_admin <$> runReaderT (checkAuth req) env
-  liftIO . catch admin . noAuthorization $ False
+  liftIO . catch admin . noAuthorization env $ False
 
 -- Checks the user's ability to create news.
 isAuthor :: W.Request -> ReaderT Environment IO Bool
 isAuthor req = do
   env <- ask
   let author = is_author <$> runReaderT (checkAuth req) env
-  liftIO . catch author . noAuthorization $ False
+  liftIO . catch author . noAuthorization env $ False

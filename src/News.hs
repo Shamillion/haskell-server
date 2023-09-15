@@ -186,9 +186,9 @@ mkCreateNewsQuery isAuth authID photoIdList ls = do
 -- Puts the photos from the query into the database and
 --  returns a list from the ID.
 buildPhotoIDLs :: [(BC.ByteString, Maybe BC.ByteString)] -> ReaderT Environment IO BC.ByteString
-buildPhotoIDLs ls = idLs <&> (\x -> "'{" <> mkPhotoIdString x <> "}'")
+buildPhotoIDLs ls = photoIDLs <&> (\x -> "'{" <> mkPhotoIdString x <> "}'")
   where
-    idLs = mapM (sendPhotoToDB . fromMaybe "" . snd) . filter ((== "photo") . fst) $ ls
+    photoIDLs = mapM (sendPhotoToDB . fromMaybe "" . snd) . filter ((== "photo") . fst) $ ls
 
 mkPhotoIdString :: [BC.ByteString] -> BC.ByteString
 mkPhotoIdString [] = ""
@@ -202,8 +202,8 @@ mkPhotoIdString (x : xs) = x <> ", " <> mkPhotoIdString xs
 buildEditNewsQuery :: W.Request -> ReaderT Environment IO Query
 buildEditNewsQuery req = do
   authId <- authorID req
-  isAuth <- authorNews (fromQuery authId) newsId
-  if null ls || not isAuth
+  isAuthorNews <- authorNews (fromQuery authId) newsId
+  if null ls || not isAuthorNews
     then liftIO $ throwIO CommonError
     else do
       photoIdStr <- photoIdList
@@ -250,9 +250,9 @@ authorNews authId newsId = do
 -- Creates a row with updated news fields.
 mkUpdatedNewsFields :: [(BC.ByteString, Maybe BC.ByteString)] -> Maybe BC.ByteString
 mkUpdatedNewsFields [] = Nothing
-mkUpdatedNewsFields [(field, maybeParam)] = maybeParam >>= \param -> pure $ field <> " = " <> q <> param <> q
+mkUpdatedNewsFields [(field, maybeParam)] = maybeParam >>= \param -> pure $ field <> " = " <> quote <> param <> quote
   where
-    q = if field `elem` fields then "'" else ""
+    quote = if field `elem` fields then "'" else ""
     fields = ["title", "content"]
 mkUpdatedNewsFields ((field, maybeParam) : xs) = mkUpdatedNewsFields [(field, maybeParam)] <> pure ", " <> mkUpdatedNewsFields xs
 

@@ -107,7 +107,7 @@ cryptoPass num = hashPassword (mod num 7 + 4)
 
 -- Checking the uniqueness of the login in the database.
 checkUniqLogin :: BC.ByteString -> ReaderT Environment IO Bool
-checkUniqLogin str = do
+checkUniqLogin login = do
   conn <- connectDB
   ls <-
     liftIO $
@@ -115,7 +115,7 @@ checkUniqLogin str = do
         Query $
           "SELECT name_user FROM users \
           \ WHERE login = '"
-            <> str
+            <> login
             <> "';" ::
       ReaderT Environment IO [[BC.ByteString]]
   liftIO $ close conn

@@ -9,8 +9,8 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Environment (Environment)
+import Logger (writingLine, writingLineDebug)
 import User (cryptoPass)
-import Logger ( writingLine, writingLineDebug )
 
 -- Checking the availability of the necessary tables in the database.
 checkDB :: Int -> ReaderT Environment IO Int
@@ -22,9 +22,9 @@ checkDB num
     writingLineDebug qry
     db <- liftIO $ query_ conn qry :: ReaderT Environment IO [[T.Text]]
     writingLineDebug db
-    let k = all (`elem` concat db) ["users", "news", "category", "photo"]
+    let allTablesExist = all (`elem` concat db) ["users", "news", "category", "photo"]
     _ <-
-      if k
+      if allTablesExist
         then do
           liftIO $ close conn
           writingLine INFO "Database is OK."
@@ -40,8 +40,8 @@ checkDB num
                 createTableNews,
                 createTablePhoto
               ]
-            close conn  
-          writingLine INFO "Database has been created."          
+            close conn
+          writingLine INFO "Database has been created."
           checkDB (num + 1)
     writingLine DEBUG "Checking database has been successfully."
     pure num
