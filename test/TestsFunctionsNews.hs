@@ -4,24 +4,41 @@ module TestsFunctionsNews
   )
 where
 
-import Data.Functor.Identity (Identity, runIdentity)
+import Config (Configuration (..), Priority (DEBUG))
+import Control.Monad.Reader (ReaderT (runReaderT))
+import Data.Functor.Identity (runIdentity)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Environment (Environment (..), connectingParameters)
 import Lib
-  ( LimitAndOffsetHandle (..),
-    setLimitAndOffset,
+  ( setLimitAndOffset,
   )
 import News (setMethodNews)
 import Test.Hspec (SpecWith, it, shouldBe)
 
-testHandler :: LimitAndOffsetHandle Identity
-testHandler =
-  LimitAndOffsetHandle
-    { limitElemH = pure 20
+testConf :: Configuration
+testConf =
+  Configuration
+    { serverPort = 0,
+      dbHost = "",
+      dbPort = 0,
+      dbname = "",
+      dbUser = "",
+      dbPassword = "",
+      maxElem = 20,
+      priorityLevel = DEBUG,
+      logOutput = "cons"
+    }
+
+testEnv :: Environment
+testEnv =
+  Environment
+    { configuration = testConf,
+      connectInfo = connectingParameters testConf
     }
 
 setLimitAndOffset' :: [(T.Text, Maybe T.Text)] -> Query
-setLimitAndOffset' = runIdentity . setLimitAndOffset testHandler
+setLimitAndOffset' ls = runIdentity $ runReaderT (setLimitAndOffset ls) testEnv
 
 testsFunctionSetLimitAndOffset :: SpecWith ()
 testsFunctionSetLimitAndOffset = do
@@ -62,7 +79,7 @@ testsFunctionSetLimitAndOffset = do
       `shouldBe` Query " LIMIT 20 OFFSET 0"
 
 setMethodNews' :: [(T.Text, Maybe T.Text)] -> Maybe (Query, Query)
-setMethodNews' = runIdentity . setMethodNews testHandler
+setMethodNews' ls = runIdentity $ runReaderT (setMethodNews ls) testEnv
 
 testsFunctionSetMethodNews :: SpecWith ()
 testsFunctionSetMethodNews = do

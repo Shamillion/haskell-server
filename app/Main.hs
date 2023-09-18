@@ -2,11 +2,14 @@ module Main where
 
 import Auth (isAdmin)
 import Category (buildCreateCategoryQuery, buildEditCategoryQuery, getCategoryHandler)
-import Config (Priority (..), port, writingLine, writingLineDebug)
+import Config (Configuration (serverPort), Priority (..))
 import Control.Exception (catch, throwIO)
+import Control.Monad.Reader (ReaderT (runReaderT), liftIO)
 import qualified Data.ByteString.Lazy.Char8 as LC
+import Environment (Environment (configuration), environment)
 import Error (CategoryError (..), Error (..))
 import Lib (createAndEditObjectsHandler)
+import Logger (writingLine, writingLineDebug)
 import MigrationsDB (checkDB)
 import Network.HTTP.Types (status200, status404, status406)
 import qualified Network.Wai as W
@@ -15,7 +18,7 @@ import News (buildCreateNewsQuery, buildEditNewsQuery, getNewsHandler)
 import Photo (getPhotoHandler, headerAndImage)
 import User (buildCreateUserQuery, buildEditUserQuery, getUserHandler)
 
-handler :: W.Request -> IO LC.ByteString
+handler :: W.Request -> ReaderT Environment IO LC.ByteString
 handler req = do
   admin <- isAdmin req
   let reqMethod = W.requestMethod req
@@ -31,18 +34,21 @@ handler req = do
     ("POST", "category") -> createAndEditObjectsHandler (buildCreateCategoryQuery admin) req
     ("PUT", "category") -> createAndEditObjectsHandler (buildEditCategoryQuery admin) req
     ("GET", "photo") -> getPhotoHandler req
-    _ -> throwIO CommonError
+    _ -> liftIO $ throwIO CommonError
 
-app :: W.Application
-app req respond = do
-  writingLine INFO "Received a request."
-  writingLineDebug $ W.requestMethod req
-  writingLineDebug $ W.requestHeaders req
-  writingLineDebug $ W.pathInfo req
-  writingLineDebug $ W.queryString req
+app :: Environment -> W.Application
+app env req respond = do
+  mapM_
+    (`runReaderT` env)
+    [ writingLine INFO "Received a request.",
+      writingLineDebug $ W.requestMethod req,
+      writingLineDebug $ W.requestHeaders req,
+      writingLineDebug $ W.pathInfo req,
+      writingLineDebug $ W.queryString req
+    ]
   ans <-
     catch
-      (handler req)
+      (runReaderT (handler req) env)
       ( \err ->
           "" <$ case err of
             LoginOccupied ->
@@ -68,11 +74,14 @@ app req respond = do
 
 main :: IO ()
 main = do
-  num <- checkDB 1
-  writingLine DEBUG $ "checkDB was runing " <> show num <> " times."
+  env <- environment
+  num <- runReaderT (checkDB 1) env
+  runReaderT (writingLine DEBUG $ "checkDB was runing " <> show num <> " times.") env
   if num > 2
     then putStrLn "Error Database! Server can not be started!"
     else do
-      port' <- port
-      mapM_ (\func -> func "Server is started.") [putStrLn, writingLine INFO]
-      run port' app
+      let port = serverPort . configuration $ env
+          msg = "Server is started."
+      putStrLn msg
+      runReaderT (writingLine INFO msg) env
+      run port $ app env

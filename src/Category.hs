@@ -3,8 +3,9 @@
 
 module Category where
 
-import Config (connectDB, writingLineDebug)
+import ConnectDB (connectDB)
 import Control.Exception (throwIO)
+import Control.Monad.Reader (ReaderT, liftIO)
 import Data.Aeson (ToJSON, encode)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
@@ -13,6 +14,7 @@ import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (FromRow, close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Environment (Environment)
 import Error
   ( CategoryError (..),
     Error
@@ -21,7 +23,8 @@ import Error
       ),
   )
 import GHC.Generics (Generic)
-import Lib (limitAndOffsetHandler, runGetQuery, setLimitAndOffset)
+import Lib (runGetQuery, setLimitAndOffset)
+import Logger (writingLineDebug)
 import Network.HTTP.Types (queryToQueryText)
 import qualified Network.Wai as W
 
@@ -47,14 +50,14 @@ data Category = Category
 newtype CategoryHandle m = CategoryHandle
   {checkUniqCategoryH :: BC.ByteString -> m Bool}
 
-categoryHandler :: CategoryHandle IO
+categoryHandler :: CategoryHandle (ReaderT Environment IO)
 categoryHandler = CategoryHandle {checkUniqCategoryH = checkUniqCategory}
 
-getParentCategories :: T.Text -> IO [T.Text]
+getParentCategories :: T.Text -> ReaderT Environment IO [T.Text]
 getParentCategories category = do
   conn <- connectDB
-  allCategoriesLs <- query_ conn getCategoryForList :: IO [[T.Text]]
-  close conn
+  allCategoriesLs <- liftIO $ query_ conn getCategoryForList :: ReaderT Environment IO [[T.Text]]
+  liftIO $ close conn
   writingLineDebug allCategoriesLs
   let buildingList categoryLs = do
         let val =
@@ -172,51 +175,53 @@ editCategory CategoryHandle {..} isAdmin ls = do
     buildQuery (_, _) = Left CommonError
 
 -- Checking the uniqueness of the category name in the database.
-checkUniqCategory :: BC.ByteString -> IO Bool
+checkUniqCategory :: BC.ByteString -> ReaderT Environment IO Bool
 checkUniqCategory str = do
   conn <- connectDB
   ls <-
-    query_ conn $
-      Query $
-        "SELECT name_category FROM category WHERE \
-        \ name_category = '"
-          <> str
-          <> "';" ::
-      IO [[BC.ByteString]]
-  close conn
+    liftIO $
+      query_ conn $
+        Query $
+          "SELECT name_category FROM category WHERE \
+          \ name_category = '"
+            <> str
+            <> "';" ::
+      ReaderT Environment IO [[BC.ByteString]]
   writingLineDebug ls
   pure $ null ls
 
-getCategoryHandler :: W.Request -> IO LC.ByteString
+getCategoryHandler :: W.Request -> ReaderT Environment IO LC.ByteString
 getCategoryHandler req = do
   queryCategory <- buildGetCategoryQuery req
-  category <- runGetQuery queryCategory :: IO [Category]
+  category <- runGetQuery queryCategory :: ReaderT Environment IO [Category]
   pure $ encode category
 
-buildGetCategoryQuery :: W.Request -> IO Query
+buildGetCategoryQuery :: W.Request -> ReaderT Environment IO Query
 buildGetCategoryQuery req = do
-  limitOffset <- setLimitAndOffset limitAndOffsetHandler . queryToQueryText $ arr
+  limitOffset <- setLimitAndOffset $ queryToQueryText arr
   pure $ mkGetCategoryQuery limitOffset
   where
     arr = W.queryString req
 
 buildCreateOrEditCategoryQuery ::
-  ( CategoryHandle IO ->
+  ( CategoryHandle (ReaderT Environment IO) ->
     Bool ->
     [(BC.ByteString, Maybe BC.ByteString)] ->
-    IO (Either Error Query)
+    ReaderT Environment IO (Either Error Query)
   ) ->
   Bool ->
   W.Request ->
-  IO Query
+  ReaderT Environment IO Query
 buildCreateOrEditCategoryQuery func isAdmin req = do
+  conn <- connectDB
   eitherQuery <- func categoryHandler isAdmin $ W.queryString req
+  liftIO $ close conn
   case eitherQuery of
-    Left err -> throwIO err
+    Left err -> liftIO $ throwIO err
     Right qry -> pure qry
 
-buildCreateCategoryQuery :: Bool -> W.Request -> IO Query
+buildCreateCategoryQuery :: Bool -> W.Request -> ReaderT Environment IO Query
 buildCreateCategoryQuery = buildCreateOrEditCategoryQuery createCategory
 
-buildEditCategoryQuery :: Bool -> W.Request -> IO Query
+buildEditCategoryQuery :: Bool -> W.Request -> ReaderT Environment IO Query
 buildEditCategoryQuery = buildCreateOrEditCategoryQuery editCategory

@@ -1,42 +1,47 @@
 module MigrationsDB where
 
-import Config (Priority (..), connectDB, writingLine, writingLineDebug)
+import Config (Priority (..))
+import ConnectDB (connectDB)
+import Control.Monad.Reader (ReaderT, liftIO)
 import qualified Data.ByteString.Char8 as BC
 import Data.Char (ord)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Environment (Environment)
+import Logger (writingLine, writingLineDebug)
 import User (cryptoPass)
 
 -- Checking the availability of the necessary tables in the database.
-checkDB :: Int -> IO Int
+checkDB :: Int -> ReaderT Environment IO Int
 checkDB num
   | num > 2 = writingLine ERROR "Error Database!" >> pure num
   | otherwise = do
     writingLine INFO "Checking Database..."
     conn <- connectDB
     writingLineDebug qry
-    db <- query_ conn qry :: IO [[T.Text]]
+    db <- liftIO $ query_ conn qry :: ReaderT Environment IO [[T.Text]]
     writingLineDebug db
-    let k = all (`elem` concat db) ["users", "news", "category", "photo"]
+    let allTablesExist = all (`elem` concat db) ["users", "news", "category", "photo"]
     _ <-
-      if k
+      if allTablesExist
         then do
-          close conn
+          liftIO $ close conn
           writingLine INFO "Database is OK."
           pure num
         else do
-          addAdmin' <- addAdmin
-          mapM_
-            (execute_ conn)
-            [ createTableUsers,
-              addAdmin',
-              createTableCategory,
-              createTableNews,
-              createTablePhoto
-            ]
+          liftIO $ do
+            addAdmin' <- addAdmin
+            mapM_
+              (execute_ conn)
+              [ createTableUsers,
+                addAdmin',
+                createTableCategory,
+                createTableNews,
+                createTablePhoto
+              ]
+            close conn
           writingLine INFO "Database has been created."
-          close conn
           checkDB (num + 1)
     writingLine DEBUG "Checking database has been successfully."
     pure num

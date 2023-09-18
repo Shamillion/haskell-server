@@ -28,8 +28,11 @@ library
       Auth
       Category
       Config
+      ConnectDB
+      Environment
       Error
       Lib
+      Logger
       MigrationsDB
       News
       Photo
@@ -50,6 +53,7 @@ library
     , cryptonite
     , http-conduit
     , http-types
+    , mtl
     , postgresql-simple
     , text
     , time
@@ -77,6 +81,7 @@ executable haskell-server-exe
     , haskell-server
     , http-conduit
     , http-types
+    , mtl
     , postgresql-simple
     , text
     , time
@@ -109,6 +114,7 @@ test-suite haskell-server-test
     , hspec
     , http-conduit
     , http-types
+    , mtl
     , postgresql-simple
     , text
     , time

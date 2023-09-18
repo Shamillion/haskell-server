@@ -33,6 +33,7 @@ dependencies:
 - wai
 - warp
 - postgresql-simple
+- mtl
 
 default-extensions:
 - OverloadedStrings
