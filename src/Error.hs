@@ -1,10 +1,15 @@
 module Error where
 
-import Control.Exception (Exception)
+import Config (Priority (DEBUG, ERROR))
+import Control.Exception (Exception, throwIO)
+import Control.Monad.Reader (liftIO)
+import Environment (Flow)
+import Logger (writingLine)
 
 data Error
   = CommonError
   | LoginOccupied
+  | AuthError AuthError
   | CategoryError CategoryError
   | ParseError ParseError
   deriving (Show, Eq)
@@ -22,7 +27,6 @@ instance Exception CategoryError
 
 data ParseError
   = DecodeImageError
-  | ParseCategoryError
   | ParseNewsError
   | ParseUserError
   deriving (Show, Eq)
@@ -36,3 +40,10 @@ data AuthError
   deriving (Show, Eq)
 
 instance Exception AuthError
+
+throwError :: Error -> Flow a
+throwError err = do
+  let priority = if err `elem` errorLs then ERROR else DEBUG
+      errorLs = [AuthError DecodeLoginAndPassError, ParseError DecodeImageError]
+  writingLine priority $ show err
+  liftIO $ throwIO err

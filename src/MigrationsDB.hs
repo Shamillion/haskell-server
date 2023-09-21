@@ -2,25 +2,25 @@ module MigrationsDB where
 
 import Config (Priority (..))
 import ConnectDB (connectDB)
-import Control.Monad.Reader (ReaderT, liftIO)
+import Control.Monad.Reader (liftIO)
 import qualified Data.ByteString.Char8 as BC
 import Data.Char (ord)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Environment (Environment)
+import Environment (Flow)
 import Logger (writingLine, writingLineDebug)
 import User (cryptoPass)
 
 -- Checking the availability of the necessary tables in the database.
-checkDB :: Int -> ReaderT Environment IO Int
+checkDB :: Int -> Flow Int
 checkDB num
   | num > 2 = writingLine ERROR "Error Database!" >> pure num
   | otherwise = do
     writingLine INFO "Checking Database..."
     conn <- connectDB
     writingLineDebug qry
-    db <- liftIO $ query_ conn qry :: ReaderT Environment IO [[T.Text]]
+    db <- liftIO $ query_ conn qry :: Flow [[T.Text]]
     writingLineDebug db
     let allTablesExist = all (`elem` concat db) ["users", "news", "category", "photo"]
     _ <-
@@ -31,11 +31,11 @@ checkDB num
           pure num
         else do
           liftIO $ do
-            addAdmin' <- addAdmin
+            addAdmin <- buildAddAdminQuery
             mapM_
               (execute_ conn)
               [ createTableUsers,
-                addAdmin',
+                addAdmin,
                 createTableCategory,
                 createTableNews,
                 createTablePhoto
@@ -62,8 +62,8 @@ createTableUsers =
   \ is_author BOOLEAN );"
 
 -- Creating the first administrator. Required to create other users.
-addAdmin :: IO Query
-addAdmin = do
+buildAddAdminQuery :: IO Query
+buildAddAdminQuery = do
   pass <- cryptoPass (sum . map ord . BC.unpack $ "Adam") "sixthDay"
   pure . Query $
     "INSERT INTO users \

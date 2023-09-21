@@ -1,6 +1,7 @@
 module Environment where
 
 import Config (Configuration (dbHost, dbPassword, dbPort, dbUser, dbname), readConfigFile)
+import Control.Monad.Reader (ReaderT)
 import qualified Database.PostgreSQL.Simple as PS
 
 data Environment = Environment
@@ -9,8 +10,8 @@ data Environment = Environment
   }
   deriving (Show)
 
-environment :: IO Environment
-environment = do
+buildEnvironment :: IO Environment
+buildEnvironment = do
   conf <- readConfigFile
   pure $
     Environment
@@ -28,3 +29,5 @@ connectingParameters conf = do
       PS.connectUser = dbUser conf,
       PS.connectPassword = dbPassword conf
     }
+
+type Flow = ReaderT Environment IO
