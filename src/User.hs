@@ -24,10 +24,10 @@ import qualified Network.Wai as W
 
 -- Creating a database query to get a list of users
 mkGetUserQuery :: Query -> Query
-mkGetUserQuery str =
+mkGetUserQuery limitOffset =
   "SELECT  user_id, name_user, (creation_date :: TEXT), is_admin, is_author, \
   \ pass FROM users "
-    <> str
+    <> limitOffset
     <> ";"
 
 data User = User
@@ -64,7 +64,7 @@ parseUser _ = Left $ ParseError ParseUserError
 -- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
 buildCreateUserQuery :: Bool -> W.Request -> Flow Query
 buildCreateUserQuery isAdmn req = do
-  if not isAdmn || null ls || map fst ls /= checkList || searchNothing
+  if not isAdmn || null dataFromRequest || map fst dataFromRequest /= checkList || searchNothing
     then throwError CommonError
     else do
       uniq <- checkUniqLogin login
@@ -87,10 +87,10 @@ buildCreateUserQuery isAdmn req = do
               <> "');"
         else throwError LoginOccupied
   where
-    ls = W.queryString req
+    dataFromRequest = W.queryString req
     checkList = ["name_user", "login", "pass", "is_admin", "is_author"]
-    searchNothing = elem Nothing $ map snd ls
-    [nameUser, login, pass, isAdmin, isAuthor] = map (fromMaybe "" . snd) ls
+    searchNothing = elem Nothing $ map snd dataFromRequest
+    [nameUser, login, pass, isAdmin, isAuthor] = map (fromMaybe "" . snd) dataFromRequest
 
 -- Disables the administrator rights of an automatically created user.
 -- Request example '../user?block_admin=Adam'
@@ -108,7 +108,7 @@ cryptoPass num = hashPassword (mod num 7 + 4)
 checkUniqLogin :: BC.ByteString -> Flow Bool
 checkUniqLogin login = do
   conn <- connectDB
-  ls <-
+  usernameLs <-
     liftIO $
       query_ conn $
         Query $
@@ -118,8 +118,8 @@ checkUniqLogin login = do
             <> "';" ::
       Flow [[BC.ByteString]]
   liftIO $ close conn
-  writingLineDebug ls
-  pure $ null ls
+  writingLineDebug usernameLs
+  pure $ null usernameLs
 
 getUserHandler :: W.Request -> Flow LC.ByteString
 getUserHandler req = do
@@ -130,8 +130,8 @@ getUserHandler req = do
 buildGetUserQuery :: W.Request -> Flow Query
 buildGetUserQuery req = mkGetUserQuery <$> limitOffset
   where
-    arr = W.queryString req
-    limitOffset = setLimitAndOffset $ queryToQueryText arr
+    dataFromRequest = W.queryString req
+    limitOffset = setLimitAndOffset $ queryToQueryText dataFromRequest
 
 buildEditUserQuery :: Bool -> W.Request -> Flow Query
 buildEditUserQuery isAdmin _ =

@@ -6,7 +6,6 @@ import qualified Database.PostgreSQL.Simple as PS
 import Environment (Environment (connectInfo), Flow)
 import Logger (writingLine, writingLineDebug)
 
--- Establishing a connection to the database.
 connectDB :: Flow PS.Connection
 connectDB = do
   connectInf <- asks connectInfo

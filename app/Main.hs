@@ -74,9 +74,9 @@ app env req respond = do
 main :: IO ()
 main = do
   env <- buildEnvironment
-  num <- runReaderT (checkDB 1) env
-  runReaderT (writingLine DEBUG $ "checkDB was runing " <> show num <> " times.") env
-  if num > 2
+  retries <- runReaderT (checkDB 1) env
+  runReaderT (writingLine DEBUG $ "checkDB was runing " <> show retries <> " times.") env
+  if retries > 2
     then putStrLn "Error Database! Server can not be started!"
     else do
       let port = serverPort . configuration $ env
