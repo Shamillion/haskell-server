@@ -2,72 +2,66 @@ module Auth where
 
 import Config (Priority (ERROR))
 import ConnectDB (connectDB)
-import Control.Exception (catch, throwIO)
-import Control.Monad.Reader (ReaderT, ask, liftIO, runReaderT)
+import Control.Exception (catch)
+import Control.Monad.Reader (ask, liftIO, runReaderT)
 import Crypto.KDF.BCrypt (validatePassword)
 import qualified Data.ByteString.Base64 as BB
 import qualified Data.ByteString.Char8 as BC
 import Data.String (fromString)
 import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Environment (Environment)
-import Error (AuthError (..))
+import Environment (Flow)
+import Error (AuthError (..), Error (AuthError), throwError)
 import Logger (writingLine, writingLineDebug)
 import qualified Network.Wai as W
 import User (User (..), mkGetUserQuery)
 
 -- Returns the user with the username and password from the request.
-checkAuth :: W.Request -> ReaderT Environment IO User
+checkAuth :: W.Request -> Flow User
 checkAuth req =
   if null filteredLs
-    then liftIO $ throwIO NoAuthorization
+    then throwError $ AuthError NoAuthorization
     else case decodeLogAndPass of
       Left err -> do
         writingLine ERROR err
-        liftIO $ throwIO DecodeLoginAndPassError
+        throwError $ AuthError DecodeLoginAndPassError
       Right [login, password] -> do
         conn <- connectDB
         let qry = mkGetUserQuery $ Query $ "WHERE login = '" <> login <> "'"
         writingLineDebug qry
-        userList <- liftIO $ query_ conn qry :: ReaderT Environment IO [User]
+        userList <- liftIO $ query_ conn qry :: Flow [User]
         liftIO $ close conn
         writingLineDebug userList
-        liftIO $ checkPassword password userList
-      _ -> liftIO $ throwIO NoAuthorization
+        checkPassword password userList
+      _ -> throwError $ AuthError NoAuthorization
   where
     filteredLs = filter ((== "Authorization") . fst) $ W.requestHeaders req
     [(_, str)] = filteredLs
     decodeLogAndPass = BC.split ':' <$> (BB.decode =<< (lastElem . BC.split ' ' $ str))
     lastElem [] = Left "Error! Empty list"
     lastElem arr = pure . (\(x : _) -> x) . reverse $ arr
-    checkPassword _ [] = throwIO NoSuchUserInDB
+    checkPassword _ [] = throwError $ AuthError NoSuchUserInDB
     checkPassword password (user : _)
       | validatePassword password $ pass user = pure user
-      | otherwise = throwIO NoSuchUserInDB
-
--- Returns the value in case of failed authorization.
-noAuthorization :: Environment -> a -> AuthError -> IO a
-noAuthorization env val err = do
-  runReaderT (writingLineDebug err) env
-  pure val
+      | otherwise = throwError $ AuthError NoSuchUserInDB
 
 -- Returns the user ID.
-authorID :: W.Request -> ReaderT Environment IO Query
+authorID :: W.Request -> Flow Query
 authorID req = do
   env <- ask
   let userId = fromString . show . user_id <$> runReaderT (checkAuth req) env
-  liftIO . catch userId . noAuthorization env $ "Null"
+  liftIO $ catch userId (pure . const "Null" :: Error -> IO Query)
 
 -- Checks the administrator rights of the user.
-isAdmin :: W.Request -> ReaderT Environment IO Bool
+isAdmin :: W.Request -> Flow Bool
 isAdmin req = do
   env <- ask
   let admin = is_admin <$> runReaderT (checkAuth req) env
-  liftIO . catch admin . noAuthorization env $ False
+  liftIO $ catch admin (pure . const False :: Error -> IO Bool)
 
 -- Checks the user's ability to create news.
-isAuthor :: W.Request -> ReaderT Environment IO Bool
+isAuthor :: W.Request -> Flow Bool
 isAuthor req = do
   env <- ask
   let author = is_author <$> runReaderT (checkAuth req) env
-  liftIO . catch author . noAuthorization env $ False
+  liftIO $ catch author (pure . const False :: Error -> IO Bool)

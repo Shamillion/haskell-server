@@ -4,8 +4,7 @@
 module Category where
 
 import ConnectDB (connectDB)
-import Control.Exception (throwIO)
-import Control.Monad.Reader (ReaderT, liftIO)
+import Control.Monad.Reader (liftIO)
 import Data.Aeson (ToJSON, encode)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
@@ -14,13 +13,14 @@ import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (FromRow, close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Environment (Environment)
+import Environment (Flow)
 import Error
   ( CategoryError (..),
     Error
       ( CategoryError,
         CommonError
       ),
+    throwError,
   )
 import GHC.Generics (Generic)
 import Lib (runGetQuery, setLimitAndOffset)
@@ -50,13 +50,13 @@ data Category = Category
 newtype CategoryHandle m = CategoryHandle
   {checkUniqCategoryH :: BC.ByteString -> m Bool}
 
-categoryHandler :: CategoryHandle (ReaderT Environment IO)
+categoryHandler :: CategoryHandle Flow
 categoryHandler = CategoryHandle {checkUniqCategoryH = checkUniqCategory}
 
-getParentCategories :: T.Text -> ReaderT Environment IO [T.Text]
+getParentCategories :: T.Text -> Flow [T.Text]
 getParentCategories category = do
   conn <- connectDB
-  allCategoriesLs <- liftIO $ query_ conn getCategoryForList :: ReaderT Environment IO [[T.Text]]
+  allCategoriesLs <- liftIO $ query_ conn getCategoryForList :: Flow [[T.Text]]
   liftIO $ close conn
   writingLineDebug allCategoriesLs
   let buildingList categoryLs = do
@@ -175,7 +175,7 @@ editCategory CategoryHandle {..} isAdmin ls = do
     buildQuery (_, _) = Left CommonError
 
 -- Checking the uniqueness of the category name in the database.
-checkUniqCategory :: BC.ByteString -> ReaderT Environment IO Bool
+checkUniqCategory :: BC.ByteString -> Flow Bool
 checkUniqCategory str = do
   conn <- connectDB
   ls <-
@@ -186,17 +186,17 @@ checkUniqCategory str = do
           \ name_category = '"
             <> str
             <> "';" ::
-      ReaderT Environment IO [[BC.ByteString]]
+      Flow [[BC.ByteString]]
   writingLineDebug ls
   pure $ null ls
 
-getCategoryHandler :: W.Request -> ReaderT Environment IO LC.ByteString
+getCategoryHandler :: W.Request -> Flow LC.ByteString
 getCategoryHandler req = do
   queryCategory <- buildGetCategoryQuery req
-  category <- runGetQuery queryCategory :: ReaderT Environment IO [Category]
+  category <- runGetQuery queryCategory :: Flow [Category]
   pure $ encode category
 
-buildGetCategoryQuery :: W.Request -> ReaderT Environment IO Query
+buildGetCategoryQuery :: W.Request -> Flow Query
 buildGetCategoryQuery req = do
   limitOffset <- setLimitAndOffset $ queryToQueryText arr
   pure $ mkGetCategoryQuery limitOffset
@@ -204,24 +204,24 @@ buildGetCategoryQuery req = do
     arr = W.queryString req
 
 buildCreateOrEditCategoryQuery ::
-  ( CategoryHandle (ReaderT Environment IO) ->
+  ( CategoryHandle Flow ->
     Bool ->
     [(BC.ByteString, Maybe BC.ByteString)] ->
-    ReaderT Environment IO (Either Error Query)
+    Flow (Either Error Query)
   ) ->
   Bool ->
   W.Request ->
-  ReaderT Environment IO Query
+  Flow Query
 buildCreateOrEditCategoryQuery func isAdmin req = do
   conn <- connectDB
   eitherQuery <- func categoryHandler isAdmin $ W.queryString req
   liftIO $ close conn
   case eitherQuery of
-    Left err -> liftIO $ throwIO err
+    Left err -> throwError err
     Right qry -> pure qry
 
-buildCreateCategoryQuery :: Bool -> W.Request -> ReaderT Environment IO Query
+buildCreateCategoryQuery :: Bool -> W.Request -> Flow Query
 buildCreateCategoryQuery = buildCreateOrEditCategoryQuery createCategory
 
-buildEditCategoryQuery :: Bool -> W.Request -> ReaderT Environment IO Query
+buildEditCategoryQuery :: Bool -> W.Request -> Flow Query
 buildEditCategoryQuery = buildCreateOrEditCategoryQuery editCategory

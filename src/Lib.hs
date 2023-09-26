@@ -11,7 +11,7 @@ import qualified Data.List as LT
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (FromRow, Query, close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (Query))
-import Environment (Environment, configuration)
+import Environment (Environment, Flow, configuration)
 import Logger (writingLineDebug)
 import qualified Network.Wai as W
 import Text.Read (readMaybe)
@@ -53,7 +53,7 @@ setLimitAndOffset ls = do
         _ -> defaultVal
     toByteString = BC.pack . show
 
-runGetQuery :: (Show r, FromRow r) => Query -> ReaderT Environment IO [r]
+runGetQuery :: (Show r, FromRow r) => Query -> Flow [r]
 runGetQuery qry = do
   conn <- connectDB
   dataFromDB <- liftIO $ query_ conn qry
@@ -61,7 +61,7 @@ runGetQuery qry = do
   liftIO $ close conn
   pure dataFromDB
 
-runPostOrPutQuery :: Query -> ReaderT Environment IO Int64
+runPostOrPutQuery :: Query -> Flow Int64
 runPostOrPutQuery qry = do
   conn <- connectDB
   num <- liftIO $ execute_ conn qry
@@ -73,7 +73,7 @@ runPostOrPutQuery qry = do
 mkComment :: Int64 -> LC.ByteString
 mkComment num = LC.pack (show num) <> " position(s) done."
 
-createAndEditObjectsHandler :: (W.Request -> ReaderT Environment IO Query) -> W.Request -> ReaderT Environment IO LC.ByteString
+createAndEditObjectsHandler :: (W.Request -> Flow Query) -> W.Request -> Flow LC.ByteString
 createAndEditObjectsHandler func req = do
   queryForDB <- func req
   num <- runPostOrPutQuery queryForDB

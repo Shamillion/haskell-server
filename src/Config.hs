@@ -27,19 +27,19 @@ data Configuration = Configuration
 -- Getting information from configuration file.
 readConfigFile :: IO Configuration
 readConfigFile = do
-  time' <- time
+  time <- buildTime
   content <- L.readFile "config.json"
   case eitherDecode content of
     Right conf -> pure conf
     Left err -> do
-      let str = time' ++ " UTC   " ++ "ERROR  " ++ " - " ++ err
+      let str = time ++ " UTC   " ++ "ERROR  " ++ " - " ++ err
       print str
       appendFile logFile $ str ++ "\n"
       die "Error reading the configuration file! Check out config.json!"
 
 -- Get current time for the logger.
-time :: IO String
-time = take 19 . show <$> getCurrentTime
+buildTime :: IO String
+buildTime = take 19 . show <$> getCurrentTime
 
 -- Data type for the logger.
 data Priority = DEBUG | INFO | WARNING | ERROR

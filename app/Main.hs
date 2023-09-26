@@ -3,11 +3,11 @@ module Main where
 import Auth (isAdmin)
 import Category (buildCreateCategoryQuery, buildEditCategoryQuery, getCategoryHandler)
 import Config (Configuration (serverPort), Priority (..))
-import Control.Exception (catch, throwIO)
-import Control.Monad.Reader (ReaderT (runReaderT), liftIO)
+import Control.Exception (catch)
+import Control.Monad.Reader (ReaderT (runReaderT), void)
 import qualified Data.ByteString.Lazy.Char8 as LC
-import Environment (Environment (configuration), environment)
-import Error (CategoryError (..), Error (..))
+import Environment (Environment (configuration), Flow, buildEnvironment)
+import Error (CategoryError (..), Error (..), throwError)
 import Lib (createAndEditObjectsHandler)
 import Logger (writingLine, writingLineDebug)
 import MigrationsDB (checkDB)
@@ -18,7 +18,7 @@ import News (buildCreateNewsQuery, buildEditNewsQuery, getNewsHandler)
 import Photo (getPhotoHandler, headerAndImage)
 import User (buildCreateUserQuery, buildEditUserQuery, getUserHandler)
 
-handler :: W.Request -> ReaderT Environment IO LC.ByteString
+handler :: W.Request -> Flow LC.ByteString
 handler req = do
   admin <- isAdmin req
   let reqMethod = W.requestMethod req
@@ -34,18 +34,17 @@ handler req = do
     ("POST", "category") -> createAndEditObjectsHandler (buildCreateCategoryQuery admin) req
     ("PUT", "category") -> createAndEditObjectsHandler (buildEditCategoryQuery admin) req
     ("GET", "photo") -> getPhotoHandler req
-    _ -> liftIO $ throwIO CommonError
+    _ -> throwError CommonError
 
 app :: Environment -> W.Application
 app env req respond = do
-  mapM_
-    (`runReaderT` env)
-    [ writingLine INFO "Received a request.",
-      writingLineDebug $ W.requestMethod req,
-      writingLineDebug $ W.requestHeaders req,
-      writingLineDebug $ W.pathInfo req,
+  void $
+    flip runReaderT env $ do
+      writingLine INFO "Received a request."
+      writingLineDebug $ W.requestMethod req
+      writingLineDebug $ W.requestHeaders req
+      writingLineDebug $ W.pathInfo req
       writingLineDebug $ W.queryString req
-    ]
   ans <-
     catch
       (runReaderT (handler req) env)
@@ -74,7 +73,7 @@ app env req respond = do
 
 main :: IO ()
 main = do
-  env <- environment
+  env <- buildEnvironment
   num <- runReaderT (checkDB 1) env
   runReaderT (writingLine DEBUG $ "checkDB was runing " <> show num <> " times.") env
   if num > 2

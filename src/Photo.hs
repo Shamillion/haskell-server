@@ -2,7 +2,7 @@ module Photo where
 
 import ConnectDB (connectDB)
 import Control.Exception (throwIO)
-import Control.Monad.Reader (ReaderT, liftIO)
+import Control.Monad.Reader (liftIO)
 import qualified Data.Bifunctor as BF
 import Data.ByteString.Base64.Lazy (decodeLenient)
 import qualified Data.ByteString.Char8 as BC
@@ -12,7 +12,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Database.PostgreSQL.Simple (close, execute, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import Environment (Environment)
+import Environment (Flow)
 import Error (Error (CommonError, ParseError), ParseError (DecodeImageError))
 import Lib (runGetQuery)
 import qualified Network.Wai as W
@@ -40,7 +40,7 @@ decodeImage ([txt] : _) = pure $ header <> ";" <> image
 decodeImage (_ : _) = Left $ ParseError DecodeImageError
 
 -- The function sends the photo to the database and returns its ID in the table.
-sendPhotoToDB :: BC.ByteString -> ReaderT Environment IO BC.ByteString
+sendPhotoToDB :: BC.ByteString -> Flow BC.ByteString
 sendPhotoToDB str = do
   conn <- connectDB
   liftIO $ do
@@ -49,7 +49,7 @@ sendPhotoToDB str = do
     close conn
     pure val
 
-getPhotoHandler :: W.Request -> ReaderT Environment IO LC.ByteString
+getPhotoHandler :: W.Request -> Flow LC.ByteString
 getPhotoHandler req = do
   queryPhoto <- liftIO $ buildGetPhotoQuery req
   photoTxt <- runGetQuery queryPhoto

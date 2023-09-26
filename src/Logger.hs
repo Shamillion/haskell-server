@@ -1,17 +1,17 @@
 module Logger where
 
-import Config (Configuration (logOutput, priorityLevel), Priority (..), logFile, time)
-import Control.Monad.Reader (ReaderT, asks, liftIO)
-import Environment (Environment (configuration))
+import Config (Configuration (logOutput, priorityLevel), Priority (..), buildTime, logFile)
+import Control.Monad.Reader (asks, liftIO)
+import Environment (Environment (configuration), Flow)
 
 -- Function writes log information down.
-writingLine :: Priority -> String -> ReaderT Environment IO ()
+writingLine :: Priority -> String -> Flow ()
 writingLine level str = do
   conf <- asks configuration
   if level >= priorityLevel conf
     then liftIO $ do
-      t <- time
-      let string = t <> " UTC   " <> showLevel level <> " - " <> str
+      time <- buildTime
+      let string = time <> " UTC   " <> showLevel level <> " - " <> str
           out = logOutput conf
       case out of
         "file" -> appendFile logFile $ string <> "\n"
@@ -24,5 +24,5 @@ writingLine level str = do
       WARNING -> "WARNING"
       ERROR -> "ERROR  "
 
-writingLineDebug :: (Show a) => a -> ReaderT Environment IO ()
+writingLineDebug :: (Show a) => a -> Flow ()
 writingLineDebug s = writingLine DEBUG $ show s

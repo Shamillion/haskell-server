@@ -1,13 +1,13 @@
 module ConnectDB where
 
 import Config (Priority (INFO))
-import Control.Monad.Reader (ReaderT, asks, liftIO)
+import Control.Monad.Reader (asks, liftIO)
 import qualified Database.PostgreSQL.Simple as PS
-import Environment (Environment (connectInfo))
+import Environment (Environment (connectInfo), Flow)
 import Logger (writingLine, writingLineDebug)
 
 -- Establishing a connection to the database.
-connectDB :: ReaderT Environment IO PS.Connection
+connectDB :: Flow PS.Connection
 connectDB = do
   connectInf <- asks connectInfo
   writingLine INFO "Sent a request to the database."
