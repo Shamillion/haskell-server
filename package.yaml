@@ -25,6 +25,7 @@ dependencies:
 - base64-bytestring
 - bytestring
 - cryptonite
+- exceptions
 - http-conduit
 - http-types
 - text
