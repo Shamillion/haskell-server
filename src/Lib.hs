@@ -38,7 +38,7 @@ setLimitAndOffset ::
   Monad m =>
   [(T.Text, Maybe T.Text)] ->
   ReaderT Environment m Query
-setLimitAndOffset ls = do
+setLimitAndOffset dataFromRequest = do
   limitInConfig <- asks (maxElem . configuration)
   let limit = listToValue "limit" setLimit limitInConfig
       setLimit val = if val > 0 && val < limitInConfig then val else limitInConfig
@@ -46,7 +46,7 @@ setLimitAndOffset ls = do
   where
     offset = listToValue "offset" (max 0) 0
     getMaybe param func =
-      (LT.find ((== param) . fst) ls >>= snd >>= readMaybe . T.unpack) <&> func
+      (LT.find ((== param) . fst) dataFromRequest >>= snd >>= readMaybe . T.unpack) <&> func
     listToValue param func defaultVal = toByteString $
       case getMaybe param func of
         Just val -> val

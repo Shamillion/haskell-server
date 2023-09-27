@@ -92,21 +92,21 @@ setMethodNews ::
   Monad m =>
   [(T.Text, Maybe T.Text)] ->
   ReaderT Environment m (Maybe (Query, Query))
-setMethodNews ls = do
-  setLimOffs <- setLimitAndOffset ls
+setMethodNews dataFromRequest = do
+  setLimOffs <- setLimitAndOffset dataFromRequest
   let sortNewsLimitOffset = fmap (<> setLimOffs) sortNews
   pure $ do
     filterForNews <- filterNews
     sortAndLimitAndOffset <- sortNewsLimitOffset
     pure (filterForNews, sortAndLimitAndOffset)
   where
-    filterNews = setFiltersNews $ LT.filter ((`notElem` fields) . fst) ls
+    filterNews = setFiltersNews $ LT.filter ((`notElem` fields) . fst) dataFromRequest
     fields = ["sort_by", "limit", "offset"]
     sortNews =
       case findSort of
         [("sort_by", Just param)] -> sortBy param
         _ -> pure ""
-    findSort = LT.filter ((== "sort_by") . fst) ls
+    findSort = LT.filter ((== "sort_by") . fst) dataFromRequest
 
 -- Processing of the "sort_by=..." part of the request.
 sortBy :: T.Text -> Maybe Query
@@ -146,8 +146,8 @@ setFiltersNews ((field, param) : xs)
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
 mkCreateNewsQuery :: Bool -> Query -> BC.ByteString -> [(BC.ByteString, Maybe BC.ByteString)] -> Maybe Query
-mkCreateNewsQuery isAuth authID photoIdList ls = do
-  if not isAuth || null ls || nothingInLs
+mkCreateNewsQuery isAuth authID photoIdList dataFromRequest = do
+  if not isAuth || null dataFromRequest || nothingInLs
     then Nothing
     else do
       let maybeStr =
@@ -175,19 +175,19 @@ mkCreateNewsQuery isAuth authID photoIdList ls = do
         Just str -> pure $ Query str
         Nothing -> Nothing
   where
-    nothingInLs = any (\(_, y) -> isNothing y) ls
+    nothingInLs = any (\(_, y) -> isNothing y) dataFromRequest
     titleNws = getValue "title"
     categoryId = getValue "category_id"
     contentNws = getValue "content"
     isPublished = getValue "is_published"
-    getValue str = LT.find (\(x, _) -> x == str) ls >>= snd
+    getValue str = LT.find (\(x, _) -> x == str) dataFromRequest >>= snd
 
 -- Puts the photos from the query into the database and
---  returns a list from the ID.
+--  returns a list the ID.
 buildPhotoIDLs :: [(BC.ByteString, Maybe BC.ByteString)] -> Flow BC.ByteString
-buildPhotoIDLs ls = photoIDLs <&> (\x -> "'{" <> mkPhotoIdString x <> "}'")
+buildPhotoIDLs dataFromRequest = photoIDLs <&> (\x -> "'{" <> mkPhotoIdString x <> "}'")
   where
-    photoIDLs = mapM (sendPhotoToDB . fromMaybe "" . snd) . filter ((== "photo") . fst) $ ls
+    photoIDLs = mapM (sendPhotoToDB . fromMaybe "" . snd) . filter ((== "photo") . fst) $ dataFromRequest
 
 mkPhotoIdString :: [BC.ByteString] -> BC.ByteString
 mkPhotoIdString [] = ""
@@ -202,7 +202,7 @@ buildEditNewsQuery :: W.Request -> Flow Query
 buildEditNewsQuery req = do
   authId <- authorID req
   isAuthorNews <- authorNews (fromQuery authId) newsId
-  if null ls || not isAuthorNews
+  if null dataFromRequest || not isAuthorNews
     then throwError CommonError
     else do
       photoIdStr <- photoIdList
@@ -217,16 +217,16 @@ buildEditNewsQuery req = do
         Just str -> pure $ Query str
         Nothing -> throwError CommonError
   where
-    ls = W.queryString req
-    newsId = case LT.find (\(x, _) -> x == "news_id") ls of
+    dataFromRequest = W.queryString req
+    newsId = case LT.find (\(x, _) -> x == "news_id") dataFromRequest of
       Just (_, Just n) -> n
       _ -> "0"
-    filteredLs = LT.filter (\(x, y) -> elem x fields && isJust y) ls
+    filteredLs = LT.filter (\(x, y) -> elem x fields && isJust y) dataFromRequest
     fields = ["title", "category_id", "content", "is_published"]
     photoIdList =
-      if "photo" `elem` map fst ls
+      if "photo" `elem` map fst dataFromRequest
         then do
-          str <- buildPhotoIDLs ls
+          str <- buildPhotoIDLs dataFromRequest
           pure $ "photo = " <> str <> ", "
         else pure ""
 
@@ -236,7 +236,7 @@ authorNews "Null" _ = pure False
 authorNews authId newsId = do
   conn <- connectDB
   liftIO $ do
-    ls <-
+    newsIdLs <-
       query
         conn
         "SELECT news_id FROM news WHERE user_id = ? AND \
@@ -244,7 +244,7 @@ authorNews authId newsId = do
         (authId, newsId) ::
         IO [[Int]]
     close conn
-    pure $ ls /= []
+    pure $ newsIdLs /= []
 
 -- Creates a row with updated news fields.
 mkUpdatedNewsFields :: [(BC.ByteString, Maybe BC.ByteString)] -> Maybe BC.ByteString
@@ -277,10 +277,10 @@ buildCreateNewsQuery :: W.Request -> Flow Query
 buildCreateNewsQuery req = do
   athr <- isAuthor req
   authId <- authorID req
-  photoIdList <- buildPhotoIDLs arr
-  let maybeQuery = mkCreateNewsQuery athr authId photoIdList arr
+  photoIdList <- buildPhotoIDLs dataFromRequest
+  let maybeQuery = mkCreateNewsQuery athr authId photoIdList dataFromRequest
   case maybeQuery of
     Just qry -> pure qry
     Nothing -> throwError CommonError
   where
-    arr = W.queryString req
+    dataFromRequest = W.queryString req

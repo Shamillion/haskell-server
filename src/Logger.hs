@@ -6,14 +6,14 @@ import Environment (Environment (configuration), Flow)
 
 -- Function writes log information down.
 writingLine :: Priority -> String -> Flow ()
-writingLine level str = do
+writingLine level information = do
   conf <- asks configuration
   if level >= priorityLevel conf
     then liftIO $ do
       time <- buildTime
-      let string = time <> " UTC   " <> showLevel level <> " - " <> str
-          out = logOutput conf
-      case out of
+      let string = time <> " UTC   " <> showLevel level <> " - " <> information
+          outputDestinationType = logOutput conf
+      case outputDestinationType of
         "file" -> appendFile logFile $ string <> "\n"
         _ -> putStrLn string
     else pure ()
@@ -25,4 +25,4 @@ writingLine level str = do
       ERROR -> "ERROR  "
 
 writingLineDebug :: (Show a) => a -> Flow ()
-writingLineDebug s = writingLine DEBUG $ show s
+writingLineDebug information = writingLine DEBUG $ show information

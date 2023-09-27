@@ -79,15 +79,15 @@ createCategory ::
   Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
-createCategory CategoryHandle {..} isAdmin ls = do
-  if not isAdmin || null ls || null categorys
+createCategory CategoryHandle {..} isAdmin dataFromRequest = do
+  if not isAdmin || null dataFromRequest || null categorys
     then pure $ Left CommonError
     else do
       isUniqName <- checkUniqCategoryH nameCategory
       isUniqParent <- checkUniqCategoryH parentCategory
       pure $ checkAndResponse isUniqName isUniqParent
   where
-    (x : _) = map (BC.split '>' . fst) ls
+    (x : _) = map (BC.split '>' . fst) dataFromRequest
     categorys = filter (/= "") x
     (parentCategory : nameCategory : _) =
       if length categorys == 1 then "Null" : categorys else categorys
@@ -117,8 +117,8 @@ editCategory ::
   Bool ->
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
-editCategory CategoryHandle {..} isAdmin ls = do
-  if not isAdmin || null ls || null filteredLs || "" `elem` [name, new_name]
+editCategory CategoryHandle {..} isAdmin dataFromRequest = do
+  if not isAdmin || null dataFromRequest || null filteredLs || "" `elem` [name, new_name]
     then pure $ Left CommonError
     else do
       isUniqName <- checkUniqCategoryH name
@@ -128,7 +128,7 @@ editCategory CategoryHandle {..} isAdmin ls = do
           isUniqNew_name <- checkUniqCategoryH new_name
           pure $ checkAndResponse isUniqNew_name
   where
-    filteredLs = filter ((/= "") . snd) $ map (fmap (fromMaybe "")) $ take 1 ls
+    filteredLs = filter ((/= "") . snd) $ map (fmap (fromMaybe "")) $ take 1 dataFromRequest
     splitedFilteredLs = map (fmap (BC.split '>')) filteredLs
     categories = map (filter (/= "") <$>) splitedFilteredLs
     methodAndNames@((method, [name, new_name]) : _) =
@@ -178,7 +178,7 @@ editCategory CategoryHandle {..} isAdmin ls = do
 checkUniqCategory :: BC.ByteString -> Flow Bool
 checkUniqCategory str = do
   conn <- connectDB
-  ls <-
+  categoryLs <-
     liftIO $
       query_ conn $
         Query $
@@ -187,8 +187,8 @@ checkUniqCategory str = do
             <> str
             <> "';" ::
       Flow [[BC.ByteString]]
-  writingLineDebug ls
-  pure $ null ls
+  writingLineDebug categoryLs
+  pure $ null categoryLs
 
 getCategoryHandler :: W.Request -> Flow LC.ByteString
 getCategoryHandler req = do
@@ -198,10 +198,8 @@ getCategoryHandler req = do
 
 buildGetCategoryQuery :: W.Request -> Flow Query
 buildGetCategoryQuery req = do
-  limitOffset <- setLimitAndOffset $ queryToQueryText arr
+  limitOffset <- setLimitAndOffset $ queryToQueryText $ W.queryString req
   pure $ mkGetCategoryQuery limitOffset
-  where
-    arr = W.queryString req
 
 buildCreateOrEditCategoryQuery ::
   ( CategoryHandle Flow ->

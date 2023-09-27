@@ -14,8 +14,8 @@ import User (cryptoPass)
 
 -- Checking the availability of the necessary tables in the database.
 checkDB :: Int -> Flow Int
-checkDB num
-  | num > 2 = writingLine ERROR "Error Database!" >> pure num
+checkDB retries
+  | retries > 2 = writingLine ERROR "Error Database!" >> pure retries
   | otherwise = do
     writingLine INFO "Checking Database..."
     conn <- connectDB
@@ -28,7 +28,7 @@ checkDB num
         then do
           liftIO $ close conn
           writingLine INFO "Database is OK."
-          pure num
+          pure retries
         else do
           liftIO $ do
             addAdmin <- buildAddAdminQuery
@@ -42,9 +42,9 @@ checkDB num
               ]
             close conn
           writingLine INFO "Database has been created."
-          checkDB (num + 1)
+          checkDB (retries + 1)
     writingLine DEBUG "Checking database has been successfully."
-    pure num
+    pure retries
   where
     qry =
       "SELECT table_name FROM information_schema.tables \

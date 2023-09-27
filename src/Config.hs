@@ -10,7 +10,6 @@ import Data.Word (Word16)
 import GHC.Generics (Generic)
 import System.Exit (die)
 
--- Data type for the configuration file.
 data Configuration = Configuration
   { serverPort :: Int,
     dbHost :: String,
@@ -24,7 +23,6 @@ data Configuration = Configuration
   }
   deriving (Show, Generic, FromJSON)
 
--- Getting information from configuration file.
 readConfigFile :: IO Configuration
 readConfigFile = do
   time <- buildTime
@@ -33,7 +31,7 @@ readConfigFile = do
     Right conf -> pure conf
     Left err -> do
       let str = time ++ " UTC   " ++ "ERROR  " ++ " - " ++ err
-      print str
+      putStrLn str
       appendFile logFile $ str ++ "\n"
       die "Error reading the configuration file! Check out config.json!"
 
