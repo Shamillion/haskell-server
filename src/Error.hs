@@ -12,6 +12,7 @@ data Error
   | AuthError AuthError
   | CategoryError CategoryError
   | ParseError ParseError
+  | NewsError NewsError
   deriving (Show, Eq)
 
 instance Exception Error
@@ -40,6 +41,13 @@ data AuthError
   deriving (Show, Eq)
 
 instance Exception AuthError
+
+data NewsError
+  = UserNotAuthor
+  | NotAuthorThisNews
+  deriving (Show, Eq)
+
+instance Exception NewsError
 
 throwError :: Error -> Flow a
 throwError err = do

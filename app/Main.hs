@@ -7,11 +7,11 @@ import Control.Exception (catch)
 import Control.Monad.Reader (ReaderT (runReaderT), void)
 import qualified Data.ByteString.Lazy.Char8 as LC
 import Environment (Environment (configuration), Flow, buildEnvironment)
-import Error (CategoryError (..), Error (..), throwError)
+import Error (CategoryError (..), Error (..), NewsError (..), throwError)
 import Lib (createAndEditObjectsHandler)
 import Logger (writingLine, writingLineDebug)
 import MigrationsDB (checkDB)
-import Network.HTTP.Types (status200, status404, status406)
+import Network.HTTP.Types (status200, status403, status404, status406)
 import qualified Network.Wai as W
 import Network.Wai.Handler.Warp (run)
 import News (buildCreateNewsQuery, buildEditNewsQuery, getNewsHandler)
@@ -22,18 +22,18 @@ handler :: W.Request -> Flow LC.ByteString
 handler req = do
   admin <- isAdmin req
   let reqMethod = W.requestMethod req
-      [entity] = W.pathInfo req
+      entity = W.pathInfo req
   case (reqMethod, entity) of
-    ("GET", "news") -> getNewsHandler req
-    ("POST", "news") -> createAndEditObjectsHandler buildCreateNewsQuery req
-    ("PUT", "news") -> createAndEditObjectsHandler buildEditNewsQuery req
-    ("GET", "user") -> getUserHandler req
-    ("POST", "user") -> createAndEditObjectsHandler (buildCreateUserQuery admin) req
-    ("PUT", "user") -> createAndEditObjectsHandler (buildEditUserQuery admin) req
-    ("GET", "category") -> getCategoryHandler req
-    ("POST", "category") -> createAndEditObjectsHandler (buildCreateCategoryQuery admin) req
-    ("PUT", "category") -> createAndEditObjectsHandler (buildEditCategoryQuery admin) req
-    ("GET", "photo") -> getPhotoHandler req
+    ("GET", ["news"]) -> getNewsHandler req
+    ("POST", ["news", "create"]) -> createAndEditObjectsHandler buildCreateNewsQuery req
+    ("PUT", ["news", "update"]) -> createAndEditObjectsHandler buildEditNewsQuery req
+    ("GET", ["user"]) -> getUserHandler req
+    ("POST", ["user", "create"]) -> createAndEditObjectsHandler (buildCreateUserQuery admin) req
+    ("PUT", ["user", "update"]) -> createAndEditObjectsHandler (buildEditUserQuery admin) req
+    ("GET", ["category"]) -> getCategoryHandler req
+    ("POST", ["category", "create"]) -> createAndEditObjectsHandler (buildCreateCategoryQuery admin) req
+    ("PUT", ["category", "update"]) -> createAndEditObjectsHandler (buildEditCategoryQuery admin) req
+    ("GET", ["photo"]) -> getPhotoHandler req
     _ -> throwError CommonError
 
 app :: Environment -> W.Application
@@ -60,6 +60,10 @@ app env req respond = do
               respondsSts406 "There is no such parent category.\n"
             CategoryError CategoryParentItself ->
               respondsSts406 "A category cannot be a parent to itself.\n"
+            NewsError NotAuthorThisNews ->
+              respondsSts403 "The user is not the author of this news.\n"
+            NewsError UserNotAuthor ->
+              respondsSts403 "The user does not have author rights.\n"
             _ -> responds status404 "text/plain" "404 Not Found.\n"
       )
   let (header, answer) =
@@ -70,6 +74,7 @@ app env req respond = do
   where
     responds status header = respond . W.responseLBS status [("Content-Type", header)]
     respondsSts406 = responds status406 "text/plain"
+    respondsSts403 = responds status403 "text/plain"
 
 main :: IO ()
 main = do

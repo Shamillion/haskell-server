@@ -36,7 +36,7 @@ To deploy the project, you need to perform the following steps:
 7. Open one more terminal to send requests to the server.
 8. Create a user by sending the following request to the server
    ```  
-   curl -X POST 'http://Adam:sixthDay@localhost:SERVER_PORT/user?name_user=NAME&login=LOGIN&pass=PASSWORD&is_admin=true&is_author=true'
+   curl -X POST 'http://Adam:sixthDay@localhost:SERVER_PORT/user/create?name_user=NAME&login=LOGIN&pass=PASSWORD&is_admin=true&is_author=true'
    ```
    where
     - SERVER_PORT - TCP port number, specified in the **config.json** file as **ServerPort**;    
@@ -46,7 +46,7 @@ To deploy the project, you need to perform the following steps:
 9. For security reasons, it is necessary to block the administrator rights of the user automatically created by the system. 
    You should to execute following request to do it
    ```
-   curl -X PUT 'http://LOGIN:PASSWORD@localhost:SERVER_PORT/user?block_admin=Adam'
+   curl -X PUT 'http://LOGIN:PASSWORD@localhost:SERVER_PORT/user/update?block_admin=Adam'
    ```  
    where
     - SERVER_PORT - TCP port number, specified in the **config.json** file as **ServerPort**;    
@@ -92,8 +92,7 @@ To stop the server operation, press **Ctrl + C** in the terminal where the serve
 haskell-server                       -- the root folder of the project.
   ├── app                            
   │   └── Main.hs
-  ├── config.json                    -- server settings file.
-  ├── log.log                        -- file for server logs.
+  ├── _config.json                    -- template of the server settings file.
   ├── _scripts                       -- folder with request file folders for endpoints.
   ├── sql
   │   └── db.sql                     -- sql queries for creating a database.
@@ -101,7 +100,11 @@ haskell-server                       -- the root folder of the project.
   │   ├── Auth.hs                    -- lib for user authorization.
   │   ├── Category.hs                -- lib for working with categories.
   │   ├── Config.hs                  -- lib for working with Config.json, database and logger.
+  │   ├── ConnectDB.hs               -- function for connecting to the database. 
+  │   ├── Environment.hs             -- data types and function for environment.
+  │   ├── Error.hs                   -- data types for errors.
   │   ├── Lib.hs                     -- common functions used in the project.
+  │   ├── Logger.hs                  -- logging functions
   │   ├── MigrationsDB.hs            -- lib for creating and verifying a database.
   │   ├── News.hs                    -- lib for working with news.
   │   ├── Photo.hs                   -- lib for working with images.
@@ -200,7 +203,7 @@ A request to create a news item must have the following parameters
 Example of creating news with title "Hi Everyone!", category id 3, content "The First News That I Created.",
 two images (not real, just for example),  not  publish (only  the author be able to see this news):
 ```
-curl -X POST 'http://Sam:pass123@localhost:8080/news?title=Hi%20Everyone%21&category_id=3&content=The%20First%20News%20That%20I%20Created%2E&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaHGkjHGKHJgghK&photo=data%3Aimage%2Fpng%3Bbase64%2CbbbHGkjHGKHJgghK&is_published=false'
+curl -X POST 'http://Sam:pass123@localhost:8080/news/create?title=Hi%20Everyone%21&category_id=3&content=The%20First%20News%20That%20I%20Created%2E&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaHGkjHGKHJgghK&photo=data%3Aimage%2Fpng%3Bbase64%2CbbbHGkjHGKHJgghK&is_published=false'
 ```
 
 #### News Editing
@@ -217,7 +220,7 @@ let's assume that the **news_id** 8 was assigned to it when it was created.
 And change the **title** to "Breaking news!", the **content** to 
 "The first news has been edited." and we will publish it.
 ```
-curl -X PUT 'http://Sam:pass123@localhost:8080/news?news_id=8&title=Breaking%20news%21&category_id=3&content=The%20First%20News%20has%20been%20edited%2E&is_published=true'
+curl -X PUT 'http://Sam:pass123@localhost:8080/news/update?news_id=8&title=Breaking%20news%21&category_id=3&content=The%20First%20News%20has%20been%20edited%2E&is_published=true'
 ```
 
 
@@ -242,7 +245,7 @@ A request to create a user must have the following parameters
 Example of creating user with name "Ralf", login "Ralfio", password "zxc999", 
 without administrator rights, with right to create news:
 ```
-curl -X POST 'http://Sam:pass123@localhost:8080/user?name_user=Ralf&login=Ralfio&pass=zxc999&is_admin=false&is_author=true'
+curl -X POST 'http://Sam:pass123@localhost:8080/user/create?name_user=Ralf&login=Ralfio&pass=zxc999&is_admin=false&is_author=true'
 ```
 
 
@@ -259,12 +262,12 @@ To create category, the user must have administrator rights.
 
 Example of creating a category named "Trees" in the parent category named "Nature":
 ```
-curl -X POST 'http://Sam:pass123@localhost:8080/category?Nature>Trees'
+curl -X POST 'http://Sam:pass123@localhost:8080/category/create?Nature>Trees'
 ```
 
 If you want to create a category without a parent category, then just specify the category name:
 ```
-curl -X POST 'http://Sam:pass123@localhost:8080/category?Trees'
+curl -X POST 'http://Sam:pass123@localhost:8080/category/create?Trees'
 ```
 
 #### Category Editing
@@ -279,13 +282,13 @@ A request to edit a category must have one of the following parameters
 ##### Changing the category name
 Let's change the name of the "Plants" category to "Flowers":
 ```
-curl -X PUT 'http://Sam:pass123@localhost:8080/category?change_name=Plants>Flowers'
+curl -X PUT 'http://Sam:pass123@localhost:8080/category/update?change_name=Plants>Flowers'
 ```
 
 ##### Changing the parent category
 Let's change the parent category to "Forest" for the previously created category "Trees":
 ```
-curl -X PUT 'http://Sam:pass123@localhost:8080/category?change_parent=Trees>Forest'
+curl -X PUT 'http://Sam:pass123@localhost:8080/category/update?change_parent=Trees>Forest'
 ```
 
 

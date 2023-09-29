@@ -19,7 +19,7 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Environment (Environment, Flow)
-import Error (Error (CommonError, ParseError), ParseError (ParseNewsError), throwError)
+import Error (Error (CommonError, NewsError, ParseError), NewsError (..), ParseError (ParseNewsError), throwError)
 import GHC.Generics (Generic)
 import Lib
   ( initTxt,
@@ -145,9 +145,9 @@ setFiltersNews ((field, param) : xs)
 -- '.../news?title=Text&category_id=3&content=Text&
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
-mkCreateNewsQuery :: Bool -> Query -> BC.ByteString -> [(BC.ByteString, Maybe BC.ByteString)] -> Maybe Query
-mkCreateNewsQuery isAuth authID photoIdList dataFromRequest = do
-  if not isAuth || null dataFromRequest || nothingInLs
+mkCreateNewsQuery :: Query -> BC.ByteString -> [(BC.ByteString, Maybe BC.ByteString)] -> Maybe Query
+mkCreateNewsQuery authID photoIdList dataFromRequest = do
+  if null dataFromRequest || nothingInLs
     then Nothing
     else do
       let maybeStr =
@@ -202,20 +202,21 @@ buildEditNewsQuery :: W.Request -> Flow Query
 buildEditNewsQuery req = do
   authId <- authorID req
   isAuthorNews <- authorNews (fromQuery authId) newsId
-  if null dataFromRequest || not isAuthorNews
-    then throwError CommonError
-    else do
-      photoIdStr <- photoIdList
-      let maybeStr =
-            mkUpdatedNewsFields filteredLs >>= \str ->
-              pure $
-                "UPDATE news SET " <> photoIdStr <> str
-                  <> " WHERE news_id = "
-                  <> newsId
-                  <> ";"
-      case maybeStr of
-        Just str -> pure $ Query str
-        Nothing -> throwError CommonError
+  if not isAuthorNews
+    then throwError $ NewsError NotAuthorThisNews
+    else
+      if null dataFromRequest
+        then throwError CommonError
+        else do
+          photoIdStr <- photoIdList
+          let maybeStr =
+                mkUpdatedNewsFields filteredLs >>= \str ->
+                  pure $
+                    "UPDATE news SET " <> photoIdStr <> str
+                      <> " WHERE news_id = "
+                      <> newsId
+                      <> ";"
+          getValueFromMaybe maybeStr
   where
     dataFromRequest = W.queryString req
     newsId = case LT.find (\(x, _) -> x == "news_id") dataFromRequest of
@@ -229,6 +230,9 @@ buildEditNewsQuery req = do
           str <- buildPhotoIDLs dataFromRequest
           pure $ "photo = " <> str <> ", "
         else pure ""
+    getValueFromMaybe maybeVal = case maybeVal of
+      Just value -> pure $ Query value
+      Nothing -> throwError CommonError
 
 -- Checks whether this user is the author of this news.
 authorNews :: BC.ByteString -> BC.ByteString -> Flow Bool
@@ -276,11 +280,14 @@ encodeNews = fmap encode . mapM parseNews
 buildCreateNewsQuery :: W.Request -> Flow Query
 buildCreateNewsQuery req = do
   athr <- isAuthor req
-  authId <- authorID req
-  photoIdList <- buildPhotoIDLs dataFromRequest
-  let maybeQuery = mkCreateNewsQuery athr authId photoIdList dataFromRequest
-  case maybeQuery of
-    Just qry -> pure qry
-    Nothing -> throwError CommonError
+  if athr
+    then do
+      authId <- authorID req
+      photoIdList <- buildPhotoIDLs dataFromRequest
+      let maybeQuery = mkCreateNewsQuery authId photoIdList dataFromRequest
+      case maybeQuery of
+        Just qry -> pure qry
+        Nothing -> throwError CommonError
+    else throwError $ NewsError UserNotAuthor
   where
     dataFromRequest = W.queryString req
