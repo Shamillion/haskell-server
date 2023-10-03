@@ -2,8 +2,8 @@ module Auth where
 
 import Config (Priority (ERROR))
 import ConnectDB (connectDB)
-import Control.Exception (catch)
-import Control.Monad.Reader (ask, liftIO, runReaderT)
+import Control.Monad.Catch (handle)
+import Control.Monad.Reader (liftIO)
 import Crypto.KDF.BCrypt (validatePassword)
 import qualified Data.ByteString.Base64 as BB
 import qualified Data.ByteString.Char8 as BC
@@ -47,21 +47,18 @@ checkAuth req =
 
 -- Returns the user ID.
 authorID :: W.Request -> Flow Query
-authorID req = do
-  env <- ask
-  let userId = fromString . show . user_id <$> runReaderT (checkAuth req) env
-  liftIO $ catch userId (pure . const "Null" :: Error -> IO Query)
+authorID req =
+  handle (pure . const "Null" :: Error -> Flow Query) $
+    fromString . show . user_id <$> checkAuth req
 
 -- Checks the administrator rights of the user.
 isAdmin :: W.Request -> Flow Bool
-isAdmin req = do
-  env <- ask
-  let admin = is_admin <$> runReaderT (checkAuth req) env
-  liftIO $ catch admin (pure . const False :: Error -> IO Bool)
+isAdmin req =
+  handle (pure . const False :: Error -> Flow Bool) $
+    is_admin <$> checkAuth req
 
 -- Checks the user's ability to create news.
 isAuthor :: W.Request -> Flow Bool
-isAuthor req = do
-  env <- ask
-  let author = is_author <$> runReaderT (checkAuth req) env
-  liftIO $ catch author (pure . const False :: Error -> IO Bool)
+isAuthor req =
+  handle (pure . const False :: Error -> Flow Bool) $
+    is_author <$> checkAuth req

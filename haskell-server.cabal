@@ -51,6 +51,7 @@ library
     , base64-bytestring
     , bytestring
     , cryptonite
+    , exceptions
     , http-conduit
     , http-types
     , mtl
@@ -78,6 +79,7 @@ executable haskell-server-exe
     , base64-bytestring
     , bytestring
     , cryptonite
+    , exceptions
     , haskell-server
     , http-conduit
     , http-types
@@ -110,6 +112,7 @@ test-suite haskell-server-test
     , base64-bytestring
     , bytestring
     , cryptonite
+    , exceptions
     , haskell-server
     , hspec
     , http-conduit

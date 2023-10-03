@@ -25,4 +25,4 @@ writingLine level information = do
       ERROR -> "ERROR  "
 
 writingLineDebug :: (Show a) => a -> Flow ()
-writingLineDebug information = writingLine DEBUG $ show information
+writingLineDebug = writingLine DEBUG . show 
