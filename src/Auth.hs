@@ -1,8 +1,10 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Auth where
 
 import Config (Priority (ERROR))
 import ConnectDB (connectDB)
-import Control.Monad.Catch (handle)
+import Control.Monad.Catch (catch, handle)
 import Control.Monad.Reader (liftIO)
 import Crypto.KDF.BCrypt (validatePassword)
 import qualified Data.ByteString.Base64 as BB
@@ -43,7 +45,7 @@ checkAuth req =
     checkPassword _ [] = throwError $ AuthError NoSuchUserInDB
     checkPassword password (user : _)
       | validatePassword password $ pass user = pure user
-      | otherwise = throwError $ AuthError NoSuchUserInDB
+      | otherwise = throwError $ AuthError InvalidPassword
 
 -- Returns the user ID.
 authorID :: W.Request -> Flow Query
@@ -59,6 +61,9 @@ isAdmin req =
 
 -- Checks the user's ability to create news.
 isAuthor :: W.Request -> Flow Bool
-isAuthor req =
-  handle (pure . const False :: Error -> Flow Bool) $
-    is_author <$> checkAuth req
+isAuthor req = do
+  let isAuthr = is_author <$> checkAuth req
+  catch isAuthr $
+    \case
+      AuthError InvalidPassword -> isAuthr
+      _ -> pure False

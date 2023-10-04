@@ -38,6 +38,7 @@ data AuthError
   = NoAuthorization
   | DecodeLoginAndPassError
   | NoSuchUserInDB
+  | InvalidPassword
   deriving (Show, Eq)
 
 instance Exception AuthError
