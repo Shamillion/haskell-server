@@ -4,7 +4,7 @@
 module News where
 
 import Auth (authorID, isAuthor)
-import Category (getParentCategories)
+import Category (getParentCategories, checkExistCategory)
 import ConnectDB (connectDB)
 import Control.Applicative (liftA2)
 import Control.Monad.Reader (ReaderT, liftIO)
@@ -19,7 +19,7 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Environment (Environment, Flow)
-import Error (Error (CommonError, NewsError, ParseError), NewsError (..), ParseError (ParseNewsError), throwError)
+import Error (Error (CommonError, NewsError, ParseError, CategoryError), NewsError (..), ParseError (ParseNewsError), throwError, CategoryError (NoCategory))
 import GHC.Generics (Generic)
 import Lib
   ( initTxt,
@@ -282,12 +282,18 @@ buildCreateNewsQuery req = do
   athr <- isAuthor req
   if athr
     then do
-      authId <- authorID req
-      photoIdList <- buildPhotoIDLs dataFromRequest
-      let maybeQuery = mkCreateNewsQuery authId photoIdList dataFromRequest
-      case maybeQuery of
-        Just qry -> pure qry
-        Nothing -> throwError CommonError
+      categoryExists <- checkExistCategory categoryId
+      if categoryExists
+        then do
+          authId <- authorID req
+          photoIdList <- buildPhotoIDLs dataFromRequest
+          let maybeQuery = mkCreateNewsQuery authId photoIdList dataFromRequest
+          case maybeQuery of
+            Just qry -> pure qry
+            Nothing -> throwError CommonError
+        else throwError $ CategoryError NoCategory    
     else throwError $ NewsError UserNotAuthor
   where
     dataFromRequest = W.queryString req
+    categoryId = fromMaybe "0" $ LT.find (\(x, _) -> x == "category_id") dataFromRequest >>= snd
+     

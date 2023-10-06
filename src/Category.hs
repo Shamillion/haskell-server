@@ -174,6 +174,22 @@ editCategory CategoryHandle {..} isAdmin dataFromRequest = do
         _ -> Left CommonError
     buildQuery (_, _) = Left CommonError
 
+-- Checking the existence of the category in the database.
+checkExistCategory :: BC.ByteString -> Flow Bool
+checkExistCategory str = do
+  conn <- connectDB
+  categoryLs <-
+    liftIO $
+      query_ conn $
+        Query $
+          "SELECT name_category FROM category WHERE category_id = '"
+            <> str
+            <> "';" ::
+      Flow [[BC.ByteString]]
+  liftIO $ close conn
+  writingLineDebug categoryLs
+  pure $ categoryLs /= []
+
 -- Checking the uniqueness of the category name in the database.
 checkUniqCategory :: BC.ByteString -> Flow Bool
 checkUniqCategory str = do
