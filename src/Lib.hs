@@ -2,6 +2,7 @@ module Lib where
 
 import Config (Configuration (maxElem))
 import ConnectDB (connectDB)
+import Control.Exception (SomeException, try)
 import Control.Monad.Reader (ReaderT, asks, liftIO)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
@@ -12,6 +13,7 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Simple (FromRow, Query, close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (Query))
 import Environment (Environment, Flow, configuration)
+import Error (Error (DatabaseError), throwError)
 import Logger (writingLineDebug)
 import qualified Network.Wai as W
 import Text.Read (readMaybe)
@@ -64,10 +66,12 @@ runGetQuery qry = do
 runPostOrPutQuery :: Query -> Flow Int64
 runPostOrPutQuery qry = do
   conn <- connectDB
-  num <- liftIO $ execute_ conn qry
+  eitherNum <- liftIO . try . execute_ conn $ qry :: Flow (Either SomeException Int64)
   liftIO $ close conn
-  writingLineDebug num
-  pure num
+  writingLineDebug eitherNum
+  case eitherNum of
+    Left _ -> throwError DatabaseError
+    Right num -> pure num
 
 -- A comment for the user about adding or editing objects in the database.
 mkComment :: Int64 -> LC.ByteString

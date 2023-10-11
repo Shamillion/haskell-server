@@ -11,7 +11,7 @@ import Error (AuthError (InvalidPassword), CategoryError (..), Error (..), NewsE
 import Lib (createAndEditObjectsHandler)
 import Logger (writingLine, writingLineDebug)
 import MigrationsDB (checkDB)
-import Network.HTTP.Types (status200, status401, status403, status404, status406)
+import Network.HTTP.Types (status200, status401, status403, status404, status406, status500)
 import qualified Network.Wai as W
 import Network.Wai.Handler.Warp (run)
 import News (buildCreateNewsQuery, buildEditNewsQuery, getNewsHandler)
@@ -66,6 +66,7 @@ app env req respond = do
               respondsSts403 "The user does not have author rights.\n"
             AuthError InvalidPassword ->
               responds status401 "text/plain" "Authorization error: invalid password.\n"
+            DatabaseError -> responds status500 "text/plain" "Internal server error.\n"
             _ -> responds status404 "text/plain" "404 Not Found.\n"
       )
   let (header, answer) =

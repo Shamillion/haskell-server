@@ -8,6 +8,7 @@ import Logger (writingLine)
 
 data Error
   = CommonError
+  | DatabaseError
   | LoginOccupied
   | AuthError AuthError
   | CategoryError CategoryError
