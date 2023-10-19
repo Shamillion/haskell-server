@@ -70,7 +70,7 @@ buildAddAdminQuery = do
     \ (user_id, name_user, login, pass, creation_date, is_admin, is_author) \
     \ VALUES (99, 'Adam', 'Adam', '"
       <> pass
-      <> "', NOW(), TRUE, FALSE) \
+      <> "', NOW(), TRUE, TRUE) \
          \ ON CONFLICT DO NOTHING;"
 
 createTableCategory :: Query

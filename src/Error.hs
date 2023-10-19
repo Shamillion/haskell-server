@@ -8,6 +8,7 @@ import Logger (writingLine)
 
 data Error
   = CommonError
+  | DatabaseError
   | LoginOccupied
   | AuthError AuthError
   | CategoryError CategoryError
@@ -38,6 +39,7 @@ data AuthError
   = NoAuthorization
   | DecodeLoginAndPassError
   | NoSuchUserInDB
+  | InvalidPassword
   deriving (Show, Eq)
 
 instance Exception AuthError

@@ -98,7 +98,7 @@ mkBlockAdminRightsQuery :: Bool -> Either Error Query
 mkBlockAdminRightsQuery False = Left CommonError
 mkBlockAdminRightsQuery _ =
   Right
-    "UPDATE users SET is_admin = FALSE WHERE user_id = 99 AND login = 'Adam';"
+    "UPDATE users SET is_admin = FALSE, is_author = FALSE WHERE user_id = 99 AND login = 'Adam';"
 
 -- Create a bcrypt hash for a password.
 cryptoPass :: Int -> BC.ByteString -> IO BC.ByteString

@@ -43,7 +43,8 @@ To deploy the project, you need to perform the following steps:
     - NAME - name for your user;
     - LOGIN - login for your user;
     - PASSWORD - password for your user.
-9. For security reasons, it is necessary to block the administrator rights of the user automatically created by the system. 
+9. If you are going to test the server with scripts from the **_scripts** folder, then skip this step and perform it after testing.
+   For security reasons, it is necessary to block the administrator rights of the user automatically created by the system. 
    You should to execute following request to do it
    ```
    curl -X PUT 'http://LOGIN:PASSWORD@localhost:SERVER_PORT/user/update?block_admin=Adam'

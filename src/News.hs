@@ -4,7 +4,7 @@
 module News where
 
 import Auth (authorID, isAuthor)
-import Category (getParentCategories)
+import Category (checkExistCategory, getParentCategories)
 import ConnectDB (connectDB)
 import Control.Applicative (liftA2)
 import Control.Monad.Reader (ReaderT, liftIO)
@@ -19,7 +19,7 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import Environment (Environment, Flow)
-import Error (Error (CommonError, NewsError, ParseError), NewsError (..), ParseError (ParseNewsError), throwError)
+import Error (CategoryError (NoCategory), Error (CategoryError, CommonError, NewsError, ParseError), NewsError (..), ParseError (ParseNewsError), throwError)
 import GHC.Generics (Generic)
 import Lib
   ( initTxt,
@@ -216,7 +216,7 @@ buildEditNewsQuery req = do
                       <> " WHERE news_id = "
                       <> newsId
                       <> ";"
-          getValueFromMaybe maybeStr
+          Query <$> getValueFromMaybe maybeStr
   where
     dataFromRequest = W.queryString req
     newsId = case LT.find (\(x, _) -> x == "news_id") dataFromRequest of
@@ -230,9 +230,11 @@ buildEditNewsQuery req = do
           str <- buildPhotoIDLs dataFromRequest
           pure $ "photo = " <> str <> ", "
         else pure ""
-    getValueFromMaybe maybeVal = case maybeVal of
-      Just value -> pure $ Query value
-      Nothing -> throwError CommonError
+
+getValueFromMaybe :: Maybe a -> Flow a
+getValueFromMaybe maybeVal = case maybeVal of
+  Just value -> pure value
+  Nothing -> throwError CommonError
 
 -- Checks whether this user is the author of this news.
 authorNews :: BC.ByteString -> BC.ByteString -> Flow Bool
@@ -282,12 +284,15 @@ buildCreateNewsQuery req = do
   athr <- isAuthor req
   if athr
     then do
-      authId <- authorID req
-      photoIdList <- buildPhotoIDLs dataFromRequest
-      let maybeQuery = mkCreateNewsQuery authId photoIdList dataFromRequest
-      case maybeQuery of
-        Just qry -> pure qry
-        Nothing -> throwError CommonError
+      categoryExists <- checkExistCategory categoryId
+      if categoryExists
+        then do
+          authId <- authorID req
+          photoIdList <- buildPhotoIDLs dataFromRequest
+          let maybeQuery = mkCreateNewsQuery authId photoIdList dataFromRequest
+          getValueFromMaybe maybeQuery
+        else throwError $ CategoryError NoCategory
     else throwError $ NewsError UserNotAuthor
   where
     dataFromRequest = W.queryString req
+    categoryId = fromMaybe "0" $ LT.find (\(x, _) -> x == "category_id") dataFromRequest >>= snd

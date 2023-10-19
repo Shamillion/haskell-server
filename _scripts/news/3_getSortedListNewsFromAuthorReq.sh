@@ -1,2 +1,2 @@
 #!/bin/sh
-curl -X GET "http://SamLog:BlackPass@localhost:8080/news?sort_by=author"
+curl -X GET "http://Adam:sixthDay@localhost:8080/news?sort_by=author"
