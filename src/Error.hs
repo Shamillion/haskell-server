@@ -54,6 +54,6 @@ instance Exception NewsError
 throwError :: Error -> Flow a
 throwError err = do
   let priority = if err `elem` errorLs then ERROR else DEBUG
-      errorLs = [AuthError DecodeLoginAndPassError, ParseError DecodeImageError]
+      errorLs = [AuthError DecodeLoginAndPassError, ParseError DecodeImageError, DatabaseError]
   writingLine priority $ show err
   liftIO $ throwIO err

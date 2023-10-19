@@ -1,6 +1,6 @@
 module Lib where
 
-import Config (Configuration (maxElem))
+import Config (Configuration (maxElem), Priority (ERROR))
 import ConnectDB (connectDB)
 import Control.Exception (SomeException, try)
 import Control.Monad.Reader (ReaderT, asks, liftIO)
@@ -10,11 +10,11 @@ import Data.Functor ((<&>))
 import Data.Int (Int64)
 import qualified Data.List as LT
 import qualified Data.Text as T
-import Database.PostgreSQL.Simple (FromRow, Query, close, execute_, query_)
+import Database.PostgreSQL.Simple (Connection, FromRow, Query, close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (Query))
 import Environment (Environment, Flow, configuration)
 import Error (Error (DatabaseError), throwError)
-import Logger (writingLineDebug)
+import Logger (writingLine, writingLineDebug)
 import qualified Network.Wai as W
 import Text.Read (readMaybe)
 
@@ -55,23 +55,22 @@ setLimitAndOffset dataFromRequest = do
         _ -> defaultVal
     toByteString = BC.pack . show
 
-runGetQuery :: (Show r, FromRow r) => Query -> Flow [r]
-runGetQuery qry = do
+runQuery :: (Show a) => (Connection -> Query -> IO a) -> Query -> Flow a
+runQuery funcQueryToDB qry = do
   conn <- connectDB
-  dataFromDB <- liftIO $ query_ conn qry
-  writingLineDebug dataFromDB
+  eitherDataFromDB <- liftIO . (try :: IO a -> IO (Either SomeException a)) . funcQueryToDB conn $ qry
   liftIO $ close conn
-  pure dataFromDB
+  case eitherDataFromDB of
+    Left err -> do
+      writingLine ERROR $ show err
+      throwError DatabaseError
+    Right dataFromDB -> writingLineDebug dataFromDB >> pure dataFromDB
+
+runGetQuery :: (Show r, FromRow r) => Query -> Flow [r]
+runGetQuery = runQuery query_
 
 runPostOrPutQuery :: Query -> Flow Int64
-runPostOrPutQuery qry = do
-  conn <- connectDB
-  eitherNum <- liftIO . try . execute_ conn $ qry :: Flow (Either SomeException Int64)
-  liftIO $ close conn
-  writingLineDebug eitherNum
-  case eitherNum of
-    Left _ -> throwError DatabaseError
-    Right num -> pure num
+runPostOrPutQuery = runQuery execute_
 
 -- A comment for the user about adding or editing objects in the database.
 mkComment :: Int64 -> LC.ByteString
