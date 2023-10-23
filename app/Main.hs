@@ -2,11 +2,11 @@ module Main where
 
 import Auth (isAdmin)
 import Category (buildCreateCategoryQuery, buildEditCategoryQuery, getCategoryHandler)
-import Config (Configuration (serverPort), Priority (..))
+import Config (Configuration (serverPort), Priority (..), readConfigFile)
 import Control.Exception (catch)
 import Control.Monad.Reader (ReaderT (runReaderT), void)
 import qualified Data.ByteString.Lazy.Char8 as LC
-import Environment (Environment (configuration), Flow, buildEnvironment)
+import Environment (Environment, Flow, buildEnvironment)
 import Error (AuthError (InvalidPassword), CategoryError (..), Error (..), NewsError (..), throwError)
 import Lib (createAndEditObjectsHandler)
 import Logger (writingLine, writingLineDebug)
@@ -87,8 +87,8 @@ main = do
   if retries > 2
     then putStrLn "Error Database! Server can not be started!"
     else do
-      let port = serverPort . configuration $ env
-          msg = "Server is started."
+      port <- serverPort <$> readConfigFile
+      let msg = "Server is started."
       putStrLn msg
       runReaderT (writingLine INFO msg) env
       run port $ app env

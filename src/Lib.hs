@@ -1,6 +1,6 @@
 module Lib where
 
-import Config (Configuration (maxElem), Priority (ERROR))
+import Config (Priority (ERROR))
 import ConnectDB (connectDB)
 import Control.Exception (SomeException, try)
 import Control.Monad.Reader (ReaderT, asks, liftIO)
@@ -12,7 +12,7 @@ import qualified Data.List as LT
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (Connection, FromRow, Query, close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (Query))
-import Environment (Environment, Flow, configuration)
+import Environment (Environment (limitElem), Flow)
 import Error (Error (DatabaseError), throwError)
 import Logger (writingLine, writingLineDebug)
 import qualified Network.Wai as W
@@ -41,7 +41,7 @@ setLimitAndOffset ::
   [(T.Text, Maybe T.Text)] ->
   ReaderT Environment m Query
 setLimitAndOffset dataFromRequest = do
-  limitInConfig <- asks (maxElem . configuration)
+  limitInConfig <- asks limitElem
   let limit = listToValue "limit" setLimit limitInConfig
       setLimit val = if val > 0 && val < limitInConfig then val else limitInConfig
   pure . Query $ " LIMIT " <> limit <> " OFFSET " <> offset
