@@ -1,23 +1,28 @@
 module Environment where
 
-import Config (Configuration (dbHost, dbPassword, dbPort, dbUser, dbname), readConfigFile)
+import Config
+  ( Configuration (dbHost, dbPassword, dbPort, dbUser, dbname, logOutput, maxElem, priorityLevel),
+    Priority,
+  )
 import Control.Monad.Reader (ReaderT)
 import qualified Database.PostgreSQL.Simple as PS
 
 data Environment = Environment
-  { configuration :: Configuration,
+  { limitElem :: Int,
+    loggingLevel :: Priority,
+    logOutputObject :: String,
     connectInfo :: PS.ConnectInfo
   }
   deriving (Show)
 
-buildEnvironment :: IO Environment
-buildEnvironment = do
-  conf <- readConfigFile
-  pure $
-    Environment
-      { configuration = conf,
-        connectInfo = connectingParameters conf
-      }
+mkEnvironment :: Configuration -> Environment
+mkEnvironment conf =
+  Environment
+    { limitElem = maxElem conf,
+      loggingLevel = priorityLevel conf,
+      logOutputObject = logOutput conf,
+      connectInfo = connectingParameters conf
+    }
 
 -- Parameters for connecting to the database.
 connectingParameters :: Configuration -> PS.ConnectInfo

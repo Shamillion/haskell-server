@@ -149,31 +149,28 @@ mkCreateNewsQuery :: Query -> BC.ByteString -> [(BC.ByteString, Maybe BC.ByteStr
 mkCreateNewsQuery authID photoIdList dataFromRequest = do
   if null dataFromRequest || nothingInLs
     then Nothing
-    else do
-      let maybeStr =
-            foldr
-              (liftA2 (<>))
-              (Just "")
-              [ pure
-                  "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
-                  \ content, is_published) \
-                  \ VALUES ('",
-                titleNws,
-                pure "', NOW(), ",
-                pure $ fromQuery authID,
-                pure ", ",
-                categoryId,
-                pure ", ",
-                pure photoIdList,
-                pure ", '",
-                contentNws,
-                pure "', ",
-                isPublished,
-                pure ");"
-              ]
-      case maybeStr of
-        Just str -> pure $ Query str
-        Nothing -> Nothing
+    else
+      Query
+        <$> foldr
+          (liftA2 (<>))
+          (Just "")
+          [ pure
+              "INSERT INTO news (title, creation_date, user_id, category_id, photo, \
+              \ content, is_published) \
+              \ VALUES ('",
+            titleNws,
+            pure "', NOW(), ",
+            pure $ fromQuery authID,
+            pure ", ",
+            categoryId,
+            pure ", ",
+            pure photoIdList,
+            pure ", '",
+            contentNws,
+            pure "', ",
+            isPublished,
+            pure ");"
+          ]
   where
     nothingInLs = any (\(_, y) -> isNothing y) dataFromRequest
     titleNws = getValue "title"

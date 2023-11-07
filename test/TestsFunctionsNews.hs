@@ -33,7 +33,9 @@ testConf =
 testEnv :: Environment
 testEnv =
   Environment
-    { configuration = testConf,
+    { limitElem = maxElem testConf,
+      loggingLevel = priorityLevel testConf,
+      logOutputObject = logOutput testConf,
       connectInfo = connectingParameters testConf
     }
 
