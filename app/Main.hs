@@ -6,7 +6,7 @@ import Config (Configuration (serverPort), Priority (..), readConfigFile)
 import Control.Exception (catch)
 import Control.Monad.Reader (ReaderT (runReaderT), void)
 import qualified Data.ByteString.Lazy.Char8 as LC
-import Environment (Environment, Flow, buildEnvironment)
+import Environment (Environment, Flow, mkEnvironment)
 import Error (AuthError (InvalidPassword), CategoryError (..), Error (..), NewsError (..), throwError)
 import Lib (createAndEditObjectsHandler)
 import Logger (writingLine, writingLineDebug)
@@ -81,14 +81,15 @@ app env req respond = do
 
 main :: IO ()
 main = do
-  env <- buildEnvironment
+  config <- readConfigFile
+  let env = mkEnvironment config
   retries <- runReaderT (checkDB 1) env
   runReaderT (writingLine DEBUG $ "checkDB was runing " <> show retries <> " times.") env
   if retries > 2
     then putStrLn "Error Database! Server can not be started!"
     else do
-      port <- serverPort <$> readConfigFile
-      let msg = "Server is started."
+      let port = serverPort config
+          msg = "Server is started."
       putStrLn msg
       runReaderT (writingLine INFO msg) env
       run port $ app env
