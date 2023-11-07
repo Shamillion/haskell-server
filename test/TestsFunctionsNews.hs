@@ -9,11 +9,11 @@ import Control.Monad.Reader (ReaderT (runReaderT))
 import Data.Functor.Identity (runIdentity)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Endpoints.News (setMethodNews)
 import Environment (Environment (..), connectingParameters)
 import Lib
   ( setLimitAndOffset,
   )
-import News (setMethodNews)
 import Test.Hspec (SpecWith, it, shouldBe)
 
 testConf :: Configuration

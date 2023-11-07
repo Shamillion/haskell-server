@@ -8,9 +8,9 @@ import Data.Char (ord)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, execute_, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Endpoints.User (cryptoPass)
 import Environment (Flow)
 import Logger (writingLine, writingLineDebug)
-import User (cryptoPass)
 
 -- Checking the availability of the necessary tables in the database.
 checkDB :: Int -> Flow Int

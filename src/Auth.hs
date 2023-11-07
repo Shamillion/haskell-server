@@ -12,11 +12,11 @@ import qualified Data.ByteString.Char8 as BC
 import Data.String (fromString)
 import Database.PostgreSQL.Simple (close, query_)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Endpoints.User (User (..), mkGetUserQuery)
 import Environment (Flow)
 import Error (AuthError (..), Error (AuthError), throwError)
 import Logger (writingLine, writingLineDebug)
 import qualified Network.Wai as W
-import User (User (..), mkGetUserQuery)
 
 -- Returns the user with the username and password from the request.
 checkAuth :: W.Request -> Flow User

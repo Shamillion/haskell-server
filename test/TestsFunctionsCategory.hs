@@ -4,11 +4,11 @@ module TestsFunctionsCategory
   )
 where
 
-import Category (CategoryHandle (..), createCategory, editCategory)
 import qualified Data.ByteString.Char8 as BC
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.String (IsString)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Endpoints.Category (CategoryHandle (..), createCategory, editCategory)
 import Error (CategoryError (..), Error (..))
 import Test.Hspec (SpecWith, it, shouldBe)
 

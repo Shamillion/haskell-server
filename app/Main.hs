@@ -1,11 +1,14 @@
 module Main where
 
 import Auth (isAdmin)
-import Category (buildCreateCategoryQuery, buildEditCategoryQuery, getCategoryHandler)
 import Config (Configuration (serverPort), Priority (..), readConfigFile)
 import Control.Exception (catch)
 import Control.Monad.Reader (ReaderT (runReaderT), void)
 import qualified Data.ByteString.Lazy.Char8 as LC
+import Endpoints.Category (buildCreateCategoryQuery, buildEditCategoryQuery, getCategoryHandler)
+import Endpoints.News (buildCreateNewsQuery, buildEditNewsQuery, getNewsHandler)
+import Endpoints.Photo (getPhotoHandler, headerAndImage)
+import Endpoints.User (buildCreateUserQuery, buildEditUserQuery, getUserHandler)
 import Environment (Environment, Flow, mkEnvironment)
 import Error (AuthError (InvalidPassword), CategoryError (..), Error (..), NewsError (..), throwError)
 import Lib (createAndEditObjectsHandler)
@@ -14,9 +17,6 @@ import MigrationsDB (checkDB)
 import Network.HTTP.Types (status200, status401, status403, status404, status406, status500)
 import qualified Network.Wai as W
 import Network.Wai.Handler.Warp (run)
-import News (buildCreateNewsQuery, buildEditNewsQuery, getNewsHandler)
-import Photo (getPhotoHandler, headerAndImage)
-import User (buildCreateUserQuery, buildEditUserQuery, getUserHandler)
 
 handler :: W.Request -> Flow LC.ByteString
 handler req = do
