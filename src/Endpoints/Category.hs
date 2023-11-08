@@ -4,7 +4,7 @@
 module Endpoints.Category where
 
 import ConnectDB (connectDB)
-import Control.Monad.Reader (liftIO)
+import Control.Monad.Reader (join, liftIO)
 import Data.Aeson (ToJSON, encode)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
@@ -70,9 +70,9 @@ getParentCategories category = do
   pure $ filter (/= "Null") $ buildingList [category]
 
 -- Request example:
---  '.../category?aaa>bbb'
---      aaa - parent category's name,
---      bbb - category's name.
+--  '.../category/create?categoryName=aaa&parentName=bbb'
+--      aaa - category's name,
+--      bbb - parent category's name.
 createCategory ::
   Monad m =>
   CategoryHandle m ->
@@ -80,17 +80,15 @@ createCategory ::
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
 createCategory CategoryHandle {..} isAdmin dataFromRequest = do
-  if not isAdmin || null dataFromRequest || null categorys
+  if not isAdmin || null dataFromRequest || nameCategory == "Null"
     then pure $ Left CommonError
     else do
       isUniqName <- checkUniqCategoryH nameCategory
       isUniqParent <- checkUniqCategoryH parentCategory
       pure $ checkAndResponse isUniqName isUniqParent
   where
-    (x : _) = map (BC.split '>' . fst) dataFromRequest
-    categorys = filter (/= "") x
-    (parentCategory : nameCategory : _) =
-      if length categorys == 1 then "Null" : categorys else categorys
+    getValueFromTuplesLs val = fromMaybe "Null" . join . lookup val
+    [nameCategory, parentCategory] = map (`getValueFromTuplesLs` dataFromRequest) ["categoryName", "parentName"]
     checkAndResponse isUniqName isUniqParent
       | not isUniqName = Left $ CategoryError CategoryExists
       | isUniqParent && parentCategory /= "Null" = Left $ CategoryError NoParentCategory
@@ -129,8 +127,8 @@ editCategory CategoryHandle {..} isAdmin dataFromRequest = do
           pure $ checkAndResponse isUniqNew_name
   where
     filteredLs = filter ((/= "") . snd) $ map (fmap (fromMaybe "")) $ take 1 dataFromRequest
-    splitedFilteredLs = map (fmap (BC.split '>')) filteredLs
-    categories = map (filter (/= "") <$>) splitedFilteredLs
+    splitFilteredLs = map (fmap (BC.split '>')) filteredLs
+    categories = map (filter (/= "") <$>) splitFilteredLs
     methodAndNames@((method, [name, new_name]) : _) =
       map
         ( \x ->

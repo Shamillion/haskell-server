@@ -142,7 +142,7 @@ testsFunctionEditCategory = do
     editCategory' True [("change_name", Just ">")]
       `shouldBe` Left CommonError
   it "Syntax error" $
-    editCategory' True [("change_name", Just "existeCategorynewCategory")]
+    editCategory' True [("change_name", Just "existCategorynewCategory")]
       `shouldBe` Left CommonError
   it "Syntax error 2" $
     editCategory' True [("change_name", Just "existCategory>>newCategory")]

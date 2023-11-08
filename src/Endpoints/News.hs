@@ -142,7 +142,7 @@ setFiltersNews ((field, param) : xs)
     creationDate x = (("News.creation_date " <> x <> " '") <>) <$> argument <&> (<> "'")
 
 -- Request example:
--- '.../news?title=Text&category_id=3&content=Text&
+-- '.../news/create?title=Text&category_id=3&content=Text&
 --       photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
 mkCreateNewsQuery :: Query -> BC.ByteString -> [(BC.ByteString, Maybe BC.ByteString)] -> Maybe Query
@@ -192,7 +192,7 @@ mkPhotoIdString [x] = x
 mkPhotoIdString (x : xs) = x <> ", " <> mkPhotoIdString xs
 
 -- Request example:
---    news?news_id=(id news needed to edit)&title=Text&category_id=3&
+-- '.../news/update?news_id=(id news needed to edit)&title=Text&category_id=3&
 --       content=Text&photo=data%3Aimage%2Fpng%3Bbase64%2CaaaH..&
 --          photo=data%3Aimage%2Fpng%3Bbase64%2CcccHG..&is_published=false'
 buildEditNewsQuery :: W.Request -> Flow Query
