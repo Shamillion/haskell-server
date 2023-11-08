@@ -1,4 +1,4 @@
-module Photo where
+module Endpoints.Photo where
 
 import ConnectDB (connectDB)
 import Control.Exception (throwIO)

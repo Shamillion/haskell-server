@@ -1,10 +1,9 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module News where
+module Endpoints.News where
 
 import Auth (authorID, isAuthor)
-import Category (checkExistCategory, getParentCategories)
 import ConnectDB (connectDB)
 import Control.Applicative (liftA2)
 import Control.Monad.Reader (ReaderT, liftIO)
@@ -18,6 +17,9 @@ import Data.String (fromString)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple (close, query)
 import Database.PostgreSQL.Simple.Types (Query (..))
+import Endpoints.Category (checkExistCategory, getParentCategories)
+import Endpoints.Photo (sendPhotoToDB)
+import Endpoints.User (User, parseUser)
 import Environment (Environment, Flow)
 import Error (CategoryError (NoCategory), Error (CategoryError, CommonError, NewsError, ParseError), NewsError (..), ParseError (ParseNewsError), throwError)
 import GHC.Generics (Generic)
@@ -31,8 +33,6 @@ import Lib
   )
 import Network.HTTP.Types (queryToQueryText)
 import qualified Network.Wai as W
-import Photo (sendPhotoToDB)
-import User (User, parseUser)
 
 -- Creating a database query to get a list of news.
 mkGetNewsQuery :: Query -> Maybe (Query, Query) -> Maybe Query

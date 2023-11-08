@@ -93,23 +93,24 @@ To stop the server operation, press **Ctrl + C** in the terminal where the serve
 haskell-server                       -- the root folder of the project.
   ├── app                            
   │   └── Main.hs
-  ├── _config.json                    -- template of the server settings file.
+  ├── _config.json                   -- template of the server settings file.
   ├── _scripts                       -- folder with request file folders for endpoints.
   ├── sql
   │   └── db.sql                     -- sql queries for creating a database.
   ├── src
   │   ├── Auth.hs                    -- lib for user authorization.
-  │   ├── Category.hs                -- lib for working with categories.
   │   ├── Config.hs                  -- lib for working with Config.json, database and logger.
   │   ├── ConnectDB.hs               -- function for connecting to the database. 
+  │   ├── Endpoints
+  │   │   ├── Category.hs            -- lib for working with categories.
+  │   │   ├── News.hs                -- lib for working with news.
+  │   │   ├── Photo.hs               -- lib for working with images.
+  │   │   └── User.hs                -- lib for working with users.
   │   ├── Environment.hs             -- data types and function for environment.
   │   ├── Error.hs                   -- data types for errors.
   │   ├── Lib.hs                     -- common functions used in the project.
   │   ├── Logger.hs                  -- logging functions
-  │   ├── MigrationsDB.hs            -- lib for creating and verifying a database.
-  │   ├── News.hs                    -- lib for working with news.
-  │   ├── Photo.hs                   -- lib for working with images.
-  │   └── User.hs                    -- lib for working with users.
+  │   └── MigrationsDB.hs            -- lib for creating and verifying a database.                   
   └── test                           -- folder with tests for server.
 ```
 

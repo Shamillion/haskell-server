@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Category where
+module Endpoints.Category where
 
 import ConnectDB (connectDB)
 import Control.Monad.Reader (liftIO)

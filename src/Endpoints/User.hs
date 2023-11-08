@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module User where
+module Endpoints.User where
 
 import ConnectDB (connectDB)
 import Control.Monad.Reader (liftIO)

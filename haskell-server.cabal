@@ -26,17 +26,17 @@ source-repository head
 library
   exposed-modules:
       Auth
-      Category
       Config
       ConnectDB
+      Endpoints.Category
+      Endpoints.News
+      Endpoints.Photo
+      Endpoints.User
       Environment
       Error
       Lib
       Logger
       MigrationsDB
-      News
-      Photo
-      User
   other-modules:
       Paths_haskell_server
   hs-source-dirs:
