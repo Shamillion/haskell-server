@@ -21,99 +21,73 @@ testUniqCategory val = pure $ val `notElem` ["parentCategory", "Null", "existCat
 createCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
 createCategory' bool ls = runIdentity $ createCategory categoryTestHandler bool ls
 
-testsFunctionCreateCategory :: SpecWith ()
+testsFunctionCreateCategory :: SpecWith () -- categoryName=aaa&parentName=bbb'
 testsFunctionCreateCategory = do
+  -- [("categoryName",Just "oneCategory"),("parentName",Just "twoCategory")]
   it "User is not admin" $
-    createCategory' False [("Cars>Wheels", Nothing)] `shouldBe` Left CommonError
+    createCategory' False [("categoryName", Just "Wheels"), ("parentName", Just "Cars")] `shouldBe` Left CommonError
   it "User is not admin and list is empty" $
     createCategory' False [] `shouldBe` Left CommonError
   it "User is admin and list is empty" $
     createCategory' True [] `shouldBe` Left CommonError
   it "Everything is all right" $
-    createCategory' True [("parentCategory>category", Nothing)]
+    createCategory' True [("categoryName", Just "category"), ("parentName", Just "parentCategory")]
       `shouldBe` Right
         ( Query
             "INSERT INTO category (name_category, parent_category) \
             \ VALUES ('category', 'parentCategory');"
         )
-  it "'Just' instead 'Nothing'" $
-    createCategory' True [("parentCategory>category", Just "anything")]
+  it "'Nothing' in the first parameter" $
+    createCategory' True [("categoryName", Nothing), ("parentName", Just "parentCategory")]
+      `shouldBe` Left CommonError
+  it "'Nothing' in the second parameter" $
+    createCategory' True [("categoryName", Just "category"), ("parentName", Nothing)]
       `shouldBe` Right
         ( Query
             "INSERT INTO category (name_category, parent_category) \
-            \ VALUES ('category', 'parentCategory');"
+            \ VALUES ('category', 'Null');"
         )
+  it "'Nothing' in both parameters" $
+    createCategory' True [("categoryName", Nothing), ("parentName", Nothing)]
+      `shouldBe` Left CommonError
   it "Parent category does not exist" $
-    createCategory' True [("notExistCategory>category", Nothing)]
+    createCategory' True [("categoryName", Just "category"), ("parentName", Just "notExistCategory")]
       `shouldBe` Left (CategoryError NoParentCategory)
   it "Name of category is not unique" $
-    createCategory' True [("parentCategory>existCategory", Nothing)]
+    createCategory' True [("categoryName", Just "existCategory"), ("parentName", Just "parentCategory")]
       `shouldBe` Left (CategoryError CategoryExists)
   it "Parent category does not exist and name of category is not unique" $
-    createCategory' True [("notExistCategory>existCategory", Nothing)]
+    createCategory' True [("categoryName", Just "existCategory"), ("parentName", Just "notExistCategory")]
       `shouldBe` Left (CategoryError CategoryExists)
   it "Name of category and name of parent category are equal" $
-    createCategory' True [("parentCategory>parentCategory", Nothing)]
+    createCategory' True [("categoryName", Just "parentCategory"), ("parentName", Just "parentCategory")]
       `shouldBe` Left (CategoryError CategoryExists)
   it "Name of category and name of parent category are equal and don't exist" $
-    createCategory' True [("notExistCategory>notExistCategory", Nothing)]
+    createCategory' True [("categoryName", Just "notExistCategory"), ("parentName", Just "notExistCategory")]
       `shouldBe` Left (CategoryError NoParentCategory)
   it "Syntax mistake in request" $
-    createCategory' True [("parentCategory<category", Nothing)]
+    createCategory' True [("categoryName", Just "categoryparentName=parentCategory")]
       `shouldBe` Right
         ( Query
             "INSERT INTO category (name_category, parent_category) \
-            \ VALUES ('parentCategory<category', 'Null');"
-        )
-  it "Syntax mistake in request - 2" $
-    createCategory' True [("parentCategory>>category", Nothing)]
-      `shouldBe` Right
-        ( Query
-            "INSERT INTO category (name_category, parent_category) \
-            \ VALUES ('category', 'parentCategory');"
+            \ VALUES ('categoryparentName=parentCategory', 'Null');"
         )
   it "Categories are more than 2" $
-    createCategory' True [("parentCategory>category_1>category_2", Nothing)]
-      `shouldBe` Right
-        ( Query
-            "INSERT INTO category (name_category, parent_category) \
-            \ VALUES ('category_1', 'parentCategory');"
-        )
-  it "2 elements into list" $
-    createCategory'
-      True
-      [ ("parentCategory>category_1", Nothing),
-        ("parentCategory>category_2", Nothing)
-      ]
-      `shouldBe` Right
-        ( Query
-            "INSERT INTO category (name_category, parent_category) \
-            \ VALUES ('category_1', 'parentCategory');"
-        )
-  it "3 elements into list" $
-    createCategory'
-      True
-      [ ("parentCategory>category_1", Nothing),
-        ("parentCategory>category_2", Nothing),
-        ("parentCategory>category_3", Nothing)
-      ]
+    createCategory' True [("categoryName", Just "category_1"), ("categoryName", Just "category_1"), ("parentName", Just "parentCategory")]
       `shouldBe` Right
         ( Query
             "INSERT INTO category (name_category, parent_category) \
             \ VALUES ('category_1', 'parentCategory');"
         )
   it "Without parent category" $
-    createCategory' True [(">category", Nothing)]
+    createCategory' True [("categoryName", Just "category")]
       `shouldBe` Right
         ( Query
             "INSERT INTO category (name_category, parent_category) \
             \ VALUES ('category', 'Null');"
         )
   it "Without category" $
-    createCategory' True [("parentCategory>", Nothing)]
-      `shouldBe` Left (CategoryError CategoryExists)
-  it "Without both categories" $
-    createCategory' True [(">", Nothing)]
+    createCategory' True [("parentName", Just "parentCategory")]
       `shouldBe` Left CommonError
 
 editCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
