@@ -16,14 +16,13 @@ categoryTestHandler :: CategoryHandle Identity
 categoryTestHandler = CategoryHandle {checkUniqCategoryH = testUniqCategory}
 
 testUniqCategory :: (Eq a, Data.String.IsString a) => a -> Identity Bool
-testUniqCategory val = pure $ val `notElem` ["parentCategory", "Null", "existCategory"]
+testUniqCategory val = pure $ val `notElem` ["parentCategory", "Null", "existCategory", "existCategory2"]
 
 createCategory' :: Bool -> [(BC.ByteString, Maybe BC.ByteString)] -> Either Error Query
 createCategory' bool ls = runIdentity $ createCategory categoryTestHandler bool ls
 
-testsFunctionCreateCategory :: SpecWith () -- categoryName=aaa&parentName=bbb'
+testsFunctionCreateCategory :: SpecWith ()
 testsFunctionCreateCategory = do
-  -- [("categoryName",Just "oneCategory"),("parentName",Just "twoCategory")]
   it "User is not admin" $
     createCategory' False [("categoryName", Just "Wheels"), ("parentName", Just "Cars")] `shouldBe` Left CommonError
   it "User is not admin and list is empty" $
@@ -50,6 +49,15 @@ testsFunctionCreateCategory = do
   it "'Nothing' in both parameters" $
     createCategory' True [("categoryName", Nothing), ("parentName", Nothing)]
       `shouldBe` Left CommonError
+  it "Empty string instead of the category name" $
+    createCategory' True [("categoryName", Just ""), ("parentName", Just "parentCategory")]
+      `shouldBe` Left CommonError
+  it "Empty string instead of the parent category name" $
+    createCategory' True [("categoryName", Just "category"), ("parentName", Just "")]
+      `shouldBe` Left (CategoryError NoParentCategory)
+  it "Empty string instead of both parameters" $
+    createCategory' True [("categoryName", Just ""), ("parentName", Just "parentCategory")]
+      `shouldBe` Left CommonError
   it "Parent category does not exist" $
     createCategory' True [("categoryName", Just "category"), ("parentName", Just "notExistCategory")]
       `shouldBe` Left (CategoryError NoParentCategory)
@@ -73,7 +81,12 @@ testsFunctionCreateCategory = do
             \ VALUES ('categoryparentName=parentCategory', 'Null');"
         )
   it "Categories are more than 2" $
-    createCategory' True [("categoryName", Just "category_1"), ("categoryName", Just "category_1"), ("parentName", Just "parentCategory")]
+    createCategory'
+      True
+      [ ("categoryName", Just "category_1"),
+        ("categoryName", Just "category_1"),
+        ("parentName", Just "parentCategory")
+      ]
       `shouldBe` Right
         ( Query
             "INSERT INTO category (name_category, parent_category) \
@@ -95,92 +108,68 @@ editCategory' bool ls = runIdentity $ editCategory categoryTestHandler bool ls
 
 testsFunctionEditCategory :: SpecWith ()
 testsFunctionEditCategory = do
-  -- [("change_name",Just "aaa>bbb")]
   it "User is not admin" $
-    editCategory' False [("change_name", Just "existCategory>newCategory")]
+    editCategory' False [("categoryName", Just "existCategory"), ("newCategoryName", Just "newCategory")]
       `shouldBe` Left CommonError
   it "User is not admin and list is empty" $
     editCategory' False [] `shouldBe` Left CommonError
   it "User is admin and list is empty" $
     editCategory' True [] `shouldBe` Left CommonError
   it "Unknown method" $
-    editCategory' True [("changeName", Just "existCategory>newCategory")]
+    editCategory' True [("newCategoryName", Just "newCategory"), ("parentName", Just "existCategory")]
+      `shouldBe` Left CommonError
+  it "Another unknown method" $
+    editCategory' True [("categoryName", Just "existCategory"), ("newName", Just "newCategory")]
       `shouldBe` Left CommonError
   it "Without old name" $
-    editCategory' True [("change_name", Just ">newCategory")]
+    editCategory' True [("newCategoryName", Just "newCategory")]
       `shouldBe` Left CommonError
   it "Without new name" $
-    editCategory' True [("change_name", Just "existCategory>")]
+    editCategory' True [("categoryName", Just "existCategory")]
       `shouldBe` Left CommonError
-  it "Without both names" $
-    editCategory' True [("change_name", Just ">")]
+  it "Empty string instead of the category name" $
+    editCategory' True [("categoryName", Just ""), ("newCategoryName", Just "newCategory")]
       `shouldBe` Left CommonError
-  it "Syntax error" $
-    editCategory' True [("change_name", Just "existCategorynewCategory")]
+  it "Empty string instead of the new name of category" $
+    editCategory' True [("categoryName", Just "existCategory"), ("newCategoryName", Just "")]
       `shouldBe` Left CommonError
-  it "Syntax error 2" $
-    editCategory' True [("change_name", Just "existCategory>>newCategory")]
-      `shouldBe` Right
-        ( Query
-            "UPDATE category \
-            \ SET   parent_category = 'newCategory' \
-            \ WHERE parent_category = 'existCategory'; \
-            \ UPDATE category \
-            \ SET   name_category = 'newCategory' \
-            \ WHERE name_category = 'existCategory'; "
-        )
+  it "Empty string instead of the name of the parent category" $
+    editCategory' True [("categoryName", Just "existCategory"), ("parentName", Just "")]
+      `shouldBe` Left CommonError
+  it "Empty strings instead of the name of the names of both categories" $
+    editCategory' True [("categoryName", Just ""), ("parentName", Just "")]
+      `shouldBe` Left CommonError
+  it "'Nothing' instead of the category name" $
+    editCategory' True [("categoryName", Nothing), ("newCategoryName", Just "newCategory")]
+      `shouldBe` Left CommonError
+  it "'Nothing' instead of the new name of category" $
+    editCategory' True [("categoryName", Just "existCategory"), ("newCategoryName", Nothing)]
+      `shouldBe` Left CommonError
+  it "'Nothing' instead of the name of the parent category" $
+    editCategory' True [("categoryName", Just "existCategory"), ("parentName", Nothing)]
+      `shouldBe` Left CommonError
+  it "'Nothing' instead of the names of both categories" $
+    editCategory' True [("categoryName", Nothing), ("parentName", Nothing)]
+      `shouldBe` Left CommonError
   it "With 3 category's name" $
     editCategory'
       True
-      [ ( "change_name",
-          Just "existCategory>newCategory>newCategory_2"
-        )
+      [ ("categoryName", Just "existCategory"),
+        ("categoryName", Just "existCategory2"),
+        ("newCategoryName", Just "newCategory")
       ]
       `shouldBe` Left CommonError
-  it "With Nothing" $
-    editCategory' True [("change_name", Nothing)]
-      `shouldBe` Left CommonError
-  it "Two elements in list. One element with syntax error" $
-    editCategory'
-      True
-      [ ("change_name", Just "existCategory>newCategory"),
-        ("change_name", Just "existCategory>>newCategory_2")
-      ]
-      `shouldBe` Right
-        ( Query
-            "UPDATE category \
-            \ SET   parent_category = 'newCategory' \
-            \ WHERE parent_category = 'existCategory'; \
-            \ UPDATE category \
-            \ SET   name_category = 'newCategory' \
-            \ WHERE name_category = 'existCategory'; "
-        )
-  it "Two elements in list with Nothing" $
-    editCategory'
-      True
-      [ ("change_name", Just "existCategory>newCategory"),
-        ("change_name", Nothing)
-      ]
-      `shouldBe` Right
-        ( Query
-            "UPDATE category \
-            \ SET   parent_category = 'newCategory' \
-            \ WHERE parent_category = 'existCategory'; \
-            \ UPDATE category \
-            \ SET   name_category = 'newCategory' \
-            \ WHERE name_category = 'existCategory'; "
-        )
   it "Method is change_name: such category already exists" $
-    editCategory' True [("change_name", Just "parentCategory>existCategory")]
+    editCategory' True [("categoryName", Just "existCategory"), ("newCategoryName", Just "existCategory2")]
       `shouldBe` Left (CategoryError CategoryExists)
   it "Method is change_name: new name and old name are the same" $
-    editCategory' True [("change_name", Just "existCategory>existCategory")]
+    editCategory' True [("categoryName", Just "existCategory"), ("newCategoryName", Just "existCategory")]
       `shouldBe` Left (CategoryError CategoryExists)
   it "Method is change_name: this category doesn't exist" $
-    editCategory' True [("change_name", Just "someNameCategory>newCategory")]
+    editCategory' True [("categoryName", Just "someNameCategory"), ("newCategoryName", Just "newCategory")]
       `shouldBe` Left (CategoryError NoCategory)
   it "Method is change_name: everything is all right" $
-    editCategory' True [("change_name", Just "existCategory>newCategory")]
+    editCategory' True [("categoryName", Just "existCategory"), ("newCategoryName", Just "newCategory")]
       `shouldBe` Right
         ( Query
             "UPDATE category \
@@ -193,42 +182,32 @@ testsFunctionEditCategory = do
   it
     "Method is change_parent: names of category and parent \
     \category are the same"
-    $ editCategory' True [("change_parent", Just "existCategory>existCategory")]
+    $ editCategory' True [("categoryName", Just "existCategory"), ("parentName", Just "existCategory")]
       `shouldBe` Left (CategoryError CategoryParentItself)
   it "Method is change_parent: this category doesn't exist" $
     editCategory'
       True
-      [ ( "change_parent",
-          Just "someNameCategory>parentCategory"
-        )
-      ]
+      [("categoryName", Just "someNameCategory"), ("parentName", Just "parentCategory")]
       `shouldBe` Left (CategoryError NoCategory)
   it "Method is change_parent: this parent category doesn't exist" $
-    editCategory' True [("change_parent", Just "existCategory>someNameCategory")]
+    editCategory' True [("categoryName", Just "existCategory"), ("parentName", Just "someNameCategory")]
       `shouldBe` Left (CategoryError NoParentCategory)
   it "Method is change_parent: everything is all right" $
-    editCategory' True [("change_parent", Just "existCategory>parentCategory")]
+    editCategory' True [("categoryName", Just "existCategory"), ("parentName", Just "parentCategory")]
       `shouldBe` Right
         ( Query
             "UPDATE category \
             \ SET parent_category = 'parentCategory' \
             \ WHERE name_category = 'existCategory'; "
         )
-  it "Method is change_parent: two elements in list" $
+  it "Method is change_parent: three elements in list" $
     editCategory'
       True
-      [ ("change_parent", Just "existCategory>parentCategory"),
-        ("change_parent", Just "parentCategory>Null")
+      [ ("categoryName", Just "existCategory"),
+        ("categoryName", Just "existCategory2"),
+        ("parentName", Just "parentCategory")
       ]
-      `shouldBe` Right
-        ( Query
-            "UPDATE category \
-            \ SET parent_category = 'parentCategory' \
-            \ WHERE name_category = 'existCategory'; "
-        )
-  it "Method is change_parent: with 'Nothing'" $
-    editCategory' True [("change_parent", Nothing)]
       `shouldBe` Left CommonError
   it "Method is change_parent: this category doesn't exist" $
-    editCategory' True [("change_parent", Just "newCategory>parentCategory")]
+    editCategory' True [("categoryName", Just "newCategory"), ("parentName", Just "parentCategory")]
       `shouldBe` Left (CategoryError NoCategory)

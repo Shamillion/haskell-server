@@ -132,10 +132,11 @@ editCategory CategoryHandle {..} isAdmin dataFromRequest = do
       ["categoryName", "parentName"] -> "change_parent"
       _ -> ""
     name = getValueFromTuplesLs "categoryName"
-    new_name = getValueFromTuplesLs $ case method of
-      "change_name" -> "newCategoryName"
-      "change_parent" -> "parentName"
-      _ -> ""
+    new_name = getValueFromTuplesLs $
+      case method of
+        "change_name" -> "newCategoryName"
+        "change_parent" -> "parentName"
+        _ -> ""
     checkAndResponse isUniq
       | method == "change_parent" && name == new_name = Left $ CategoryError CategoryParentItself
       | method == "change_name" && not isUniq = Left $ CategoryError CategoryExists

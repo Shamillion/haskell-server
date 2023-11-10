@@ -44,6 +44,7 @@ To deploy the project, you need to perform the following steps:
     - LOGIN - login for your user;
     - PASSWORD - password for your user.
 9. If you are going to test the server with scripts from the **_scripts** folder, then skip this step and perform it after testing.
+
    For security reasons, it is necessary to block the administrator rights of the user automatically created by the system. 
    You should to execute following request to do it
    ```
@@ -264,12 +265,12 @@ To create category, the user must have administrator rights.
 
 Example of creating a category named "Trees" in the parent category named "Nature":
 ```
-curl -X POST 'http://Sam:pass123@localhost:8080/category/create?Nature>Trees'
+curl -X POST 'http://Sam:pass123@localhost:8080/category/create?categoryName=Trees&parentName=Nature'
 ```
 
 If you want to create a category without a parent category, then just specify the category name:
 ```
-curl -X POST 'http://Sam:pass123@localhost:8080/category/create?Trees'
+curl -X POST 'http://Sam:pass123@localhost:8080/category/create?categoryName=Trees'
 ```
 
 #### Category Editing
@@ -277,20 +278,20 @@ To edit category, the user must have administrator rights.
 
 You can use the request to change the category name or change the parent category.
 
-A request to edit a category must have one of the following parameters
-- **change_name**   - to change the category name;
-- **change_parent** - to change the parent category.
+A request to edit the category must contain the following parameters
+- **categoryName**, **newCategoryName**   - to change the category name;
+- **categoryName**, **parentName**        - to change the parent category.
 
 ##### Changing the category name
 Let's change the name of the "Plants" category to "Flowers":
 ```
-curl -X PUT 'http://Sam:pass123@localhost:8080/category/update?change_name=Plants>Flowers'
+curl -X PUT 'http://Sam:pass123@localhost:8080/category/update?categoryName=Plants&newCategoryName=Flowers'
 ```
 
 ##### Changing the parent category
 Let's change the parent category to "Forest" for the previously created category "Trees":
 ```
-curl -X PUT 'http://Sam:pass123@localhost:8080/category/update?change_parent=Trees>Forest'
+curl -X PUT 'http://Sam:pass123@localhost:8080/category/update?categoryName=Trees&parentName=Forest'
 ```
 
 
