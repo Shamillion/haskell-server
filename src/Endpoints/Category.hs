@@ -4,7 +4,7 @@
 module Endpoints.Category where
 
 import ConnectDB (connectDB)
-import Control.Monad.Reader (liftIO)
+import Control.Monad.Reader (join, liftIO)
 import Data.Aeson (ToJSON, encode)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as LC
@@ -70,9 +70,9 @@ getParentCategories category = do
   pure $ filter (/= "Null") $ buildingList [category]
 
 -- Request example:
---  '.../category?aaa>bbb'
---      aaa - parent category's name,
---      bbb - category's name.
+--  '.../category/create?categoryName=aaa&parentName=bbb'
+--      aaa - category's name,
+--      bbb - parent category's name.
 createCategory ::
   Monad m =>
   CategoryHandle m ->
@@ -80,17 +80,15 @@ createCategory ::
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
 createCategory CategoryHandle {..} isAdmin dataFromRequest = do
-  if not isAdmin || null dataFromRequest || null categorys
+  if not isAdmin || null dataFromRequest || nameCategory `elem` ["Null", ""]
     then pure $ Left CommonError
     else do
       isUniqName <- checkUniqCategoryH nameCategory
       isUniqParent <- checkUniqCategoryH parentCategory
       pure $ checkAndResponse isUniqName isUniqParent
   where
-    (x : _) = map (BC.split '>' . fst) dataFromRequest
-    categorys = filter (/= "") x
-    (parentCategory : nameCategory : _) =
-      if length categorys == 1 then "Null" : categorys else categorys
+    getValueFromTuplesLs val = fromMaybe "Null" . join . lookup val $ dataFromRequest
+    [nameCategory, parentCategory] = map getValueFromTuplesLs ["categoryName", "parentName"]
     checkAndResponse isUniqName isUniqParent
       | not isUniqName = Left $ CategoryError CategoryExists
       | isUniqParent && parentCategory /= "Null" = Left $ CategoryError NoParentCategory
@@ -105,10 +103,10 @@ createCategory CategoryHandle {..} isAdmin dataFromRequest = do
               <> "');"
 
 -- Request examples:
---   Changing the category name: '.../category?change_name=aaa>bbb'
+--   Changing the category name: '.../category/update?categoryName=aaa&newCategoryName=bbb'
 --      aaa - old category's name,
 --      bbb - new category's name.
---   Changing the parent category: '.../category?change_parent=aaa>bbb'
+--   Changing the parent category: '.../category/update?categoryName=aaa&parentName=bbb'
 --      aaa - category's name,
 --      bbb - new parent category's name.
 editCategory ::
@@ -118,7 +116,7 @@ editCategory ::
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
 editCategory CategoryHandle {..} isAdmin dataFromRequest = do
-  if not isAdmin || null dataFromRequest || null filteredLs || "" `elem` [name, new_name]
+  if not isAdmin || null dataFromRequest || "" `elem` [method, name, new_name]
     then pure $ Left CommonError
     else do
       isUniqName <- checkUniqCategoryH name
@@ -128,23 +126,23 @@ editCategory CategoryHandle {..} isAdmin dataFromRequest = do
           isUniqNew_name <- checkUniqCategoryH new_name
           pure $ checkAndResponse isUniqNew_name
   where
-    filteredLs = filter ((/= "") . snd) $ map (fmap (fromMaybe "")) $ take 1 dataFromRequest
-    splitedFilteredLs = map (fmap (BC.split '>')) filteredLs
-    categories = map (filter (/= "") <$>) splitedFilteredLs
-    methodAndNames@((method, [name, new_name]) : _) =
-      map
-        ( \x ->
-            if length (snd x) /= 2
-              then ("", ["", ""])
-              else x
-        )
-        categories
+    getValueFromTuplesLs val = fromMaybe "" . join . lookup val $ dataFromRequest
+    method = case map fst dataFromRequest of
+      ["categoryName", "newCategoryName"] -> "change_name"
+      ["categoryName", "parentName"] -> "change_parent"
+      _ -> ""
+    name = getValueFromTuplesLs "categoryName"
+    new_name = getValueFromTuplesLs $
+      case method of
+        "change_name" -> "newCategoryName"
+        "change_parent" -> "parentName"
+        _ -> ""
     checkAndResponse isUniq
       | method == "change_parent" && name == new_name = Left $ CategoryError CategoryParentItself
       | method == "change_name" && not isUniq = Left $ CategoryError CategoryExists
       | method == "change_parent" && isUniq && new_name /= "Null" = Left $ CategoryError NoParentCategory
-      | otherwise = Query . mconcat <$> mapM buildQuery methodAndNames
-    buildQuery (meth, [nameCategory, newNameCategory]) =
+      | otherwise = Query <$> buildQuery method name new_name
+    buildQuery meth nameCategory newNameCategory =
       case meth of
         "change_name" ->
           pure $
@@ -172,7 +170,6 @@ editCategory CategoryHandle {..} isAdmin dataFromRequest = do
               <> nameCategory
               <> "'; "
         _ -> Left CommonError
-    buildQuery (_, _) = Left CommonError
 
 -- Checking the existence of the category in the database.
 checkExistCategory :: BC.ByteString -> Flow Bool

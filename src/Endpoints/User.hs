@@ -61,7 +61,7 @@ parseUser [userIdTxt, nameUser, creationDate, isAdmn, isAuthr] = do
 parseUser _ = Left $ ParseError ParseUserError
 
 -- Request example (strict order):
--- '../user?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
+-- '../user/create?name_user=Bob&login=Bob123&pass=11111&is_admin=false&is_author=true'
 buildCreateUserQuery :: Bool -> W.Request -> Flow Query
 buildCreateUserQuery isAdmn req = do
   if not isAdmn || null dataFromRequest || map fst dataFromRequest /= checkList || searchNothing
