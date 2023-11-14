@@ -159,16 +159,16 @@ testsFunctionEditCategory = do
         ("newCategoryName", Just "newCategory")
       ]
       `shouldBe` Left CommonError
-  it "Method is change_name: such category already exists" $
+  it "Method is ChangeName: such category already exists" $
     editCategory' True [("categoryName", Just "existCategory"), ("newCategoryName", Just "existCategory2")]
       `shouldBe` Left (CategoryError CategoryExists)
-  it "Method is change_name: new name and old name are the same" $
+  it "Method is ChangeName: new name and old name are the same" $
     editCategory' True [("categoryName", Just "existCategory"), ("newCategoryName", Just "existCategory")]
       `shouldBe` Left (CategoryError CategoryExists)
-  it "Method is change_name: this category doesn't exist" $
+  it "Method is ChangeName: this category doesn't exist" $
     editCategory' True [("categoryName", Just "someNameCategory"), ("newCategoryName", Just "newCategory")]
       `shouldBe` Left (CategoryError NoCategory)
-  it "Method is change_name: everything is all right" $
+  it "Method is ChangeName: everything is all right" $
     editCategory' True [("categoryName", Just "existCategory"), ("newCategoryName", Just "newCategory")]
       `shouldBe` Right
         ( Query
@@ -180,19 +180,19 @@ testsFunctionEditCategory = do
             \ WHERE name_category = 'existCategory'; "
         )
   it
-    "Method is change_parent: names of category and parent \
+    "Method is ChangeParent: names of category and parent \
     \category are the same"
     $ editCategory' True [("categoryName", Just "existCategory"), ("parentName", Just "existCategory")]
       `shouldBe` Left (CategoryError CategoryParentItself)
-  it "Method is change_parent: this category doesn't exist" $
+  it "Method is ChangeParent: this category doesn't exist" $
     editCategory'
       True
       [("categoryName", Just "someNameCategory"), ("parentName", Just "parentCategory")]
       `shouldBe` Left (CategoryError NoCategory)
-  it "Method is change_parent: this parent category doesn't exist" $
+  it "Method is ChangeParent: this parent category doesn't exist" $
     editCategory' True [("categoryName", Just "existCategory"), ("parentName", Just "someNameCategory")]
       `shouldBe` Left (CategoryError NoParentCategory)
-  it "Method is change_parent: everything is all right" $
+  it "Method is ChangeParent: everything is all right" $
     editCategory' True [("categoryName", Just "existCategory"), ("parentName", Just "parentCategory")]
       `shouldBe` Right
         ( Query
@@ -200,7 +200,7 @@ testsFunctionEditCategory = do
             \ SET parent_category = 'parentCategory' \
             \ WHERE name_category = 'existCategory'; "
         )
-  it "Method is change_parent: three elements in list" $
+  it "Method is ChangeParent: three elements in list" $
     editCategory'
       True
       [ ("categoryName", Just "existCategory"),
@@ -208,6 +208,6 @@ testsFunctionEditCategory = do
         ("parentName", Just "parentCategory")
       ]
       `shouldBe` Left CommonError
-  it "Method is change_parent: this category doesn't exist" $
+  it "Method is ChangeParent: this category doesn't exist" $
     editCategory' True [("categoryName", Just "newCategory"), ("parentName", Just "parentCategory")]
       `shouldBe` Left (CategoryError NoCategory)
