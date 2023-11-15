@@ -102,6 +102,9 @@ createCategory CategoryHandle {..} isAdmin dataFromRequest = do
               <> parentCategory
               <> "');"
 
+data EditCategoryMethod = ChangeName | ChangeParent | ErrorMethod
+  deriving (Eq)
+
 -- Request examples:
 --   Changing the category name: '.../category/update?categoryName=aaa&newCategoryName=bbb'
 --      aaa - old category's name,
@@ -116,35 +119,35 @@ editCategory ::
   [(BC.ByteString, Maybe BC.ByteString)] ->
   m (Either Error Query)
 editCategory CategoryHandle {..} isAdmin dataFromRequest = do
-  if not isAdmin || null dataFromRequest || "" `elem` [method, name, new_name]
+  if not isAdmin || null dataFromRequest || method == ErrorMethod || "" `elem` [name, newName]
     then pure $ Left CommonError
     else do
       isUniqName <- checkUniqCategoryH name
       if isUniqName
         then pure $ Left $ CategoryError NoCategory
         else do
-          isUniqNew_name <- checkUniqCategoryH new_name
+          isUniqNew_name <- checkUniqCategoryH newName
           pure $ checkAndResponse isUniqNew_name
   where
     getValueFromTuplesLs val = fromMaybe "" . join . lookup val $ dataFromRequest
     method = case map fst dataFromRequest of
-      ["categoryName", "newCategoryName"] -> "change_name"
-      ["categoryName", "parentName"] -> "change_parent"
-      _ -> ""
+      ["categoryName", "newCategoryName"] -> ChangeName
+      ["categoryName", "parentName"] -> ChangeParent
+      _ -> ErrorMethod
     name = getValueFromTuplesLs "categoryName"
-    new_name = getValueFromTuplesLs $
+    newName = getValueFromTuplesLs $
       case method of
-        "change_name" -> "newCategoryName"
-        "change_parent" -> "parentName"
+        ChangeName -> "newCategoryName"
+        ChangeParent -> "parentName"
         _ -> ""
     checkAndResponse isUniq
-      | method == "change_parent" && name == new_name = Left $ CategoryError CategoryParentItself
-      | method == "change_name" && not isUniq = Left $ CategoryError CategoryExists
-      | method == "change_parent" && isUniq && new_name /= "Null" = Left $ CategoryError NoParentCategory
-      | otherwise = Query <$> buildQuery method name new_name
+      | method == ChangeParent && name == newName = Left $ CategoryError CategoryParentItself
+      | method == ChangeName && not isUniq = Left $ CategoryError CategoryExists
+      | method == ChangeParent && isUniq && newName /= "Null" = Left $ CategoryError NoParentCategory
+      | otherwise = Query <$> buildQuery method name newName
     buildQuery meth nameCategory newNameCategory =
       case meth of
-        "change_name" ->
+        ChangeName ->
           pure $
             "UPDATE category \
             \ SET   parent_category = '"
@@ -160,7 +163,7 @@ editCategory CategoryHandle {..} isAdmin dataFromRequest = do
                  \ WHERE name_category = '"
               <> nameCategory
               <> "'; "
-        "change_parent" ->
+        ChangeParent ->
           pure $
             "UPDATE category \
             \ SET parent_category = '"
